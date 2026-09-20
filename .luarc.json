@@ -1,0 +1,20 @@
+{
+  "$schema": "https://raw.githubusercontent.com/LuaLS/vscode-lua/master/setting/schema.json",
+  "runtime.version": "Lua 5.5",
+  "runtime.special": {
+    "fail": "error"
+  },
+  "workspace.library": [
+    ".dev/types",
+    "types"
+  ],
+  "workspace.ignoreDir": [
+    "test",
+    "node_modules",
+    ".git",
+    ".venv"
+  ],
+  "diagnostics.disable": [
+    "redefined-local"
+  ]
+}
