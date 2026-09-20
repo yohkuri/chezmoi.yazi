@@ -78,8 +78,10 @@ additionally runs the pure suite and syntax checks on Lua 5.1 and 5.4, and
 validates commit messages with commitlint and the ASCII check. A separate
 Ubuntu 24.04 job downloads SHA-256-pinned Yazi 26.9.1 and chezmoi 2.72.2
 binaries and runs `test/e2e.py --smoke`; failure captures and logs are uploaded
-as artifacts. It does not run the full runtime or E2E suites. CI execution
-itself has not been observed; the repository has not been pushed.
+as artifacts. It does not run the full runtime or E2E suites. On 2026-09-20,
+both required jobs completed successfully for pull request #1: `checks` and
+`E2E smoke`. The latter ran the rendered status and refresh scenario on the
+pinned Ubuntu 24.04, Yazi 26.9.1, and chezmoi 2.72.2 environment.
 
 ## Development tooling checks
 
@@ -99,8 +101,8 @@ Locally verified on 2026-09-20:
   capitalization, body spacing, and a body emoji; three commit-range cases
   using an isolated Git repository, including rejection of an invalid commit.
 - ShellCheck for the local check scripts and workflow YAML parsing.
-- Fixed Linux LuaLS and StyLua release URLs are reachable; this does not
-  establish execution on a GitHub-hosted runner.
+- GitHub-hosted runs installed the fixed Linux LuaLS and StyLua releases and
+  completed both the development checks and E2E smoke job.
 - The Python real Yazi suite passes with and without git.yazi. It preserves
   the Lua harness scenarios, including child lifetime and generation checks.
 - The E2E smoke and all four default scenarios pass against the visible Yazi
@@ -109,8 +111,9 @@ Locally verified on 2026-09-20:
   fail on the initial status assertion, confirming that it detects a rendered
   status regression rather than only successful process startup.
 
-The empty working repository has no commit range to lint. Commit validation
-above used disposable fixture history; no project commit was created.
+The initial project commit range from `main` to the pull request head passed
+the local commit validator and the pull request's `checks` job. The isolated
+Git histories above remain the negative-case coverage for invalid messages.
 
 ## Acquisition measurement
 
@@ -138,12 +141,14 @@ not measured optimal settings.
 
 ## Limits of the evidence
 
-Linux, Windows, older versions, interactive secret providers, and arbitrary
-external hooks are not validated. Windows is explicitly rejected by setup.
-Source-state browsing is outside this release. The direct-child deadline
-does not promise grandchild termination or cleanup when Yazi itself exits.
-The output cap applies after line reads, so one long line can allocate more
-than the cap temporarily.
+The Ubuntu 24.04 E2E smoke scenario is validated in CI. The full runtime and E2E
+suites, manual workflow, unusual terminal configurations, and git.yazi
+coexistence remain unverified on Linux. Windows, older versions, interactive
+secret providers, and arbitrary external hooks are not validated. Windows is
+explicitly rejected by setup. Source-state browsing is outside this release.
+The direct-child deadline does not promise grandchild termination or cleanup
+when Yazi itself exits. The output cap applies after line reads, so one long
+line can allocate more than the cap temporarily.
 
 The pure tests are not substitutes for the Yazi suite. Scrolling through very
 large interactive lists, unusual grapheme/font combinations, and every
