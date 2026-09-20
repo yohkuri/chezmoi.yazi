@@ -1,0 +1,4 @@
+[tools]
+# Yazi v26.9.1: mlua lua55 + lua-src 551.0.1 bundles Lua 5.5.1.
+lua = "5.5.1"
+uv = "0.11.19"

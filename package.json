@@ -1,0 +1,23 @@
+{
+  "name": "chezmoi-yazi-checks",
+  "private": true,
+  "scripts": {
+    "setup:types": "node scripts/setup-types.mjs",
+    "check": "npm run lint:markdown && npm run lint:lua && stylua --check . && lua test/core.lua && npm run check:python",
+    "lint:markdown": "markdownlint-cli2",
+    "lint:lua": "sh scripts/check-lua.sh",
+    "lint:commits": "sh scripts/check-commits.sh",
+    "check:python": "uv run --locked python -m compileall -q test && uv run --locked python -m unittest discover -s test -p 'test_*.py'"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "21.2.2",
+    "@commitlint/config-conventional": "21.2.2",
+    "markdownlint-cli2": "0.23.2"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "overrides": {
+    "smol-toml": "1.8.0"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "runtime.version": "Lua 5.5",
+  "workspace.library": [
+    "../.dev/types",
+    "../types"
+  ],
+  "diagnostics.globals": [
+    "report",
+    "dispatch",
+    "python",
+    "script",
+    "pid_file"
+  ],
+  "diagnostics.disable": [
+    "redefined-local"
+  ]
+}

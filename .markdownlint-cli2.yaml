@@ -1,0 +1,13 @@
+# Run locally and in CI with npm run lint:markdown (locked in package-lock.json).
+gitignore: true
+
+globs:
+  - "**/*.md"
+
+config:
+  MD013:
+    line_length: 80
+    tables: false
+    code_blocks: false
+  MD041: false
+  MD060: false

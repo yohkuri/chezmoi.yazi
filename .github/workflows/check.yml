@@ -1,0 +1,119 @@
+name: checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: jdx/mise-action@v3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked JavaScript tools
+        run: npm ci --ignore-scripts
+      - name: Install Lua and pinned analyzers
+        env:
+          LUALS_VERSION: 3.19.1
+          STYLUA_VERSION: 2.5.2
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.1 lua5.4
+          mkdir -p "$RUNNER_TEMP/luals" "$RUNNER_TEMP/stylua"
+          curl --fail --location --retry 3 \
+            "https://github.com/LuaLS/lua-language-server/releases/download/$LUALS_VERSION/lua-language-server-$LUALS_VERSION-linux-x64.tar.gz" \
+            -o "$RUNNER_TEMP/luals.tar.gz"
+          tar -xzf "$RUNNER_TEMP/luals.tar.gz" -C "$RUNNER_TEMP/luals"
+          curl --fail --location --retry 3 \
+            "https://github.com/JohnnyMorganz/StyLua/releases/download/v$STYLUA_VERSION/stylua-linux-x86_64.zip" \
+            -o "$RUNNER_TEMP/stylua.zip"
+          unzip -q "$RUNNER_TEMP/stylua.zip" -d "$RUNNER_TEMP/stylua"
+          chmod +x "$RUNNER_TEMP/stylua/stylua"
+          echo "$RUNNER_TEMP/luals/bin" >> "$GITHUB_PATH"
+          echo "$RUNNER_TEMP/stylua" >> "$GITHUB_PATH"
+      - name: Install pinned Yazi type definitions
+        run: npm run setup:types
+      - name: Check Markdown, Lua, formatting, and Python harness
+        run: test/check.py
+      - name: Check Lua syntax and older-version compatibility
+        run: |
+          lua -v
+          lua5.1 test/core.lua
+          lua5.4 test/core.lua
+          for file in ./*.lua test/*.lua scripts/*.lua; do
+            luac -p "$file"
+            luac5.1 -p "$file"
+            luac5.4 -p "$file"
+          done
+      - name: Check commit messages
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BASE: ${{ github.event.before }}
+          PUSH_HEAD: ${{ github.sha }}
+        run: |
+          if [ "$EVENT_NAME" = pull_request ]; then
+            npm run lint:commits -- "$PR_BASE" "$PR_HEAD"
+          elif [ "$PUSH_BASE" = 0000000000000000000000000000000000000000 ]; then
+            npm run lint:commits -- --all "$PUSH_HEAD"
+          else
+            npm run lint:commits -- "$PUSH_BASE" "$PUSH_HEAD"
+          fi
+
+  e2e-smoke:
+    name: E2E smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: jdx/mise-action@v3
+      - name: Install tmux and pinned runtime binaries
+        env:
+          YAZI_URL: https://github.com/sxyazi/yazi/releases/download/v26.9.1/yazi-x86_64-unknown-linux-gnu.zip
+          YAZI_SHA256: a02fe91d3304294048c681f010f1100856872a4e98ecf6927328e888d40a6ad2
+          CHEZMOI_URL: https://github.com/twpayne/chezmoi/releases/download/v2.72.2/chezmoi-linux-amd64
+          CHEZMOI_SHA256: 64a07b2e956be7ea18a9d26cbc76aab96a8b45a6b7b6f58c41ff782a7dc361ab
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tmux unzip
+          mkdir -p "$RUNNER_TEMP/bin" "$RUNNER_TEMP/yazi"
+          curl --fail --location --retry 3 "$YAZI_URL" -o "$RUNNER_TEMP/yazi.zip"
+          echo "$YAZI_SHA256  $RUNNER_TEMP/yazi.zip" | sha256sum --check --strict
+          unzip -q "$RUNNER_TEMP/yazi.zip" -d "$RUNNER_TEMP/yazi"
+          install -m 0755 \
+            "$RUNNER_TEMP/yazi/yazi-x86_64-unknown-linux-gnu/yazi" \
+            "$RUNNER_TEMP/bin/yazi"
+          install -m 0755 \
+            "$RUNNER_TEMP/yazi/yazi-x86_64-unknown-linux-gnu/ya" \
+            "$RUNNER_TEMP/bin/ya"
+          curl --fail --location --retry 3 "$CHEZMOI_URL" \
+            -o "$RUNNER_TEMP/chezmoi"
+          echo "$CHEZMOI_SHA256  $RUNNER_TEMP/chezmoi" | \
+            sha256sum --check --strict
+          install -m 0755 "$RUNNER_TEMP/chezmoi" "$RUNNER_TEMP/bin/chezmoi"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: Run black-box status and refresh checks
+        run: test/e2e.py --smoke --artifacts "$RUNNER_TEMP/chezmoi-yazi-e2e"
+      - name: Upload E2E failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-smoke-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/chezmoi-yazi-e2e
+          if-no-files-found: warn
+          retention-days: 7

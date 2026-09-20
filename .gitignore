@@ -1,0 +1,14 @@
+.DS_Store
+node_modules/
+.dev/
+.venv/
+__pycache__/
+*.pyc
+
+# Agent-local instructions and settings are not project configuration.
+/CLAUDE.local.md
+/AGENTS.override.md
+/.claude/settings.local.json
+/CLAUDE.local.md.bak
+/AGENTS.override.md.bak
+/.claude/settings.local.json.bak
