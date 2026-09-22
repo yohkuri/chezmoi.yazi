@@ -1,3 +1,4 @@
+local actions = require(".actions")
 local M = {}
 
 -- stderr is deliberately discarded: besides containing secrets, read_line_with
@@ -67,17 +68,40 @@ function M.client(opts, cancelled)
 			"--progress=false",
 			"--skip-secrets=false",
 		}
-		for _, key in ipairs { "config", "source", "destination", "persistent_state", "cache" } do
-			if opts[key] then
-				all[#all + 1] = "--" .. key:gsub("_", "-")
-				all[#all + 1] = opts[key]
-			end
+		for _, arg in ipairs(actions.context(opts)) do
+			all[#all + 1] = arg
 		end
 		for _, arg in ipairs(args) do
 			all[#all + 1] = arg
 		end
 		return M.run(opts.command, all, opts.timeout, opts.output_limit, cancelled)
 	end
+end
+
+-- Interactive commands own the terminal until the user has read their output.
+-- The shell only implements the fixed Enter prompt; target paths never enter it.
+function M.interactive(opts, args, summary)
+	local permit = ui.hide()
+	local ok, success = pcall(function()
+		io.write("\27[2J\27[Hchezmoi\n" .. summary .. "\n\n")
+		io.flush()
+		local status =
+			Command(opts.command):arg(args):stdin(Command.INHERIT):stdout(Command.INHERIT):stderr(Command.INHERIT):status()
+		io.write(
+			status and ("\nchezmoi exited with code " .. tostring(status.code) .. ".\n")
+				or "\nCould not start or wait for chezmoi.\n"
+		)
+		io.flush()
+		local resumed = Command("/bin/sh")
+			:arg({ "-c", 'printf "Press Enter to return to Yazi... "; IFS= read -r reply' })
+			:stdin(Command.INHERIT)
+			:stdout(Command.INHERIT)
+			:stderr(Command.INHERIT)
+			:status()
+		return status and status.success and resumed and resumed.success or false
+	end)
+	permit:drop()
+	return ok and success or false
 end
 
 return M

@@ -13,6 +13,9 @@ control = root / "control"
 mode = control.read_text() if control.exists() else ""
 if "managed" in args and mode == "fail-managed":
     sys.exit(1)
+if "--no-tty" not in args:
+    # Explicit actions must retain their real terminal and have no query deadline.
+    sys.exit(subprocess.run([chezmoi, *args]).returncode)
 try:
     result = subprocess.run([chezmoi, *args], capture_output=True, timeout=10)
 except subprocess.TimeoutExpired:

@@ -27,3 +27,7 @@ Linemode = Linemode
 -- Yazi v26.9.1 yazi-plugin/src/utils/json.rs.
 ---@class ya
 ---@field json_encode fun(value: any): string
+
+-- ui.hide() returns the terminal permit; drop restores Yazi's screen.
+---@class Permit
+---@field drop fun(self: Permit)
