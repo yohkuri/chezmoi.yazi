@@ -33,10 +33,13 @@ test/runtime.py --git-plugin /absolute/path/to/git.yazi
 test/e2e.py --git-plugin /absolute/path/to/git.yazi
 ```
 
-The pure suite passes 51 assertions covering path boundaries, NUL framing,
+The pure status suite passes 51 assertions covering path boundaries, NUL framing,
 XY preservation, malformed
 or out-of-scope status rejection, bounded recovery, resolved differences,
 own/descendant independence, summary disabling, and exceptional filenames.
+The action suite adds 51 assertions for supported flags, invalid selections,
+recursive target reduction, confirmation policy, literal path arguments,
+shared context, and matching preview/apply scope.
 
 The real runtime suite uses a separate Yazi configuration and a private tmux
 socket. It inspects plugin state and actual terminal rendering. It covers:
@@ -59,11 +62,13 @@ socket. It inspects plugin state and actual terminal rendering. It covers:
 
 The black-box E2E suite does not read the probe, plugin records, or command
 history. Each scenario starts a fresh Yazi and asserts on current-pane rows and
-process exit state. Its complete local run covers visible status and directory
+process exit state, plus fixture file effects for command actions. Its complete
+local run covers visible status and directory
 summaries, manual refresh, directory and tab navigation, template failure and
 recovery, theme/flavor reload, wide-sign alignment, and RGB output. The
 optional git.yazi scenario verifies both linemodes on the same row and their
-order. `--smoke` runs only the initial status and refresh path used by CI.
+order. `--smoke` runs the initial status/refresh scenario and the basic command
+scenario used by CI; the full suite also runs the command-edge scenario.
 
 Test diagnostics live below the isolated state directory so they do not
 themselves change files in Yazi's current or parent list. Cleanup affects only
@@ -83,6 +88,61 @@ both required jobs completed successfully for pull request #1: `checks` and
 `E2E smoke`. The latter ran the rendered status and refresh scenario on the
 pinned Ubuntu 24.04, Yazi 26.9.1, and chezmoi 2.72.2 environment.
 
+## Command action validation
+
+The command extension was tested on macOS with the baseline versions above.
+`test/runtime.py` passed the existing status/rendering suite and the new command,
+command-edge, and operation-coordination scenarios. The terminal-driven
+command cases are also part of `test/e2e.py`, with the actual chezmoi executable
+and no probe or command wrapper in E2E mode.
+The full six-scenario E2E run passed; the basic command scenario was rerun after
+strengthening exact current-pane status assertions. The direct manual launcher
+also opened the new `C` menu and returned to the shell while retaining its fixture.
+
+Measured coverage includes:
+
+- Add/re-add through direct bindings and the menu; forget keeps destination
+  files and destroy deletes both entries. Current-pane status and row removal
+  are checked after these actions and after apply.
+- Diff before apply, refused and accepted apply, native conflict prompts,
+  quit without overwriting, and failed template evaluation stopping before apply.
+  In this runtime, quitting a native conflict prompt can exit with code zero;
+  the notification therefore reports command completion, not changed-file counts.
+- Multiple selections, paginated confirmation, selections in another directory,
+  known inapplicable mixed targets, and rejection of directory edit.
+- Literal spaces, Japanese, quotes, backslashes, CR/LF, leading dashes, and
+  shell-looking filenames; recursive and nonrecursive directory add; an orphan
+  symlink whose outside referent is not followed or created.
+- Template add and re-add skipping; age-encrypted add and transparent
+  edit/re-encryption; terminal editor input, Ctrl-C, partial editor failure,
+  edit-and-apply success, and cancellation preserving the source edit.
+- Standalone diff honoring `[diff].exclude=["scripts"]`, while the apply preview
+  includes the script that apply actually runs. Missing descendants are restored.
+- An obsolete status query draining before an action; no concurrent mutation
+  or refresh subprocess while the action lock is held; target snapshots surviving
+  hover movement during menu input; resumption of status acquisition afterward.
+
+On 2026-09-22, an isolated chezmoi 2.72.2 reproduction showed that
+`destroy --recursive=false` on a directory still deletes the directory and
+its descendants, including an unmanaged child. The plugin now rejects this
+combination before confirmation or mutation, including mixed selections; the
+file-target form remains available. Three action-policy assertions cover this
+boundary. The full `test/runtime.py` suite and wrapper-free
+`test/e2e.py --case command-edges` passed with the directory and its child
+intact after rejection. `test/check.py` also passed with 51 core and 54 action
+assertions and ten Python tests.
+
+The fixture's chezmoi config now lives at `config/chezmoi.toml`. Keeping it at
+the fixture root caused chezmoi add to protect that whole directory, including
+the disposable destination. Interactive instrumentation inherits the terminal
+and does not impose the status wrapper's timeout. Tests never use `--force`.
+
+These checks use a disposable editor program and public age test identity.
+They do not validate every real editor, GUI editor waiting convention, pager,
+interactive secret provider, arbitrary hook, or terminal size. The new command
+extension has not been run on Linux; the earlier Ubuntu status-only smoke
+evidence below does not establish command behavior on that platform.
+
 ## Development tooling checks
 
 Locally verified on 2026-09-20:
@@ -92,9 +152,9 @@ Locally verified on 2026-09-20:
   `test/manual.py` passed, including manual status and cleanup commands.
   The scripts invoke uv themselves; mise is only an optional tool installer.
 - `test/check.py`: Markdown clean, LuaLS clean for plugin and harness,
-  StyLua clean, all 51 core assertions passing, and ten Python harness tests
-  passing. The six screen-parser tests cover exact names, missing rows,
-  unmanaged spacing, ANSI/hover decorations, pane boundaries, and cell width;
+  StyLua clean, all 51 core and 51 action assertions passing, and ten Python
+  harness tests passing. The six screen-parser tests cover exact names, missing
+  rows, unmanaged spacing, ANSI/hover decorations, pane boundaries, and cell width;
   the other four cover Lua string encoding, CR/LF preservation, cleanup guards,
   and timeout.
 - Commit validation: eight valid/invalid message cases, including length,
@@ -105,8 +165,9 @@ Locally verified on 2026-09-20:
   completed both the development checks and E2E smoke job.
 - The Python real Yazi suite passes with and without git.yazi. It preserves
   the Lua harness scenarios, including child lifetime and generation checks.
-- The E2E smoke and all four default scenarios pass against the visible Yazi
-  screen. The optional git.yazi coexistence scenario also passes. A temporary
+- Before the command extension, E2E smoke and the four default scenarios passed
+  against the visible Yazi screen, as did the optional git.yazi coexistence
+  scenario. A temporary
   copy with the managed sign changed from `C` to `X` made the smoke scenario
   fail on the initial status assertion, confirming that it detects a rendered
   status regression rather than only successful process startup.

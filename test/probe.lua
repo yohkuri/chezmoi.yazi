@@ -20,9 +20,11 @@ return {
 			rows = rows,
 			destination = st.destination,
 			running = st.running,
+			action_busy = st.action_busy or false,
 			epoch = st.epoch,
 			signs = st.theme.signs,
 			cwd = tostring(cx.active.current.cwd),
+			instance = os.getenv("YAZI_ID"),
 		})
 		out:close()
 	end,

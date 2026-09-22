@@ -3,7 +3,9 @@
 import argparse
 import json
 import time
+import subprocess
 from support import baseline, fixture, read, write
+from action_cases import commands, extended, configure, finish, confirm
 
 
 def test(t, git_plugin):
@@ -145,9 +147,80 @@ def test(t, git_plugin):
     assert not sentinel.exists(), "Apply script ran during a later query"
 
 
+def action_coordination(t):
+    baseline(t)
+    configure(t)
+    t.start()
+    instance_id = t.snapshot()["instance"]
+
+    def emit(name, *args):
+        result = subprocess.run(["ya", "emit-to", instance_id, name, *args],
+                                env=t.env, cwd=t.root, capture_output=True, timeout=5)
+        assert result.returncode == 0, result.stderr
+
+    def snapshot():
+        t.report.unlink(missing_ok=True)
+        emit("plugin", "probe")
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            try:
+                return json.loads(read(t.report))
+            except (FileNotFoundError, json.JSONDecodeError):
+                time.sleep(0.03)
+        raise AssertionError("No remote probe response")
+
+    # Trigger an action while an obsolete status acquisition is still running.
+    t.key("3")
+    write(t.control, "slow")
+    t.key("R")
+    deadline = time.monotonic() + 4
+    while not t.barrier.exists() and time.monotonic() < deadline:
+        time.sleep(0.03)
+    assert t.barrier.exists()
+    t.key("p")
+    t.wait_screen(lambda s: "Press Enter to return" in s, "diff with action lock held")
+    state = snapshot()
+    assert state["action_busy"] and not state["running"]
+    before = read(t.calls)
+    emit("plugin", "chezmoi", "add")
+    emit("plugin", "chezmoi", "refresh")
+    time.sleep(0.25)
+    assert read(t.calls) == before, "Concurrent action/refresh started a subprocess"
+    t.control.unlink()
+    finish(t, next_confirm=True)
+    confirm(t, False)
+    t.wait(lambda s: not s["action_busy"] and not s["running"])
+    # Freeze selection before menu input, even if DDS moves the hover elsewhere.
+    t.key("2"); t.key("C")
+    t.wait_screen(lambda s: "Add options" in s, "menu snapshot")
+    emit("reveal", str(t.dest / "source"))
+    t.key("a"); finish(t)
+    assert read(t.source / "unmanaged") == "other\n"
+    assert read(t.source / "source") == "source edit\n"
+    # A selection in another directory remains part of the tab's selection.
+    t.key("S"); t.key("1"); t.key("s")
+    emit("reveal", str(t.dest / ".exact/keep"))
+    t.wait(lambda s: s["cwd"] == str(t.dest / ".exact"))
+    t.key("s"); t.key("r"); confirm(t); finish(t)
+    calls = [json.loads(line) for line in read(t.calls).splitlines()]
+    readd = [args for args in calls if "re-add" in args and "--no-tty" not in args][-1]
+    assert str(t.dest / "clean") in readd and str(t.dest / ".exact/keep") in readd
+    t.wait(lambda s: not s["action_busy"] and not s["running"])
+    assert "runtime error:" not in t.logs(), t.logs()
+    print("PASS action coordination: stale worker, operation lock, menu snapshot, cross-directory selection")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--git-plugin")
     args = parser.parse_args()
     with fixture(args.git_plugin) as instance:
         test(instance, args.git_plugin)
+    with fixture(args.git_plugin) as instance:
+        baseline(instance)
+        commands(instance)
+    with fixture(args.git_plugin) as instance:
+        baseline(instance)
+        extended(instance)
+    with fixture(args.git_plugin) as instance:
+        action_coordination(instance)
