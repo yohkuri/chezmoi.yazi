@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "setup:types": "node scripts/setup-types.mjs",
-    "check": "npm run lint:markdown && npm run lint:lua && stylua --check . && lua test/core.lua && npm run check:python",
+    "check": "npm run lint:markdown && npm run lint:lua && stylua --check . && lua test/core.lua && lua test/actions.lua && npm run check:python",
     "lint:markdown": "markdownlint-cli2",
     "lint:lua": "sh scripts/check-lua.sh",
     "lint:commits": "sh scripts/check-commits.sh",

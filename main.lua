@@ -1,6 +1,8 @@
 --- @since 26.9.1
 
+local actions = require(".actions")
 local core = require(".core")
+local interaction = require(".interaction")
 local process = require(".process")
 local render = require(".render")
 local M = {}
@@ -21,6 +23,9 @@ end
 
 local function enqueue(st, files, force)
 	if not st.opts then
+		return
+	end
+	if st.action_busy then
 		return
 	end
 	if force then
@@ -73,7 +78,7 @@ local claim = ya.sync(function(st)
 end)
 
 local take = ya.sync(function(st)
-	if not st.opts or not next(st.pending) then
+	if st.action_busy or not st.opts or not next(st.pending) then
 		st.running, st.worker_active, st.inflight = false, false, nil
 		return nil
 	end
@@ -87,6 +92,36 @@ local take = ya.sync(function(st)
 	st.inflight, st.inflight_epoch, st.pending = st.pending, st.epoch, {}
 	ui.render()
 	return { files = files, opts = st.opts, epoch = st.epoch }
+end)
+
+local begin_action = ya.sync(function(st)
+	if st.action_busy then
+		return { error = "Another chezmoi action is already running." }
+	end
+	if not st.opts then
+		return { error = 'Call require("chezmoi"):setup() first.' }
+	end
+	local files = {}
+	local function add(file) files[#files + 1] = { path = tostring(file.url), local_path = file.url.spec.is_regular } end
+	for _, file in pairs(cx.active.selected) do
+		add(file)
+	end
+	if #files == 0 and cx.active.current.hovered then
+		add(cx.active.current.hovered)
+	end
+	st.action_busy, st.epoch, st.pending, st.records = true, st.epoch + 1, {}, {}
+	ui.render()
+	return { opts = st.opts, files = files }
+end)
+
+local worker_finished = ya.sync(function(st) return not st.worker_active end)
+
+local end_action = ya.sync(function(st, executed)
+	st.action_busy = false
+	if executed then
+		ya.emit("refresh", {})
+	end
+	enqueue(st, current_files(), true)
 end)
 
 local cancelled = ya.sync(function(st, epoch) return st.epoch ~= epoch end)
@@ -229,17 +264,36 @@ function M:fetch(job)
 end
 
 function M:entry(job)
-	local action = job.args[1] or "refresh"
-	if action == "refresh" then
-		return submit({}, true)
-	end
-	if action ~= "work" then
-		return ya.notify {
-			title = "chezmoi",
-			content = "Unknown command. Use: plugin chezmoi -- refresh",
-			level = "warn",
-			timeout = 5,
-		}
+	local name = job.args[1] or "refresh"
+	if name ~= "work" then
+		local action, err = actions.parse(job.args)
+		if not action then
+			return interaction.notify(err)
+		end
+		if action.name == "refresh" then
+			return submit({}, true)
+		end
+		local snapshot = begin_action()
+		if snapshot.error then
+			return interaction.notify(snapshot.error)
+		end
+		local ok = pcall(function()
+			if action.name == "menu" then
+				action = interaction.menu()
+			end
+			if not action or action.name == "refresh" then
+				return
+			end
+			while not worker_finished() do
+				ya.sleep(0.02)
+			end
+			interaction.run(snapshot, action)
+		end)
+		end_action(snapshot.executed or false)
+		if not ok then
+			interaction.notify("Action could not finish. Terminal and status acquisition have been restored.")
+		end
+		return
 	end
 	if not claim() then
 		return

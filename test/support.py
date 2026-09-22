@@ -55,7 +55,7 @@ def environment(root):
 
 
 def chezmoi_args(root):
-    return ["--config", str(root / "chezmoi.toml"), "--source", str(root / "source"),
+    return ["--config", str(root / "config/chezmoi.toml"), "--source", str(root / "source"),
             "--destination", str(root / "dest"), "--persistent-state", str(root / "chezmoi.db"),
             "--cache", str(root / "cache/chezmoi"), "--no-tty", "--no-pager",
             "--color=false", "--progress=false", "--skip-secrets=false"]
@@ -105,7 +105,7 @@ class Runtime:
         for directory in ["source", "dest", "config/plugins", "state", "cache", "data"]:
             (root / directory).mkdir(parents=True, exist_ok=True)
         self.source, self.dest = root / "source", root / "dest"
-        self.cfg = root / "chezmoi.toml"
+        self.cfg = root / "config/chezmoi.toml"
         write(self.cfg, "")
         self.env = environment(root)
         self.instrument = root / "state/instrument"
@@ -139,7 +139,7 @@ class Runtime:
             run(["git", "-c", "init.templateDir=", "init", "--quiet", str(self.dest)], env=self.env)
         write(root / "config/init.lua", init)
         write(root / "config/yazi.toml", config)
-        keys = dict(R="plugin chezmoi -- refresh", Y="app:theme",
+        keys = dict(C="plugin chezmoi -- menu", R="plugin chezmoi -- refresh", Y="app:theme",
                     N="cd " + shlex.quote(str(self.dest / ".config")), B="cd " + shlex.quote(str(self.dest)),
                     G="tab_create " + shlex.quote(str(self.dest / ".config")), H="tab_switch 0")
         if probe:
