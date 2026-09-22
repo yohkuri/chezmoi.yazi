@@ -130,7 +130,7 @@ file-target form remains available. Three action-policy assertions cover this
 boundary. The full `test/runtime.py` suite and wrapper-free
 `test/e2e.py --case command-edges` passed with the directory and its child
 intact after rejection. `test/check.py` also passed with 51 core and 54 action
-assertions and ten Python tests.
+assertions and 11 Python tests after the cleanup regression was added.
 
 The fixture's chezmoi config now lives at `config/chezmoi.toml`. Keeping it at
 the fixture root caused chezmoi add to protect that whole directory, including
@@ -139,9 +139,13 @@ and does not impose the status wrapper's timeout. Tests never use `--force`.
 
 These checks use a disposable editor program and public age test identity.
 They do not validate every real editor, GUI editor waiting convention, pager,
-interactive secret provider, arbitrary hook, or terminal size. The new command
-extension has not been run on Linux; the earlier Ubuntu status-only smoke
-evidence below does not establish command behavior on that platform.
+interactive secret provider, arbitrary hook, or terminal size. On 2026-09-22,
+the basic status-refresh and command scenarios passed in a push-triggered
+Ubuntu CI run. A parallel PR run passed both scenarios but failed during
+fixture cleanup when a terminating child wrote into the directory being
+removed (`ENOTEMPTY`). Cleanup now retries only this bounded race, with a
+dedicated regression test. The extended command-edge and operation-coordination
+scenarios have not been run on Linux.
 
 ## Development tooling checks
 
