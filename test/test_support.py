@@ -1,11 +1,14 @@
 """Fast checks for the harness's byte handling and cleanup boundaries."""
+import errno
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
-from support import REPO, lua, owned, read, run, stop, write
+from unittest import mock
+from support import REPO, Runtime, lua, owned, read, run, stop, write
 
 
 class SupportTests(unittest.TestCase):
@@ -44,6 +47,30 @@ class SupportTests(unittest.TestCase):
     def test_process_timeout(self):
         with self.assertRaises(subprocess.TimeoutExpired):
             run([sys.executable, "-c", "import time; time.sleep(5)"], timeout=0.05)
+
+    def test_cleanup_retries_transient_nonempty_directory(self):
+        root = Path(tempfile.mkdtemp(prefix="chezmoi-yazi-test-")).resolve()
+        instance = Runtime.__new__(Runtime)
+        instance.root = instance.owned_root = root
+        instance.started = instance.keep = False
+        actual_rmtree = shutil.rmtree
+        attempts = 0
+
+        def remove(path):
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                raise OSError(errno.ENOTEMPTY, "writer raced with cleanup", path)
+            actual_rmtree(path)
+
+        try:
+            with mock.patch("support.shutil.rmtree", side_effect=remove), mock.patch("support.time.sleep"):
+                instance.close()
+            self.assertEqual(attempts, 2)
+            self.assertFalse(root.exists())
+        finally:
+            if root.exists():
+                actual_rmtree(root)
 
 
 if __name__ == "__main__":

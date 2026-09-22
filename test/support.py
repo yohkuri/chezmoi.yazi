@@ -1,5 +1,6 @@
 """Shared real-runtime fixture, with no third-party Python dependencies."""
 from contextlib import contextmanager
+import errno
 import json
 import os
 from pathlib import Path
@@ -277,7 +278,16 @@ class Runtime:
         if self.keep:
             print(f"Evidence: {self.root}")
         else:
-            shutil.rmtree(self.root)
+            # A terminating Yazi child may write one last cache file while the
+            # tree is being removed. Retry only that bounded cleanup race.
+            for attempt in range(20):
+                try:
+                    shutil.rmtree(self.root)
+                    break
+                except OSError as error:
+                    if error.errno != errno.ENOTEMPTY or attempt == 19:
+                        raise
+                    time.sleep(0.1)
 
 
 @contextmanager
