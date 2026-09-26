@@ -139,8 +139,11 @@ choose `forget` or `destroy` explicitly. Other CLI flags are not accepted.
 Single-file add/re-add and opening the editor need no plugin confirmation.
 Multiple-target or directory add/re-add operations confirm their scope first.
 Forget/destroy always confirm their different effects. Confirmations list
-targets in pages; cancelling any page cancels execution. Chezmoi's own prompts
-remain enabled; the plugin never adds `--force`.
+targets in pages sized to the current pane, including continuations of long
+paths. Cancelling any page cancels execution. A pane resize restarts review
+from the first page; panes smaller than 32 columns or 8 rows must be enlarged
+before retrying. Chezmoi's own prompts remain enabled; the plugin never adds
+`--force`.
 
 Apply always follows a successful diff and explicit confirmation. The preview
 and apply use the same targets, recursion, and all entry types, matching a
@@ -150,6 +153,9 @@ diff but do not restrict chezmoi apply. A standalone `diff` retains those
 settings. Other chezmoi settings, including secret skipping, are inherited.
 The linemode continues to evaluate all types independently of these settings.
 Diff is a preview, not a transaction: chezmoi evaluates again at apply time.
+Both edit commands explicitly disable chezmoi's `edit.apply` and `edit.watch`
+settings. Editing alone cannot apply changes, and `edit --apply` waits for the
+plugin's separate diff and confirmation stages.
 
 Yazi temporarily hands over the terminal for the editor, pager, credentials,
 and conflict prompts. Press Enter after each command to return or continue.

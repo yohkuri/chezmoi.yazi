@@ -5,7 +5,7 @@ import json
 import time
 import subprocess
 from support import baseline, fixture, read, write
-from action_cases import commands, extended, configure, finish, confirm
+from action_cases import commands, extended, configure, finish, confirm, confirmation_pages
 
 
 def test(t, git_plugin):
@@ -224,3 +224,6 @@ if __name__ == "__main__":
         extended(instance)
     with fixture(args.git_plugin) as instance:
         action_coordination(instance)
+    with fixture(args.git_plugin) as instance:
+        baseline(instance)
+        confirmation_pages(instance)

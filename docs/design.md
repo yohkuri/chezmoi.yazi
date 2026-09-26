@@ -61,6 +61,8 @@ The selected interaction defaults are:
 - Apply only after a successful diff and explicit confirmation. `edit --apply`
   is implemented as separate edit, diff, confirmation, and apply stages, so
   refusing apply retains the source edit. Failed stages stop the workflow.
+  Every native edit stage passes `--apply=false --watch=false`, overriding
+  automatic application settings that would bypass the plugin's confirmation.
 - Offer template/encrypted add (including their combination) and edit-and-apply
   alongside the seven basic actions. Reject unsupported flags and explain the
   distinction between forget and destroy when `remove` is requested.
@@ -71,6 +73,13 @@ the asynchronous UI. `main.lua` owns the operation lock, immutable selection
 snapshot, and status-worker coordination. The shared context argument builder
 passes the same executable/config/source/destination/state/cache to queries and
 actions without sharing query-specific flags.
+
+Confirmation pages are built from Yazi's prewrapped Unicode-aware lines, with
+room reserved for the dialog borders, buttons, and continuation prompt. Page
+size follows the current pane, and long paths can continue across pages without
+truncation. A resize detected after accepting a page restarts the entire review.
+Panes below 32 columns or 8 rows reject confirmation until enlarged. No command
+runs unless all pages are accepted at a consistent pane size.
 
 The preflight queries all managed entries, and a files/symlinks/directories
 subset excluding externals for edit/forget/destroy. Removal and script entries

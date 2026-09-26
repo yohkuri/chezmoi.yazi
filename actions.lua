@@ -126,6 +126,10 @@ function M.args(plan, opts, name)
 	name = name or plan.action.name
 	local args = M.context(opts)
 	args[#args + 1] = name
+	-- The plugin owns the separate preview/confirmation/apply stages.
+	if name == "edit" then
+		args[#args + 1], args[#args + 2] = "--apply=false", "--watch=false"
+	end
 	-- apply has no diff.include/exclude configuration. Its preview must not
 	-- silently omit entries hidden by the standalone diff configuration.
 	if name == "apply" or name == "diff" and (plan.action.name == "apply" or plan.action.apply) then

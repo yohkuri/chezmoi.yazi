@@ -1,5 +1,6 @@
 """Terminal-driven command acceptance shared by runtime and black-box E2E."""
 import json
+import re
 import shlex
 import time
 import sys
@@ -48,8 +49,15 @@ def finish(t, next_confirm=False, success=True, next_command=False):
 
 
 def confirm(t, yes=True):
-    t.wait_screen(lambda s: "Continue?" in s, "plugin confirmation")
-    t.key("y" if yes else "n")
+    while True:
+        capture = t.wait_screen(lambda s: "Continue?" in s, "plugin confirmation")
+        match = re.search(r"chezmoi \S+ \((\d+)/(\d+)\)", capture)
+        assert match, capture
+        page, total = map(int, match.groups())
+        t.key("y" if yes else "n")
+        if not yes or page == total:
+            return
+        t.wait_screen(lambda s: f"({page + 1}/{total})" in s, "next confirmation page")
 
 
 def native_confirm(t):
@@ -144,7 +152,7 @@ def extended(t):
     identity.chmod(0o600)
     cfg = ('encryption="age"\nuseBuiltinAge=true\n[age]\nidentity=' + json.dumps(str(identity))
            + '\nrecipient="age1gde3ncmahlqd9gg50tanl99r960llztrhfapnmx853s4tjum03uqfssgdh"\n'
-           + '[edit]\ncommand=' + json.dumps(sys.executable) + '\nargs='
+           + '[edit]\napply=true\nwatch=true\ncommand=' + json.dumps(sys.executable) + '\nargs='
            + json.dumps([str(REPO / "test/editor.py"), str(t.root)]) + '\n'
            + '[diff]\nexclude=["scripts"]\n')
     write(t.cfg, cfg)
@@ -154,8 +162,7 @@ def extended(t):
     for name in special:
         t.key(keys[name]); t.key("s")
     t.key("a")
-    for _ in range((len(special) + 4) // 5):
-        confirm(t)
+    confirm(t)
     finish(t)
     for name in special:
         assert read(t.source / name) == "literal path\n", name
@@ -202,6 +209,8 @@ def extended(t):
     assert read(t.dest / "unmanaged") == "other\n"
     # Edit-and-apply cancellation retains the source edit.
     t.key("3"); t.key("v")
+    t.wait_screen(lambda s: "Press Enter to return to Yazi" in s, "edit exit before diff")
+    assert read(t.dest / "source") == "original\n", "Native edit applied before preview"
     finish(t, next_command=True)
     finish(t, next_confirm=True)
     confirm(t, False)
@@ -240,3 +249,77 @@ def extended(t):
     t.key("R")
     assert "runtime error:" not in t.logs(), t.logs()
     print("PASS action edges: selections, literal paths, directories, links, encryption, editor, scripts, interruption")
+
+
+def confirmation_pages(t):
+    configure(t)
+    names = [str(i) + "a" * 170 + "日本語" * 5 + "\\\n-end-" + str(i) for i in range(5)]
+    names += ["/".join(["deep"] + ["d" * 90] * 7 + ["last-target"])]
+    for name in names:
+        for root in [t.dest, t.source]:
+            path = root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            write(path, "confirmation fixture\n")
+    keys = bind_targets(t, names)
+    t.start()
+    for name in names:
+        t.key(keys[name]); t.key("s")
+
+    def body(capture):
+        lines = capture.splitlines()
+        top = next(i for i, line in enumerate(lines) if "╭" in line and "chezmoi destroy" in line)
+        left = screen.cell_width(lines[top].split("╭")[0])
+        width = screen.cell_width(lines[top].split("╭")[1].split("╮")[0])
+        result = []
+        for line in lines[top + 1:]:
+            if "╰" in line:
+                break
+            column, text = 0, ""
+            for char in line:
+                if left < column <= left + width:
+                    text += char
+                column += screen.cell_width(char)
+            if "[Y]es" not in text and "Continue?" not in text:
+                result.append(text.strip())
+        return "".join(result)
+
+    for cols, rows in [(140, 40), (80, 18)]:
+        t.tmux("resize-window", "-t", "test", "-x", cols, "-y", rows)
+        time.sleep(0.2)
+        t.key("x")
+        reviewed, page = "", 1
+        while True:
+            capture = t.wait_screen(lambda s: f"chezmoi destroy ({page}/" in s and "Continue?" in s,
+                                    "complete confirmation page")
+            reviewed += body(capture)
+            total = int(re.search(r"chezmoi destroy \(\d+/(\d+)\)", capture)[1])
+            if page == total:
+                t.key("n")
+                break
+            t.key("y")
+            page += 1
+        assert total > 1
+        for name in names:
+            escaped = str(t.dest / name).replace("\\", "\\\\").replace("\n", "\\x0a")
+            assert escaped in reviewed, (escaped, reviewed)
+            assert (t.source / name).exists() and (t.dest / name).exists(), "Cancellation mutated a target"
+
+    # Accepting a page after a resize must restart review, never skip clipped text.
+    t.tmux("resize-window", "-t", "test", "-x", 140, "-y", 40)
+    time.sleep(0.2)
+    t.key("x")
+    t.wait_screen(lambda s: "chezmoi destroy (1/" in s, "initial review page")
+    t.tmux("resize-window", "-t", "test", "-x", 80, "-y", 18)
+    time.sleep(0.2)
+    t.key("y")
+    t.wait_screen(lambda s: "chezmoi destroy (1/" in s and "Continue?" in s and "Pane resized" in s,
+                  "review restarts after resize")
+    t.key("n")
+    assert all((t.source / name).exists() and (t.dest / name).exists() for name in names)
+    t.tmux("resize-window", "-t", "test", "-x", 40, "-y", 12)
+    time.sleep(0.2)
+    t.key("x")
+    t.wait_screen(lambda s: "Enlarge the current pane" in s, "too-small pane rejected")
+    assert all((t.source / name).exists() and (t.dest / name).exists() for name in names)
+    assert "runtime error:" not in t.logs(), t.logs()
+    print("PASS confirmation pages: complete long/Unicode/control paths, small pane, cancellation, resize")
