@@ -104,12 +104,12 @@ function M.prepare(action, files, destination, source, managed, editable)
 		broad = broad or target.dir
 	end
 	table.sort(targets, function(a, b) return a.path < b.path end)
-	local minimal = {}
+	local minimal, directories = {}, {}
 	for _, target in ipairs(targets) do
 		local covered = false
 		if action.recursive or action.name == "forget" then
-			for _, parent in ipairs(minimal) do
-				if parent.dir and core.inside(target.path, parent.path) then
+			for _, parent in ipairs(directories) do
+				if core.inside(target.path, parent.path) then
 					covered = true
 					break
 				end
@@ -117,6 +117,9 @@ function M.prepare(action, files, destination, source, managed, editable)
 		end
 		if not covered then
 			minimal[#minimal + 1] = target
+			if target.dir then
+				directories[#directories + 1] = target
+			end
 		end
 	end
 	return { action = action, targets = minimal, broad = broad }
