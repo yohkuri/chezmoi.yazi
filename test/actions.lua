@@ -79,7 +79,9 @@ for _, name in ipairs(names) do
 end
 p = assert(plan({ "edit", apply = true }, { file("/d/a") }))
 local args = actions.args(p, {}, "edit")
-check(#args == 3 and args[1] == "edit", "edit never invokes native --apply")
+check(args[2] == "--apply=false" and args[3] == "--watch=false", "edit disables native auto-apply and watch")
+local plain_edit = actions.args(assert(plan({ "edit" }, { file("/d/a") })), {})
+check(table.concat(args, "\0") == table.concat(plain_edit, "\0"), "plain edit has the same safe edit stage")
 local diff, apply = actions.args(p, {}, "diff"), actions.args(p, {}, "apply")
 diff[1] = "apply"
 check(table.concat(diff, "\0") == table.concat(apply, "\0"), "preview and apply use identical scope/options")

@@ -41,31 +41,45 @@ function M.menu()
 end
 
 local function confirm(plan, name)
-	-- Review every target, including selections outside the visible directory.
-	for first = 1, #plan.targets, 5 do
-		local page = { action = plan.action, targets = {} }
-		for i = first, math.min(first + 4, #plan.targets) do
-			page.targets[#page.targets + 1] = plan.targets[i]
-		end
-		if
-			not ya.confirm {
-				pos = { "center", w = 76, h = 20 },
-				title = "chezmoi "
-					.. name
-					.. " ("
-					.. first
-					.. "-"
-					.. math.min(first + 4, #plan.targets)
-					.. "/"
-					.. #plan.targets
-					.. ")",
-				body = ui.Text(actions.summary(page, name) .. "\n\nContinue?"):wrap(ui.Wrap.YES),
-			}
-		then
+	while true do
+		-- The current pane fits the terminal even with a customized layout.
+		local area = ui.area("current")
+		local w, h = math.min(76, area.w), math.min(20, area.h)
+		if w < 32 or h < 8 then
+			M.notify("Enlarge the current pane to at least 32 columns and 8 rows, then retry.")
 			return false
 		end
+		-- Prewrap with Yazi's Unicode-aware renderer, then disable further wrapping.
+		-- Reserve borders, buttons, and the blank line plus Continue prompt.
+		local lines = ui.lines(actions.summary(plan, name), { width = w - 2, wrap = ui.Wrap.YES, tab_size = 4 })
+		local rows = h - 5
+		local resized = false
+		for first = 1, #lines, rows do
+			local body = {}
+			for i = first, math.min(first + rows - 1, #lines) do
+				body[#body + 1] = lines[i]
+			end
+			body[#body + 1], body[#body + 2] = ui.Line(""), ui.Line("Continue?")
+			if
+				not ya.confirm {
+					pos = { "center", w = w, h = h },
+					title = string.format("chezmoi %s (%d/%d)", name, math.ceil(first / rows), math.ceil(#lines / rows)),
+					body = ui.Text(body):wrap(ui.Wrap.NO),
+				}
+			then
+				return false
+			end
+			local current = ui.area("current")
+			if current.w ~= area.w or current.h ~= area.h then
+				resized = true
+				M.notify("Pane resized. Review the confirmation again from the first page.")
+				break
+			end
+		end
+		if not resized then
+			return true
+		end
 	end
-	return true
 end
 
 local function preflight(snapshot, action)
