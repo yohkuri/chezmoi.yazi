@@ -40,6 +40,17 @@ check(
 	plan({ "destroy", recursive = false }, { file("/d/a"), file("/d/dir", true) }) == nil,
 	"unsafe directory rejects the entire selection"
 )
+local replaced_dir = file("/d/dir")
+replaced_dir.source_dir = true
+check(
+	plan({ "destroy", recursive = false }, { replaced_dir }) == nil,
+	"reject nonrecursive destroy when only the source is a directory"
+)
+check(
+	plan({ "destroy", recursive = false }, { file("/d/a"), replaced_dir }) == nil,
+	"source directory rejects the entire selection"
+)
+check(plan({ "destroy" }, { replaced_dir }) ~= nil, "recursive destroy still accepts a replaced source directory")
 check(plan({ "add" }, { file("/d/source/a") }) == nil, "reject source tree")
 check(plan({ "add" }, { file("/elsewhere") }) == nil, "reject destination escape")
 check(plan({ "add" }, { file("/d/../elsewhere") }) == nil, "normalize before validation")

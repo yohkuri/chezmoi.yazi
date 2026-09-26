@@ -146,7 +146,13 @@ def extended(t):
     write(folder / "child", "child\n")
     (t.dest / "emptydir").mkdir()
     (t.dest / "outside-link").symlink_to(t.root / "unmanaged-outside")
-    keys = bind_targets(t, special + ["newdir", "emptydir", "outside-link"])
+    replaced_dirs = ["directory-as-file", "directory-as-link"]
+    for name in replaced_dirs:
+        (t.source / name).mkdir()
+        write(t.source / name / "child", "preserve source child\n")
+    write(t.dest / replaced_dirs[0], "replacement file\n")
+    (t.dest / replaced_dirs[1]).symlink_to("clean")
+    keys = bind_targets(t, special + ["newdir", "emptydir", "outside-link"] + replaced_dirs)
     identity = t.root / "age-identity"
     write(identity, "AGE-SECRET-KEY-1KTYK6RVLN5TAPE7VF6FQQSKZ9HWWCDSKUGXXNUQDWZ7XXT5YK5LSF3UTKQ\n")
     identity.chmod(0o600)
@@ -191,6 +197,22 @@ def extended(t):
             "Unsafe directory destroy reached chezmoi")
     assert read(t.source / "newdir/child") == "child\n"
     assert read(t.dest / "newdir/child") == "child\n"
+    # Source directories remain unsafe when the destination is a file or link.
+    for name in replaced_dirs:
+        before = read(t.calls) if logged else ""
+        t.key("1"); t.key("s")
+        t.key(keys[name]); t.key("s"); t.key("D")
+        capture = t.wait_screen(lambda s: "Non-recursive destroy" in s and name in s,
+                                "source directory rejects the entire selection")
+        assert "Continue?" not in capture
+        if logged:
+            new_calls = [json.loads(line) for line in read(t.calls)[len(before):].splitlines()]
+            assert not any("destroy" in args and "--no-tty" not in args for args in new_calls)
+        assert read(t.source / name / "child") == "preserve source child\n"
+        assert read(t.source / "clean") == read(t.dest / "clean") == "original\n"
+        t.key("S")
+    assert read(t.dest / replaced_dirs[0]) == "replacement file\n"
+    assert (t.dest / replaced_dirs[1]).is_symlink()
     # A symlink is added as a symlink, never followed into its outside referent.
     t.key(keys["outside-link"]); t.key("a"); finish(t)
     assert (t.source / "symlink_outside-link").exists()
