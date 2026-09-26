@@ -41,6 +41,7 @@ function M.menu()
 end
 
 local function confirm(plan, name)
+	local summary = actions.summary(plan, name)
 	while true do
 		-- The current pane fits the terminal even with a customized layout.
 		local area = ui.area("current")
@@ -51,9 +52,8 @@ local function confirm(plan, name)
 		end
 		-- Prewrap with Yazi's Unicode-aware renderer, then disable further wrapping.
 		-- Reserve borders, buttons, and the blank line plus Continue prompt.
-		local lines = ui.lines(actions.summary(plan, name), { width = w - 2, wrap = ui.Wrap.YES, tab_size = 4 })
+		local lines = ui.lines(summary, { width = w - 2, wrap = ui.Wrap.YES, tab_size = 4 })
 		local rows = h - 5
-		local resized = false
 		for first = 1, #lines, rows do
 			local body = {}
 			for i = first, math.min(first + rows - 1, #lines) do
@@ -71,13 +71,12 @@ local function confirm(plan, name)
 			end
 			local current = ui.area("current")
 			if current.w ~= area.w or current.h ~= area.h then
-				resized = true
 				M.notify("Pane resized. Review the confirmation again from the first page.")
 				break
 			end
-		end
-		if not resized then
-			return true
+			if first + rows > #lines then
+				return true
+			end
 		end
 	end
 end
