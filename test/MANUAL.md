@@ -310,7 +310,9 @@ prompts accept their indicated keys; do not add `--force` to the fixture.
    confirmation pages show all paths. Mix managed and unmanaged files for Edit:
    the whole operation must stop. Selecting a directory for Edit must ask you
    to select files inside it instead.
-6. Use Edit and apply with a terminal editor. Cancel after the diff and verify
+6. Set `apply=true` and `watch=true` under `[edit]` in the fixture's chezmoi
+   config. Plain Edit must leave the destination unchanged. Use Edit and apply
+   with a terminal editor. Cancel after the diff and verify
    the source edit survives while the destination stays unchanged. Repeat with
    an accepted apply. Interrupt the editor with Ctrl-C and verify Yazi returns
    after the exit prompt and remains usable. The fixture uses your available
@@ -319,8 +321,12 @@ prompts accept their indicated keys; do not add `--force` to the fixture.
    the missing `new` file and runs the disposable pending script. The
    `script-ran` marker must appear below the fixture root. Background status
    queries alone must never create it.
-8. Resize the terminal and inspect confirmation wrapping, escaped control
-   characters in filenames, output readability, and return to the file list.
+8. Select several long paths and inspect every confirmation page, including a
+   single path that spans pages and escaped control characters. Resize while
+   confirming: accepting the old page must restart review from the first page.
+   Cancel on a later page and verify no files changed. A pane below 32 columns
+   or 8 rows must ask you to enlarge it. Also inspect output readability and
+   return to the file list.
 
 ## 10. Evidence and cleanup
 

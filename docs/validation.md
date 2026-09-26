@@ -68,7 +68,8 @@ summaries, manual refresh, directory and tab navigation, template failure and
 recovery, theme/flavor reload, wide-sign alignment, and RGB output. The
 optional git.yazi scenario verifies both linemodes on the same row and their
 order. `--smoke` runs the initial status/refresh scenario and the basic command
-scenario used by CI; the full suite also runs the command-edge scenario.
+scenario used by CI; the full suite also runs the command-edge and
+confirmation-pages scenarios.
 
 Test diagnostics live below the isolated state directory so they do not
 themselves change files in Yazi's current or parent list. Cleanup affects only
@@ -146,6 +147,26 @@ fixture cleanup when a terminating child wrote into the directory being
 removed (`ENOTEMPTY`). Cleanup now retries only this bounded race, with a
 dedicated regression test. The extended command-edge and operation-coordination
 scenarios have not been run on Linux.
+
+### Confirmation and edit regressions
+
+On 2026-09-23, the fixes were checked on macOS with Yazi 26.9.1 and chezmoi
+2.72.2. `test/check.py` passed with 51 core assertions, 55 action assertions,
+and 11 Python tests. The full `test/runtime.py` suite passed, including action
+coordination and confirmation pagination. Wrapper-free E2E runs passed for
+`command-edges` and `confirmation-pages`:
+
+- With both `edit.apply=true` and `edit.watch=true`, plain encrypted edit
+  leaves the destination untouched. Edit-and-apply also leaves it untouched
+  before the diff and after refusing apply; accepted apply still works.
+- Six selected targets include long Unicode/control-character filenames and
+  a deeply nested path spanning pages. The test reconstructs every complete
+  escaped path from visible confirmation rows at 140x40 and 80x18 terminal
+  sizes, then cancels the final page and checks that all files remain.
+- Resizing during confirmation restarts review at page one. A 40x12 terminal
+  produces a current pane below the minimum size and rejects the operation.
+
+These regression scenarios have not been run on Linux or other Yazi versions.
 
 ## Development tooling checks
 

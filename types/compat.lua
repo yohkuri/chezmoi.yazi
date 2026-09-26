@@ -31,3 +31,8 @@ Linemode = Linemode
 -- ui.hide() returns the terminal permit; drop restores Yazi's screen.
 ---@class Permit
 ---@field drop fun(self: Permit)
+
+-- Yazi v26.9.1 yazi-plugin/src/ui/utils.rs.
+---@class ui
+---@field area fun(name: "current"|"preview"|"progress"): ui.Rect
+---@field lines fun(text: string, opts: { width: integer, wrap: ui.Wrap, tab_size: integer }): ui.Line[]
