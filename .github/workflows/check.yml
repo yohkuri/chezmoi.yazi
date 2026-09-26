@@ -51,6 +51,8 @@ jobs:
           lua -v
           lua5.1 test/core.lua
           lua5.4 test/core.lua
+          lua5.1 test/actions.lua
+          lua5.4 test/actions.lua
           for file in ./*.lua test/*.lua scripts/*.lua; do
             luac -p "$file"
             luac5.1 -p "$file"
@@ -107,7 +109,7 @@ jobs:
             sha256sum --check --strict
           install -m 0755 "$RUNNER_TEMP/chezmoi" "$RUNNER_TEMP/bin/chezmoi"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
-      - name: Run black-box status and refresh checks
+      - name: Run black-box status and command checks
         run: test/e2e.py --smoke --artifacts "$RUNNER_TEMP/chezmoi-yazi-e2e"
       - name: Upload E2E failure evidence
         if: failure()

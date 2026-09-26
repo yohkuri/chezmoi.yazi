@@ -1,6 +1,7 @@
 # chezmoi.yazi
 
-Show chezmoi management and status in Yazi's linemode. A managed file gets a
+Run scoped chezmoi commands and show management and status in Yazi's linemode.
+A managed file gets a
 `C` marker and the original two `chezmoi status` columns. Directories also show
 whether any managed descendant differs, including missing destination files.
 
@@ -13,7 +14,7 @@ other Yazi/chezmoi versions and Linux have not been verified locally.
 
 Place this repository at `~/.config/yazi/plugins/chezmoi.yazi` (or under
 `$YAZI_CONFIG_HOME/plugins` if configured). For a local checkout, symlink that
-directory to the checkout instead. Keep all four Lua files together.
+directory to the checkout instead. Keep all root Lua files together.
 
 Add to `init.lua`:
 
@@ -35,9 +36,14 @@ run = "chezmoi"
 group = "chezmoi"
 ```
 
-Add an optional manual refresh binding to `keymap.toml`:
+Add optional menu and manual refresh bindings to `keymap.toml`:
 
 ```toml
+[[mgr.prepend_keymap]]
+on = ["c", "m"]
+run = "plugin chezmoi -- menu"
+desc = "Chezmoi actions"
+
 [[mgr.prepend_keymap]]
 on = ["c", "r"]
 run = "plugin chezmoi -- refresh"
@@ -91,6 +97,76 @@ An automatic refresh can display old results with the `stale` style while
 working. Once a query fails, failure signs replace the old status. Manual
 refresh and navigation clear old results immediately. Failure notifications
 are limited to one per 30 seconds and never include raw stderr or secrets.
+
+## Commands
+
+Use the menu or bind any command directly. Both routes use the same target
+validation and confirmation rules. No arguments still means `refresh`.
+
+| Plugin command | Action |
+| --- | --- |
+| `plugin chezmoi -- menu` | Choose an action; `Add options` offers template, encrypted, or both |
+| `plugin chezmoi -- add` | Copy destination files into source state, replacing existing entries |
+| `plugin chezmoi -- add --template` | Add as templates |
+| `plugin chezmoi -- add --encrypt` | Add encrypted; can be combined with `--template` |
+| `plugin chezmoi -- re-add` | Re-add modifications; chezmoi skips templates and non-files |
+| `plugin chezmoi -- edit` | Edit source files through chezmoi's configured editor |
+| `plugin chezmoi -- edit --apply` | Edit, show diff, confirm, then apply |
+| `plugin chezmoi -- diff` | Show diff using chezmoi's configured diff tool/pager |
+| `plugin chezmoi -- apply` | Show diff, confirm, then apply |
+| `plugin chezmoi -- forget` | Stop managing entries; keep destination files |
+| `plugin chezmoi -- destroy` | Permanently delete source and destination entries |
+| `plugin chezmoi -- refresh` | Refresh the visible status |
+
+Actions snapshot the active tab's selection, including selected files in other
+directories. With no selection, they use the hovered file. Empty targets never
+become an unscoped chezmoi command. Remote URLs, targets outside the destination,
+source-tree paths, unavailable files, and unsupported file types are rejected.
+Fresh managed information is required; known inapplicable targets stop the
+whole selection before execution. Edit requires individual files or symlinks,
+not directories. External, removal, and script entries cannot be edited,
+forgotten, or destroyed through these actions.
+
+Directories include descendants by default. `add`, `re-add`, `diff`, `apply`,
+and `destroy` accept `--recursive=false` on direct bindings. For `destroy`,
+this option accepts files and symlinks but rejects directories: chezmoi still
+deletes a directory's descendants with `--recursive=false`. Recursive parent
+targets absorb duplicate child selections. `forget` includes a directory's
+source descendants and has no nonrecursive option. Select a managed parent
+directory to restore missing descendants with apply. `remove` is unavailable;
+choose `forget` or `destroy` explicitly. Other CLI flags are not accepted.
+
+Single-file add/re-add and opening the editor need no plugin confirmation.
+Multiple-target or directory add/re-add operations confirm their scope first.
+Forget/destroy always confirm their different effects. Confirmations list
+targets in pages sized to the current pane, including continuations of long
+paths. Cancelling any page cancels execution. A pane resize restarts review
+from the first page; panes smaller than 32 columns or 8 rows must be enlarged
+before retrying. Chezmoi's own prompts remain enabled; the plugin never adds
+`--force`.
+
+Apply always follows a successful diff and explicit confirmation. The preview
+and apply use the same targets, recursion, and all entry types, matching a
+normal chezmoi apply; scripts are not independently excluded. In particular,
+the apply preview overrides `[diff].include`/`exclude`, which affect standalone
+diff but do not restrict chezmoi apply. A standalone `diff` retains those
+settings. Other chezmoi settings, including secret skipping, are inherited.
+The linemode continues to evaluate all types independently of these settings.
+Diff is a preview, not a transaction: chezmoi evaluates again at apply time.
+Both edit commands explicitly disable chezmoi's `edit.apply` and `edit.watch`
+settings. Editing alone cannot apply changes, and `edit --apply` waits for the
+plugin's separate diff and confirmation stages.
+
+Yazi temporarily hands over the terminal for the editor, pager, credentials,
+and conflict prompts. Press Enter after each command to return or continue.
+Interactive commands have no status-query timeout. Only one action runs per
+Yazi instance; status queries pause and obsolete results are discarded.
+After an executed command, success, failure, and interruption all trigger a
+file-list/status refresh. Failures may leave partial changes; there is no
+automatic retry or rollback. Cancelling apply after edit keeps the source edit.
+Completion means the command finished, not that every entry was changed.
+Raw command output stays in the terminal and is not copied to plugin logs or
+notifications. Terminal scrollback remains subject to your terminal settings.
 
 ## Configuration
 
@@ -175,13 +251,14 @@ desc = "Reload theme"
 
 ## Evaluation and limits
 
-The plugin calls destination discovery, `managed`, and `status`. It never calls
-`apply`, `add`, or `re-add`. Templates and encrypted files are evaluated by
+Background status acquisition calls destination discovery, `managed`, and
+`status`; it never calls mutation commands. Explicit actions are described
+above. Templates and encrypted files are evaluated by
 chezmoi, with all entry categories included and secret skipping disabled.
 Thus configured `include`/`exclude` preferences for a bare status command are
 intentionally overridden. Apply scripts are reported, not executed.
 
-Commands use argument arrays, closed stdin, `--no-tty`, no pager/color/progress,
+Background queries use argument arrays, closed stdin, `--no-tty`, no pager/color/progress,
 and a timeout. Missing credentials or invalid templates produce failure signs.
 chezmoi hooks, template functions, decryptors, and external resources may still
 run commands, refresh caches, or open their own UI. This is full chezmoi
@@ -225,7 +302,7 @@ test/check.py
 ```
 
 `npm run check` uses `.markdownlint-cli2.yaml`, `.luarc.json`, and
-`.stylua.toml`, then runs the 51-assertion pure Lua suite, Python syntax checks,
+`.stylua.toml`, then runs the pure Lua status and action suites, Python syntax checks,
 and harness unit tests. LuaLS checks the plugin and in-Yazi probes as Lua 5.5.
 
 `mise.toml` only pins tool versions for developers who use mise; it defines
@@ -294,8 +371,8 @@ test/e2e.py --smoke
 test/e2e.py --git-plugin /absolute/path/to/git.yazi
 ```
 
-The E2E suite starts a fresh isolated Yazi for each scenario and reads only
-the visible current pane and process exit state. It invokes the real chezmoi
+The E2E suite starts a fresh isolated Yazi for each scenario and checks visible
+terminal output, process exit state, and fixture files. It invokes the real chezmoi
 binary directly, without the runtime suite's probe or command wrapper. Use
 `--case NAME` to isolate one scenario, `--keep` to retain fixtures, or
 `--artifacts DIR` to save failure captures and logs. It needs Yazi, chezmoi,

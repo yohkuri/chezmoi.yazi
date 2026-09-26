@@ -1,6 +1,7 @@
 # chezmoi.yazi design
 
-Status: implemented and tested on the baseline runtime, 2026-09-18.
+Status: baseline status display implemented on 2026-09-18; explicit command
+actions added on 2026-09-20.
 See [README](../README.md) for installation and [validation](validation.md)
 for measured evidence and remaining limits. This document retains the design
 rationale; implementation notes below describe departures from its sketches.
@@ -36,6 +37,77 @@ source filename attributes must not be decoded by the plugin itself.
 The initial integration baseline is Yazi 26.9.1 and chezmoi 2.72.2 on macOS.
 The `@since 26.9.1` annotation enforces the minimum Yazi version. Other
 platforms and chezmoi versions require separate verification.
+
+## Explicit command actions
+
+The extension combines direct plugin commands with a thin `ya.which` menu.
+Both use the same pure action policy, fresh preflight, confirmations, terminal
+runner, and cleanup. Arbitrary CLI flags, source-tree actions, an independent
+management screen, and unscoped commands are outside this extension.
+
+The selected interaction defaults are:
+
+- Snapshot the active tab's selection, falling back to its hovered entry.
+  Preserve selections outside the visible directory. No target means no action.
+- Recurse through directories, with `--recursive=false` available on direct
+  add/re-add/diff/apply/destroy bindings. Reject directories for nonrecursive
+  destroy because chezmoi still deletes their descendants. Collapse covered
+  child selections.
+- Reject the entire selection on a known invalid target. Edit accepts files
+  and symlinks, not directories. Refresh membership before validating; an old
+  linemode marker is not authorization or evidence that an entry is editable.
+- Confirm broad add/re-add actions and every forget/destroy action. Keep
+  chezmoi's native confirmations and never inject `--force`.
+- Apply only after a successful diff and explicit confirmation. `edit --apply`
+  is implemented as separate edit, diff, confirmation, and apply stages, so
+  refusing apply retains the source edit. Failed stages stop the workflow.
+  Every native edit stage passes `--apply=false --watch=false`, overriding
+  automatic application settings that would bypass the plugin's confirmation.
+- Offer template/encrypted add (including their combination) and edit-and-apply
+  alongside the seven basic actions. Reject unsupported flags and explain the
+  distinction between forget and destroy when `remove` is requested.
+
+`actions.lua` contains argument validation, target reduction, command vectors,
+and confirmation policy. `interaction.lua` owns fresh metadata acquisition and
+the asynchronous UI. `main.lua` owns the operation lock, immutable selection
+snapshot, and status-worker coordination. The shared context argument builder
+passes the same executable/config/source/destination/state/cache to queries and
+actions without sharing query-specific flags.
+
+Confirmation pages are built from Yazi's prewrapped Unicode-aware lines, with
+room reserved for the dialog borders, buttons, and continuation prompt. Page
+size follows the current pane, and long paths can continue across pages without
+truncation. A resize detected after accepting a page restarts the entire review.
+Panes below 32 columns or 8 rows reject confirmation until enlarged. No command
+runs unless all pages are accepted at a consistent pane size.
+
+The preflight queries all managed entries, and a files/symlinks/directories
+subset excluding externals for edit/forget/destroy. Removal and script entries
+may have status markers without being editable source files. Filesystem metadata
+is read without following the selected symlink. Other applicability decisions
+and recursive entry exclusions remain chezmoi's responsibility; a successful
+command does not claim every entry was changed. Failure can leave partial work.
+
+Standalone diff inherits its configured filters. Apply has no corresponding
+`[apply].include`/`exclude` settings in the baseline chezmoi runtime. Its preview
+therefore explicitly uses all types with no exclusions, just like the apply
+stage, overriding diff-only filters. Neither stage forces secret evaluation or
+suppresses scripts. The background linemode remains a separate full-evaluation
+view. Preview and application evaluate separately; they are not an atomic plan.
+
+Interactive processes inherit stdin/stdout/stderr under a `ui.hide()` permit.
+They have no acquisition timeout. The runner restores the permit after errors
+and waits for Enter so output remains readable. A fixed shell snippet provides
+only this Enter prompt; executable arguments and target paths never enter shell
+source. Raw output is not copied to plugin notifications or logs.
+
+Acquiring the action lock invalidates the current acquisition epoch and pending
+work. A worker already in a query drains through its existing deadline before
+preflight or interactive execution starts. New fetch/navigation/refresh requests
+are deferred until release. A second action is rejected while the lock is held.
+Every exit releases the lock and schedules fresh visible status; an executed
+command also requests a file-list refresh, including after failure or Ctrl-C.
+Mutation commands are never automatically retried or split into multiple runs.
 
 ## Status semantics
 

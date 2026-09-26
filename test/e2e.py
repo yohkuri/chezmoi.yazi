@@ -142,14 +142,20 @@ def git_coexistence(t):
     clean_logs(t)
 
 
+from action_cases import commands, extended, confirmation_pages
+
 SCENARIOS = {
+    "commands": commands,
+    "command-edges": extended,
+    "confirmation-pages": confirmation_pages,
     "status-refresh": status_refresh,
     "navigation": navigation,
     "failure-recovery": failure_recovery,
     "theme-reload": theme_reload,
     "git-coexistence": git_coexistence,
 }
-DEFAULT_CASES = ["status-refresh", "navigation", "failure-recovery", "theme-reload"]
+DEFAULT_CASES = ["status-refresh", "navigation", "failure-recovery", "theme-reload", "commands", "command-edges",
+                 "confirmation-pages"]
 
 
 def version(command):
@@ -239,7 +245,7 @@ def main():
     )
     args = parser.parse_args()
 
-    cases = ["status-refresh"] if args.smoke else list(args.cases or DEFAULT_CASES)
+    cases = ["status-refresh", "commands"] if args.smoke else list(args.cases or DEFAULT_CASES)
     if args.git_plugin and "git-coexistence" not in cases:
         cases.append("git-coexistence")
     if "git-coexistence" in cases and not args.git_plugin:

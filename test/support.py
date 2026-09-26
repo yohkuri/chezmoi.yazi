@@ -1,5 +1,6 @@
 """Shared real-runtime fixture, with no third-party Python dependencies."""
 from contextlib import contextmanager
+import errno
 import json
 import os
 from pathlib import Path
@@ -55,7 +56,7 @@ def environment(root):
 
 
 def chezmoi_args(root):
-    return ["--config", str(root / "chezmoi.toml"), "--source", str(root / "source"),
+    return ["--config", str(root / "config/chezmoi.toml"), "--source", str(root / "source"),
             "--destination", str(root / "dest"), "--persistent-state", str(root / "chezmoi.db"),
             "--cache", str(root / "cache/chezmoi"), "--no-tty", "--no-pager",
             "--color=false", "--progress=false", "--skip-secrets=false"]
@@ -105,7 +106,7 @@ class Runtime:
         for directory in ["source", "dest", "config/plugins", "state", "cache", "data"]:
             (root / directory).mkdir(parents=True, exist_ok=True)
         self.source, self.dest = root / "source", root / "dest"
-        self.cfg = root / "chezmoi.toml"
+        self.cfg = root / "config/chezmoi.toml"
         write(self.cfg, "")
         self.env = environment(root)
         self.instrument = root / "state/instrument"
@@ -139,7 +140,7 @@ class Runtime:
             run(["git", "-c", "init.templateDir=", "init", "--quiet", str(self.dest)], env=self.env)
         write(root / "config/init.lua", init)
         write(root / "config/yazi.toml", config)
-        keys = dict(R="plugin chezmoi -- refresh", Y="app:theme",
+        keys = dict(C="plugin chezmoi -- menu", R="plugin chezmoi -- refresh", Y="app:theme",
                     N="cd " + shlex.quote(str(self.dest / ".config")), B="cd " + shlex.quote(str(self.dest)),
                     G="tab_create " + shlex.quote(str(self.dest / ".config")), H="tab_switch 0")
         if probe:
@@ -277,7 +278,16 @@ class Runtime:
         if self.keep:
             print(f"Evidence: {self.root}")
         else:
-            shutil.rmtree(self.root)
+            # A terminating Yazi child may write one last cache file while the
+            # tree is being removed. Retry only that bounded cleanup race.
+            for attempt in range(20):
+                try:
+                    shutil.rmtree(self.root)
+                    break
+                except OSError as error:
+                    if error.errno != errno.ENOTEMPTY or attempt == 19:
+                        raise
+                    time.sleep(0.1)
 
 
 @contextmanager

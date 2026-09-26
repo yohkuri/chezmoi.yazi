@@ -57,7 +57,7 @@ this checkout; restart with a fresh fixture after changing plugin code.
 | --- | --- |
 | `source/` | Disposable chezmoi source state |
 | `dest/` | Destination shown in Yazi |
-| `chezmoi.toml`, `chezmoi.db` | Isolated configuration and last-written state |
+| `config/chezmoi.toml`, `chezmoi.db` | Isolated configuration and last-written state |
 | `config/` | Isolated Yazi config, keymaps, plugin symlinks, and themes |
 | `state/`, `cache/`, `data/` | Isolated XDG paths |
 | `state/instrument/calls` | JSON lines recording plugin command arguments |
@@ -79,6 +79,7 @@ Keys are case-sensitive; use Shift for the uppercase keys.
 | --- | --- |
 | `j`, `k` or arrows | Move the cursor |
 | `l` / Right, `h` / Left | Enter a directory / go to its parent |
+| `C` | Open the chezmoi action menu |
 | `R` | Refresh chezmoi membership and status |
 | `Y` | Reload theme without refreshing status |
 | `T` | Write a diagnostic state snapshot |
@@ -88,8 +89,8 @@ Keys are case-sensitive; use Shift for the uppercase keys.
 | `H` | Switch to tab zero |
 | `q` | Quit Yazi |
 
-`R`, `Y`, `T`, `N`, `B`, `G`, and `H` override normal Yazi bindings only in this
-fixture. Hidden files are visible and the base linemode is `none` so the
+`C`, `R`, `Y`, `T`, `N`, `B`, `G`, and `H` override normal Yazi bindings only in
+this fixture. Hidden files are visible and the base linemode is `none` so the
 plugin columns are easy to identify.
 
 ## 1. Initial membership and status
@@ -283,7 +284,51 @@ cp "$CHEZMOI_YAZI_FIXTURE/baseline-theme.toml" \
 
 Press `Y`. Default signs return, preserving `"G "` when git.yazi is enabled.
 
-## 9. Evidence and cleanup
+## 9. Explicit actions
+
+Use a fresh fixture for these checks, separate from the status scenarios above.
+Press `C` to open the menu; Escape cancels. Commands temporarily take over the
+terminal. Press Enter after reading each command's output. Native chezmoi
+prompts accept their indicated keys; do not add `--force` to the fixture.
+
+1. Hover `unmanaged`, choose Add, and verify a `C` marker appears. Edit that
+   destination file in the second terminal, choose Re-add, and inspect the
+   corresponding fixture source file. Choose Forget: cancel once, then confirm
+   both the plugin and native prompt; the destination file must remain.
+2. Add `unmanaged` again, then choose Destroy and confirm both prompts. Source
+   and destination files must disappear, and Yazi's file list must update.
+   A direct `destroy --recursive=false` binding must reject a directory before
+   confirmation; its children must remain in source and destination.
+3. Hover `source`, choose Apply, read the diff, and decline the plugin's
+   confirmation. The destination must remain unchanged. Repeat and accept;
+   the destination must match source and its status must become clean.
+4. Use Add options on a disposable file to create a template. Re-add must not
+   overwrite that template. Encrypted add requires credentials configured in
+   this fixture's `config/chezmoi.toml`; do not copy personal secrets here.
+   The automated command-edge scenario provides a disposable age identity.
+5. Select several files, including one selected in another directory. Verify
+   confirmation pages show all paths. Mix managed and unmanaged files for Edit:
+   the whole operation must stop. Selecting a directory for Edit must ask you
+   to select files inside it instead.
+6. Set `apply=true` and `watch=true` under `[edit]` in the fixture's chezmoi
+   config. Plain Edit must leave the destination unchanged. Use Edit and apply
+   with a terminal editor. Cancel after the diff and verify
+   the source edit survives while the destination stays unchanged. Repeat with
+   an accepted apply. Interrupt the editor with Ctrl-C and verify Yazi returns
+   after the exit prompt and remains usable. The fixture uses your available
+   editor unless you configure `[edit]` in its isolated chezmoi config.
+7. Apply `.config` only after inspecting its diff: this intentionally creates
+   the missing `new` file and runs the disposable pending script. The
+   `script-ran` marker must appear below the fixture root. Background status
+   queries alone must never create it.
+8. Select several long paths and inspect every confirmation page, including a
+   single path that spans pages and escaped control characters. Resize while
+   confirming: accepting the old page must restart review from the first page.
+   Cancel on a later page and verify no files changed. A pane below 32 columns
+   or 8 rows must ask you to enlarge it. Also inspect output readability and
+   return to the file list.
+
+## 10. Evidence and cleanup
 
 Record versions, terminal name, failed step, expected/actual display, and a
 screenshot when reporting a visual issue. Press `T` for a fresh state snapshot.
