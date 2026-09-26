@@ -109,11 +109,28 @@ local function preflight(snapshot, action)
 			return nil, "Cannot acquire source entries. No action was run."
 		end
 	end
+	local source_dirs
+	source_dirs = {}
+	if action.name == "destroy" and action.recursive == false then
+		-- Destination metadata can differ from the source tree destroy removes.
+		output = run {
+			"managed",
+			"--include=dirs",
+			"--exclude=externals",
+			"--path-style=absolute",
+			"--nul-path-separator",
+		}
+		source_dirs = output and core.managed(output, destination)
+		if not source_dirs then
+			return nil, "Cannot acquire source directories. No action was run."
+		end
+	end
 	for _, file in ipairs(snapshot.files) do
 		if file.local_path then
 			local cha = fs.cha(Url(file.path), false)
 			file.exists = cha ~= nil
 			file.dir = cha and cha.is_dir and not cha.is_link or false
+			file.source_dir = source_dirs[core.path(file.path)] or false
 			file.special = cha and (cha.is_block or cha.is_char or cha.is_fifo or cha.is_sock) or false
 		end
 	end
