@@ -70,7 +70,7 @@ function M.prepare(action, files, destination, source, managed, editable)
 			why = "Unsupported file type"
 		elseif action.name == "edit" and file.dir then
 			why = "Select files inside the directory to edit"
-		elseif action.name == "destroy" and action.recursive == false and file.dir then
+		elseif action.name == "destroy" and action.recursive == false and (file.dir or file.source_dir) then
 			why = "Non-recursive destroy cannot target a directory; chezmoi would still delete its descendants"
 		elseif action.name ~= "add" and not managed[path] then
 			-- The destination root itself is not listed by managed.
