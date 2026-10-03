@@ -273,6 +273,8 @@ function M:entry(job)
 		if action.name == "refresh" then
 			return submit({}, true)
 		end
+		-- Commit both visual select and unset ranges before the sync snapshot.
+		ya.emit("escape", { visual = true })
 		local snapshot = begin_action()
 		if snapshot.error then
 			return interaction.notify(snapshot.error)

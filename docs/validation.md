@@ -190,6 +190,36 @@ directories fell from 3.9183 s to 0.0171 s after replacing pairwise directory
 coverage scans with ancestor lookups. This excludes CLI work and rendering and
 does not predict ordinary interactive latency. No new Linux validation was run.
 
+### Source ancestry and visual selection regressions
+
+On 2026-10-03, both review findings were reproduced on macOS with Yazi 26.9.1
+and chezmoi 2.73.0 in disposable fixtures:
+
+- With source at `dest/.local/share/chezmoi` and a managed `.local/bin`, recursive
+  destroy of `.local` passed plugin preflight. Accepting the first native prompt
+  removed the unrelated source entry `dot_bashrc`, while its destination remained.
+  Destroy now rejects any target containing the source directory before
+  confirmation or execution, regardless of recursion.
+- `v`, `j`, `j`, then add captured only the hovered third file and skipped
+  multiple-target confirmation. Actions now emit `escape --visual` before the
+  synchronous snapshot, committing select and unset ranges through Yazi's own
+  selection handling. The same snapshot is used by direct commands and the menu.
+
+`test/check.py` passed with 51 core assertions, 73 action assertions, and 11
+Python tests. The full `test/runtime.py` suite passed, including both new
+regression scenarios. The source-ancestor case covers recursive/nonrecursive
+destroy, an unmanaged ancestor, mixed selections, intact source/destination
+entries, and absence of interactive destroy calls. The visual-selection case
+covers three-file confirmation, cancellation, menu dispatch, selection in another
+directory, unset mode, and resulting source entries.
+Wrapper-free `test/e2e.py --case source-ancestor --case visual-selection` also
+passed for both scenarios.
+
+The initial sandboxed E2E attempt lost its private tmux sockets before any key
+input. Runtime and focused E2E checks therefore ran outside that sandbox with
+isolated config, source, destination, state, cache, and tmux paths. No new Linux
+validation was run.
+
 ## Development tooling checks
 
 Locally verified on 2026-09-20:

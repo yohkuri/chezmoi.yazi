@@ -47,12 +47,15 @@ management screen, and unscoped commands are outside this extension.
 
 The selected interaction defaults are:
 
-- Snapshot the active tab's selection, falling back to its hovered entry.
+- Commit visual select/unset ranges before taking the active tab's selection
+  snapshot, falling back to its hovered entry.
   Preserve selections outside the visible directory. No target means no action.
 - Recurse through directories, with `--recursive=false` available on direct
   add/re-add/diff/apply/destroy bindings. Reject directories for nonrecursive
   destroy because chezmoi still deletes their descendants. Collapse covered
-  child selections.
+  child selections. Reject destroy targets containing the source directory,
+  regardless of recursion, because destination deletion can remove the entire
+  source state.
 - Reject the entire selection on a known invalid target. Edit accepts files
   and symlinks, not directories. Refresh membership before validating; an old
   linemode marker is not authorization or evidence that an entry is editable.

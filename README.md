@@ -118,10 +118,11 @@ validation and confirmation rules. No arguments still means `refresh`.
 | `plugin chezmoi -- destroy` | Permanently delete source and destination entries |
 | `plugin chezmoi -- refresh` | Refresh the visible status |
 
-Actions snapshot the active tab's selection, including selected files in other
-directories. With no selection, they use the hovered file. Empty targets never
-become an unscoped chezmoi command. Remote URLs, targets outside the destination,
-source-tree paths, unavailable files, and unsupported file types are rejected.
+Actions commit any visual select or unset range, then snapshot the active tab's
+selection, including selected files in other directories. With no selection,
+they use the hovered file. Empty targets never become an unscoped chezmoi command.
+Remote URLs, targets outside the destination, source-tree paths, unavailable files,
+and unsupported file types are rejected.
 Fresh managed information is required; known inapplicable targets stop the
 whole selection before execution. Edit requires individual files or symlinks,
 not directories. External, removal, and script entries cannot be edited,
@@ -130,11 +131,13 @@ forgotten, or destroyed through these actions.
 Directories include descendants by default. `add`, `re-add`, `diff`, `apply`,
 and `destroy` accept `--recursive=false` on direct bindings. For `destroy`,
 this option accepts files and symlinks but rejects directories: chezmoi still
-deletes a directory's descendants with `--recursive=false`. Recursive parent
-targets absorb duplicate child selections. `forget` includes a directory's
-source descendants and has no nonrecursive option. Select a managed parent
-directory to restore missing descendants with apply. `remove` is unavailable;
-choose `forget` or `destroy` explicitly. Other CLI flags are not accepted.
+deletes a directory's descendants with `--recursive=false`. Destroy also rejects
+any target containing the source directory, regardless of recursion, to protect
+the source state. Recursive parent targets absorb duplicate child selections.
+`forget` includes a directory's source descendants and has no nonrecursive option.
+Select a managed parent directory to restore missing descendants with apply.
+`remove` is unavailable; choose `forget` or `destroy` explicitly. Other CLI flags
+are not accepted.
 
 Single-file add/re-add and opening the editor need no plugin confirmation.
 Multiple-target or directory add/re-add operations confirm their scope first.
