@@ -9,7 +9,10 @@
     "dispatch",
     "python",
     "script",
-    "pid_file"
+    "pid_file",
+    "backend",
+    "session",
+    "initial"
   ],
   "diagnostics.disable": [
     "redefined-local"

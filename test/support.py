@@ -35,10 +35,14 @@ def run(args, *, cwd=None, env=None, timeout=10):
 
 def lua(value):
     """Serialize fixture values to Lua without JSON-only Unicode escapes."""
+    if value is None:
+        return "nil"
     if isinstance(value, (str, Path)):
         return '"' + ''.join(f"\\{byte:03d}" for byte in str(value).encode()) + '"'
     if isinstance(value, bool):
         return str(value).lower()
+    if isinstance(value, (list, tuple)):
+        return "{" + ",".join(lua(item) for item in value) + "}"
     if isinstance(value, dict):
         return "{" + ",".join(f"[{lua(k)}]={lua(v)}" for k, v in value.items()) + "}"
     return str(value)

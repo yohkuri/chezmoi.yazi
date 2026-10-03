@@ -6,18 +6,31 @@ compatibility claim for every newer/older release or platform.
 
 ## Manual fixture
 
-See the [manual acceptance checklist](../test/MANUAL.md) for a persistent
-fixture with expected displays, refresh and failure scenarios, theme changes,
-and ownership-checked cleanup. `test/manual.py` creates the initial state;
-it does not reuse the automated suite's final mutated state.
+See the [guided manual acceptance walk](../test/MANUAL.md). `test/manual.py`
+opens one foreground Yazi with a bottom guide and `W` controls. Preparation,
+verdicts, retries, diagnostics, saving and cleanup are available in that session.
+Each case/retry gets fresh chezmoi paths; steps within a case share state.
 
-On 2026-09-20, the direct manual launcher was checked in an isolated terminal:
-Yazi opened without an attach command, rendered `CMM`, and produced a matching
-probe record. Quitting retained the fixture; reopening inside tmux, status,
-and ownership-checked cleanup also passed. The launcher creates no tmux server.
-The earlier detached fixture was checked with git.yazi on 2026-09-19; the new
-direct launcher has not been separately checked with git.yazi enabled.
-These checks do not constitute a human visual pass of every checklist step.
+On 2026-10-03, all 24 case setups and step preparations were exercised locally
+with Yazi 26.9.1 and chezmoi 2.73.0 on macOS. `test/manual_runtime.py` verified
+the real guide and file rows, unanswered-verdict gating, fresh retries,
+hidden/compact/full layouts, actual refresh, visual unset preservation,
+theme/flavor reload with unchanged epoch, the disposable terminal editor,
+encrypted Add, extra-tab disposal, complete long-target selection, source
+ancestor rejection, foreground diagnostics, and an in-Yazi exit choice.
+A foreground launcher round trip also archived results and removed its owned
+fixtures after Yazi exited. The manual launcher itself creates no tmux server;
+its automated integration checks use a private socket.
+
+`test/check.py` and the complete `test/runtime.py` passed. An initial runtime
+attempt timed out waiting for the resize-restart notification; the unchanged
+scenario passed on rerun. This is a timing-sensitive terminal assertion, not
+an established product regression.
+
+These automated checks do not constitute human visual acceptance of every
+case, font, color, or terminal. The guided launcher with git.yazi, actual editor
+integration, and Linux manual acceptance remain unverified. Earlier direct
+launcher evidence (2026-09-20) concerns the replaced checklist workflow.
 
 ## Automated checks
 
@@ -26,6 +39,7 @@ npm ci --ignore-scripts
 npm run setup:types
 test/check.py
 test/runtime.py
+test/manual_runtime.py
 test/e2e.py
 test/e2e.py --smoke
 # Optional, using an existing git.yazi checkout:
