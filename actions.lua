@@ -21,7 +21,7 @@ function M.parse(args)
 			name == "remove" and "remove is unavailable. Use forget (keep files) or destroy (delete files)."
 				or "Unknown chezmoi command. Use menu for available actions."
 	end
-	local action = { name = name, recursive = recursive[name] and true or nil }
+	local action = { name = name, recursive = recursive[name] }
 	for key, value in pairs(args) do
 		if key ~= 1 then
 			local allowed = key == "recursive" and recursive[name]
@@ -55,7 +55,7 @@ function M.prepare(action, files, destination, source, managed, editable)
 	if #files == 0 then
 		return nil, "No target. Select a file or hover over one."
 	end
-	local errors, targets, seen = {}, {}, {}
+	local errors, targets, seen, broad = {}, {}, {}, false
 	for _, file in ipairs(files) do
 		local path, why = core.path(file.path), nil
 		if not file.local_path or not path then
@@ -94,31 +94,27 @@ function M.prepare(action, files, destination, source, managed, editable)
 		elseif path and not seen[path] then
 			seen[path] = true
 			targets[#targets + 1] = { path = path, dir = file.dir }
+			broad = #targets > 1 or broad or file.dir
 		end
 	end
 	if #errors > 0 then
 		return nil, table.concat(errors, "\n")
 	end
-	local broad = #targets > 1
-	for _, target in ipairs(targets) do
-		broad = broad or target.dir
-	end
 	table.sort(targets, function(a, b) return a.path < b.path end)
 	local minimal, directories = {}, {}
 	for _, target in ipairs(targets) do
 		local covered = false
-		if action.recursive or action.name == "forget" then
-			for _, parent in ipairs(directories) do
-				if core.inside(target.path, parent.path) then
-					covered = true
-					break
-				end
+		if (action.recursive or action.name == "forget") and next(directories) then
+			local parent = target.path
+			while parent and not covered do
+				covered = directories[parent] or false
+				parent = parent:match("^(.+)/[^/]+$") or parent ~= "/" and "/" or nil
 			end
 		end
 		if not covered then
 			minimal[#minimal + 1] = target
 			if target.dir then
-				directories[#directories + 1] = target
+				directories[target.path] = true
 			end
 		end
 	end

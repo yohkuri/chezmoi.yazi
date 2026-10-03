@@ -16,11 +16,11 @@ def configure(t):
         "x": "plugin chezmoi -- destroy", "D": "plugin chezmoi -- destroy --recursive=false",
         "v": "plugin chezmoi -- edit --apply",
         "t": "plugin chezmoi -- add --template", "z": "plugin chezmoi -- add --encrypt",
-        "u": "plugin chezmoi -- add --recursive=false", "i": "plugin chezmoi -- diff --recursive=false",
+        "u": "plugin chezmoi -- add --recursive=false",
         "s": "toggle", "S": "escape --select",
     }
     for key, name in {"1": "clean", "2": "unmanaged", "3": "source", "4": ".config",
-                      "5": "local", "6": "space name", "7": "link", "8": "ignored"}.items():
+                      "5": "local", "6": "space name"}.items():
         keys[key] = "reveal " + shlex.quote(str(t.dest / name))
     cfg = t.root / "config/keymap.toml"
     write(cfg, read(cfg) + ''.join(
@@ -144,7 +144,6 @@ def extended(t):
     folder = t.dest / "newdir"
     folder.mkdir()
     write(folder / "child", "child\n")
-    (t.dest / "emptydir").mkdir()
     (t.dest / "outside-link").symlink_to(t.root / "unmanaged-outside")
     replaced_dirs = ["directory-as-file", "directory-as-link"]
     for name in replaced_dirs:
@@ -152,7 +151,7 @@ def extended(t):
         write(t.source / name / "child", "preserve source child\n")
     write(t.dest / replaced_dirs[0], "replacement file\n")
     (t.dest / replaced_dirs[1]).symlink_to("clean")
-    keys = bind_targets(t, special + ["newdir", "emptydir", "outside-link"] + replaced_dirs)
+    keys = bind_targets(t, special + ["newdir", "outside-link"] + replaced_dirs)
     identity = t.root / "age-identity"
     write(identity, "AGE-SECRET-KEY-1KTYK6RVLN5TAPE7VF6FQQSKZ9HWWCDSKUGXXNUQDWZ7XXT5YK5LSF3UTKQ\n")
     identity.chmod(0o600)

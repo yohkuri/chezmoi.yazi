@@ -63,6 +63,17 @@ check(
 )
 local p = assert(plan({ "apply" }, { file("/d/dir/b"), file("/d/dir", true), file("/d/a"), file("/d/a") }))
 check(#p.targets == 2 and p.broad, "recursive parent covers child; deduplicate")
+p = assert(plan({ "add" }, {
+	file("/d/tree", true),
+	file("/d/tree-sibling", true),
+	file("/d/tree/child"),
+	file("/d/tree\nname", true),
+	file("/d/tree\nname/child"),
+}))
+check(
+	#p.targets == 3 and p.targets[1].path == "/d/tree" and p.targets[3].path == "/d/tree-sibling",
+	"recursive reduction preserves sibling prefixes and newline directory boundaries"
+)
 p = assert(plan({ "diff", recursive = false }, { file("/d/dir/b"), file("/d/dir", true) }))
 check(#p.targets == 2, "nonrecursive preserves child")
 check(not actions.confirm_before(assert(plan({ "add" }, { file("/d/new") }))), "single add has no plugin confirmation")

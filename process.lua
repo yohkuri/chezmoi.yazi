@@ -60,6 +60,7 @@ function M.run(command, args, timeout, limit, cancelled)
 end
 
 function M.client(opts, cancelled)
+	local context = actions.context(opts)
 	return function(args)
 		local all = {
 			"--no-tty",
@@ -68,7 +69,7 @@ function M.client(opts, cancelled)
 			"--progress=false",
 			"--skip-secrets=false",
 		}
-		for _, arg in ipairs(actions.context(opts)) do
+		for _, arg in ipairs(context) do
 			all[#all + 1] = arg
 		end
 		for _, arg in ipairs(args) do
@@ -101,7 +102,7 @@ function M.interactive(opts, args, summary)
 		return status and status.success and resumed and resumed.success or false
 	end)
 	permit:drop()
-	return ok and success or false
+	return ok and success
 end
 
 return M

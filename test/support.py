@@ -220,15 +220,18 @@ class Runtime:
     def logs(self):
         return '\n'.join(read(p) for p in (self.root / "state").rglob("*.log"))
 
-    def snapshot(self):
+    def snapshot(self, request=None, *, timeout=2, interval=0.05):
         self.report.unlink(missing_ok=True)
-        self.key("T")
-        deadline = time.monotonic() + 2
+        if request is None:
+            self.key("T")
+        else:
+            request()
+        deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             try:
                 return json.loads(read(self.report))
             except (FileNotFoundError, json.JSONDecodeError):
-                time.sleep(0.05)
+                time.sleep(interval)
         raise AssertionError("No probe response\n" + self.logs() + self.capture())
 
     def wait(self, predicate, timeout=8):

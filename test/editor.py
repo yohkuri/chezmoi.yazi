@@ -2,17 +2,18 @@
 import json
 from pathlib import Path
 import sys
+from support import read, write
 
 root = Path(sys.argv[1])
 targets = [Path(arg) for arg in sys.argv[2:]]
-(root / "editor-targets.json").write_text(json.dumps(list(map(str, targets))))
-mode = (root / "editor-mode").read_text()
+write(root / "editor-targets.json", json.dumps(list(map(str, targets))))
+mode = read(root / "editor-mode")
 if mode == "wait":
     print("Fixture editor input:", flush=True)
     value = input()
 else:
     value = "edited by fixture"
 for target in targets:
-    target.write_text(value + "\n")
+    write(target, value + "\n")
     if mode == "partial-fail":
         sys.exit(1)

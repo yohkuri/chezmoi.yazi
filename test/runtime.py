@@ -3,8 +3,7 @@
 import argparse
 import json
 import time
-import subprocess
-from support import baseline, fixture, read, write
+from support import baseline, fixture, read, run, write
 from action_cases import commands, extended, configure, finish, confirm, confirmation_pages
 
 
@@ -154,20 +153,7 @@ def action_coordination(t):
     instance_id = t.snapshot()["instance"]
 
     def emit(name, *args):
-        result = subprocess.run(["ya", "emit-to", instance_id, name, *args],
-                                env=t.env, cwd=t.root, capture_output=True, timeout=5)
-        assert result.returncode == 0, result.stderr
-
-    def snapshot():
-        t.report.unlink(missing_ok=True)
-        emit("plugin", "probe")
-        deadline = time.monotonic() + 3
-        while time.monotonic() < deadline:
-            try:
-                return json.loads(read(t.report))
-            except (FileNotFoundError, json.JSONDecodeError):
-                time.sleep(0.03)
-        raise AssertionError("No remote probe response")
+        run(["ya", "emit-to", instance_id, name, *args], env=t.env, cwd=t.root, timeout=5)
 
     # Trigger an action while an obsolete status acquisition is still running.
     t.key("3")
@@ -179,7 +165,7 @@ def action_coordination(t):
     assert t.barrier.exists()
     t.key("p")
     t.wait_screen(lambda s: "Press Enter to return" in s, "diff with action lock held")
-    state = snapshot()
+    state = t.snapshot(lambda: emit("plugin", "probe"), timeout=3, interval=0.03)
     assert state["action_busy"] and not state["running"]
     before = read(t.calls)
     emit("plugin", "chezmoi", "add")
