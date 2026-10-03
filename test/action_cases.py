@@ -5,7 +5,7 @@ import shlex
 import time
 import sys
 import screen
-from support import REPO, NAMES, read, write
+from support import REPO, NAMES, lua, read, write
 
 
 def configure(t):
@@ -134,6 +134,92 @@ def bind_targets(t, names):
                     + json.dumps("reveal " + shlex.quote(str(t.dest / name))) + '\n')
     write(cfg, content)
     return bindings
+
+
+def source_ancestor(t):
+    configure(t)
+    nested = t.dest / ".local/share/chezmoi"
+    nested.parent.mkdir(parents=True)
+    init = t.root / "config/init.lua"
+    write(init, read(init).replace(lua(t.source), lua(nested)))
+    t.source.rename(nested)
+    t.args[t.args.index("--source") + 1] = str(nested)
+    t.source = nested
+    (t.source / "dot_local/bin").mkdir(parents=True)
+    write(t.source / "dot_local/bin/tool", "managed tool\n")
+    write(t.source / "dot_bashrc", "unrelated source entry\n")
+    targets = [t.dest / ".local/bin", t.dest / ".bashrc"]
+    write(t.root / "nested-source.diff", t.chezmoi("diff", *targets))
+    t.chezmoi("apply", *targets)
+    keys = bind_targets(t, [".local", ".local/share"])
+    t.start()
+    for name, action, mixed in [(".local", "x", False), (".local/share", "x", False),
+                                (".local", "x", True), (".local", "D", False)]:
+        t.wait_screen(lambda s: "contains the source directory" not in s,
+                      "previous rejection cleared")
+        t.key("S")
+        if mixed:
+            t.key("1"); t.key("s")
+        t.key(keys[name])
+        if mixed:
+            t.key("s")
+        before = read(t.calls) if t.calls.exists() else None
+        t.key(action)
+        capture = t.wait_screen(lambda s: "contains the source directory" in s,
+                                "source ancestor rejected before confirmation")
+        assert "Continue?" not in capture and "yes/no/all/quit" not in capture
+        if before is not None:
+            calls = [json.loads(line) for line in read(t.calls)[len(before):].splitlines()]
+            assert not any("destroy" in args and "--no-tty" not in args for args in calls)
+        assert read(t.source / "dot_bashrc") == read(t.dest / ".bashrc") == "unrelated source entry\n"
+        assert read(t.source / "dot_local/bin/tool") == read(t.dest / ".local/bin/tool") == "managed tool\n"
+        assert read(t.source / "clean") == read(t.dest / "clean") == "original\n"
+    assert "runtime error:" not in t.logs(), t.logs()
+    print("PASS source ancestor rejection: recursive, nonrecursive, unmanaged parent, mixed selection")
+
+
+def visual_selection(t):
+    configure(t)
+    cfg = t.root / "config/keymap.toml"
+    # The action suite uses v for edit-and-apply; restore visual mode here.
+    write(cfg, read(cfg).replace('run="plugin chezmoi -- edit --apply"', 'run="visual_mode"'))
+    names = ["visual/" + name for name in ["a", "b", "c", "d", "e", "f"]]
+    (t.dest / "visual").mkdir()
+    for name in names:
+        write(t.dest / name, "visual selection\n")
+    keys = bind_targets(t, names)
+    t.start()
+    t.key(keys[names[0]]); t.key("v"); t.key("j"); t.key("j"); t.key("a")
+    capture = t.wait_screen(lambda s: "Continue?" in s, "visual range confirmation")
+    assert "Targets: 3" in capture, capture
+    confirm(t, False)
+    returned(t)
+    assert not any((t.source / name).exists() for name in names)
+    t.key("a"); confirm(t); finish(t)
+    assert all(read(t.source / name) == "visual selection\n" for name in names[:3])
+    assert not any((t.source / name).exists() for name in names[3:])
+    t.key("S")
+    # Preserve a selection outside the current directory when committing a range.
+    t.key("1"); t.key("s")
+    t.key(keys[names[3]]); t.key("v"); t.key("j"); t.key("j"); t.key("C")
+    t.wait_screen(lambda s: "Add options" in s, "visual range menu snapshot")
+    t.key("a")
+    capture = t.wait_screen(lambda s: "Continue?" in s, "menu visual range confirmation")
+    assert "Targets: 4" in capture, capture
+    confirm(t); finish(t)
+    assert all(read(t.source / name) == "visual selection\n" for name in names)
+    t.key("S")
+    # Unset mode must remove the range from the existing selection.
+    for name in names[:3]:
+        t.key(keys[name]); t.key("s")
+    t.key(keys[names[0]]); t.key("V"); t.key("j"); t.key("f")
+    capture = t.wait_screen(lambda s: "Continue?" in s, "visual unset confirmation")
+    assert "Targets: 1" in capture and "/" + names[2] in capture, capture
+    confirm(t, False)
+    returned(t)
+    assert all((t.source / name).exists() and (t.dest / name).exists() for name in names)
+    assert "runtime error:" not in t.logs(), t.logs()
+    print("PASS visual selection: direct add, cancellation, menu, cross-directory selection, unset")
 
 
 def extended(t):

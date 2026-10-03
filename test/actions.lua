@@ -52,6 +52,47 @@ check(
 )
 check(plan({ "destroy" }, { replaced_dir }) ~= nil, "recursive destroy still accepts a replaced source directory")
 check(plan({ "add" }, { file("/d/source/a") }) == nil, "reject source tree")
+local nested_source = "/d/.local/share/chezmoi"
+local nested_managed = { ["/d/a"] = true, ["/d/.local"] = true, ["/d/.local/bin"] = true, ["/d/.locality"] = true }
+for _, path in ipairs { "/d", "/d/.local", "/d/.local/share", "/d/.local/bin/.." } do
+	for _, recursive in ipairs { true, false } do
+		local p, err = actions.prepare(
+			assert(actions.parse { "destroy", recursive = recursive }),
+			{ file("/d/a"), file(path, true) },
+			"/d",
+			nested_source,
+			nested_managed,
+			nested_managed
+		)
+		check(p == nil and err:find("contains the source directory", 1, true), "source ancestor rejects entire destroy")
+	end
+end
+for _, name in ipairs { "add", "diff", "apply", "forget" } do
+	check(
+		actions.prepare(
+			assert(actions.parse { name }),
+			{ file("/d/.local", true) },
+			"/d",
+			nested_source,
+			nested_managed,
+			nested_managed
+		),
+		"source ancestor restriction applies only to destroy"
+	)
+end
+for _, path in ipairs { "/d/.local/bin", "/d/.locality" } do
+	check(
+		actions.prepare(
+			assert(actions.parse { "destroy" }),
+			{ file(path, true) },
+			"/d",
+			nested_source,
+			nested_managed,
+			nested_managed
+		),
+		"destroy allows sibling directories and similar prefixes"
+	)
+end
 check(plan({ "add" }, { file("/elsewhere") }) == nil, "reject destination escape")
 check(plan({ "add" }, { file("/d/../elsewhere") }) == nil, "normalize before validation")
 check(plan({ "add" }, { { path = "sftp://host/a" } }) == nil, "reject nonlocal URL")

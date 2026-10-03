@@ -64,6 +64,8 @@ function M.prepare(action, files, destination, source, managed, editable)
 			why = "Outside the destination directory"
 		elseif core.inside(path, source) then
 			why = "Source-tree actions are unsupported"
+		elseif action.name == "destroy" and core.inside(source, path) then
+			why = "Destroy target contains the source directory"
 		elseif not file.exists then
 			why = "Target is unavailable; select its parent to restore missing files"
 		elseif file.special then

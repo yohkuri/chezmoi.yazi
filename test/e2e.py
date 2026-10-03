@@ -142,12 +142,14 @@ def git_coexistence(t):
     clean_logs(t)
 
 
-from action_cases import commands, extended, confirmation_pages
+from action_cases import commands, extended, confirmation_pages, source_ancestor, visual_selection
 
 SCENARIOS = {
     "commands": commands,
     "command-edges": extended,
     "confirmation-pages": confirmation_pages,
+    "source-ancestor": source_ancestor,
+    "visual-selection": visual_selection,
     "status-refresh": status_refresh,
     "navigation": navigation,
     "failure-recovery": failure_recovery,
@@ -155,7 +157,7 @@ SCENARIOS = {
     "git-coexistence": git_coexistence,
 }
 DEFAULT_CASES = ["status-refresh", "navigation", "failure-recovery", "theme-reload", "commands", "command-edges",
-                 "confirmation-pages"]
+                 "confirmation-pages", "source-ancestor", "visual-selection"]
 
 
 def version(command):

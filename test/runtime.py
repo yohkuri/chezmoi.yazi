@@ -4,7 +4,7 @@ import argparse
 import json
 import time
 from support import baseline, fixture, read, run, write
-from action_cases import commands, extended, configure, finish, confirm, confirmation_pages
+from action_cases import commands, extended, configure, finish, confirm, confirmation_pages, source_ancestor, visual_selection
 
 
 def test(t, git_plugin):
@@ -213,3 +213,7 @@ if __name__ == "__main__":
     with fixture(args.git_plugin) as instance:
         baseline(instance)
         confirmation_pages(instance)
+    for scenario in [source_ancestor, visual_selection]:
+        with fixture(args.git_plugin) as instance:
+            baseline(instance)
+            scenario(instance)
