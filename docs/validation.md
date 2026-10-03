@@ -277,6 +277,20 @@ multiple acquisition passes. The default 2-second reuse, 8 extra recovery
 queries, and 10-second subprocess timeout are configurable operating limits,
 not measured optimal settings.
 
+## Force-push commit validation
+
+On 2026-10-03, PR #3 was rebased onto the dependency-update commit from PR #4.
+The push workflow failed commit validation because its pre-rebase `before` SHA
+was not present in the fresh checkout. The PR workflow and both E2E smoke jobs
+passed for the same head. The push workflow now validates all reachable commits
+when the previous head is unavailable, as it already does for a new branch.
+Available push bases and PR base/head ranges retain their scoped checks.
+
+An isolated single-branch clone reproduced the missing old SHA. The actual
+workflow shell block passed normal-push, missing-base force-push, new-branch,
+and PR cases, and rejected an invalid commit with a missing push base. Workflow
+YAML parsing and full reachable-history commit validation also passed locally.
+
 ## Limits of the evidence
 
 The Ubuntu 24.04 E2E smoke scenario is validated in CI. The full runtime and E2E
