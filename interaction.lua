@@ -82,9 +82,12 @@ local function confirm(plan, name)
 end
 
 local function preflight(snapshot, action)
+	if #snapshot.files == 0 then
+		return nil, "No target. Select a file or hover over one."
+	end
 	local run = process.client(snapshot.opts)
-	local destination = run { "execute-template", "{{ .chezmoi.destDir }}" }
-	local source = run { "execute-template", "{{ .chezmoi.sourceDir }}" }
+	local context = run { "execute-template", [[{{ .chezmoi.destDir }}{{ "\x00" }}{{ .chezmoi.sourceDir }}]] }
+	local destination, source = (context or ""):match("^([^%z]+)%z([^%z]+)$")
 	destination, source = core.path(destination), core.path(source)
 	if not destination or not source then
 		return nil, "Cannot resolve chezmoi context. No action was run."
@@ -110,7 +113,6 @@ local function preflight(snapshot, action)
 		end
 	end
 	local source_dirs
-	source_dirs = {}
 	if action.name == "destroy" and action.recursive == false then
 		-- Destination metadata can differ from the source tree destroy removes.
 		output = run {
@@ -130,7 +132,7 @@ local function preflight(snapshot, action)
 			local cha = fs.cha(Url(file.path), false)
 			file.exists = cha ~= nil
 			file.dir = cha and cha.is_dir and not cha.is_link or false
-			file.source_dir = source_dirs[core.path(file.path)] or false
+			file.source_dir = source_dirs and source_dirs[core.path(file.path)] or false
 			file.special = cha and (cha.is_block or cha.is_char or cha.is_fifo or cha.is_sock) or false
 		end
 	end

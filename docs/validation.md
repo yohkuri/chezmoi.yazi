@@ -168,6 +168,28 @@ coordination and confirmation pagination. Wrapper-free E2E runs passed for
 
 These regression scenarios have not been run on Linux or other Yazi versions.
 
+### Cleanup validation
+
+On 2026-10-03, cleanup changes were checked on macOS with Yazi 26.9.1 and
+chezmoi 2.73.0. `test/check.py` passed with 51 core assertions, 59 action
+assertions, and 11 Python tests. The same checks passed in a temporary snapshot
+combining these changes with main's dependency update, including
+markdownlint-cli2 0.23.3.
+
+The full `test/runtime.py` suite passed on rerun. Its initial run passed status,
+rendering, command, command-edge, and operation-coordination checks, but timed
+out waiting for the resize notification during confirmation pagination. The
+unmodified HEAD's instrumented confirmation scenario passed in isolation.
+Wrapper-free E2E runs of `command-edges` and `confirmation-pages` also passed.
+These results do not identify the cause of the initial notification timeout.
+
+Before/after action preparation matched in 6,000 generated comparisons covering
+selection scope, rejection messages, duplicate targets, path boundaries, and
+confirmation policy. A single CPU-time measurement preparing 10,000 independent
+directories fell from 3.9183 s to 0.0171 s after replacing pairwise directory
+coverage scans with ancestor lookups. This excludes CLI work and rendering and
+does not predict ordinary interactive latency. No new Linux validation was run.
+
 ## Development tooling checks
 
 Locally verified on 2026-09-20:
