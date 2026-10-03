@@ -349,9 +349,10 @@ acquisition measurements. Run these commands from the repository root with
 the required tools on `PATH`; none invokes mise.
 
 Start an interactive fixture with `test/manual.py`. The command starts Yazi
-directly in your terminal; no attach command or tmux is needed. For expected
-displays and step-by-step checks, see the
-[manual acceptance checklist](test/MANUAL.md).
+directly in your terminal with a bottom guide. Press `W` for preparation,
+verdicts, retries and diagnostics; `q` saves results and offers cleanup. No
+second terminal, subsequent shell commands or tmux is needed. See the
+[guided manual acceptance walk](test/MANUAL.md) for controls and coverage.
 
 Run the isolated integration suite separately:
 
