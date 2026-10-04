@@ -1,371 +1,155 @@
-# Manual acceptance checklist
+# Guided manual acceptance
 
-Use a disposable destination to inspect the actual terminal display. Run the
-commands below from this repository's root. Public documentation is English;
-Unicode names in the fixture are intentional test data.
-
-## Requirements and preparation
-
-You need Yazi 26.9.1+, chezmoi, and uv on `PATH`. The baseline
-is macOS, Yazi 26.9.1, and chezmoi 2.72.2. Linux remains unverified. Allow a
-terminal at least 100 columns wide; resize later to inspect clipping.
-
-Install uv 0.11.19 using your preferred installer. mise is optional and is
-only a way to install pinned tool versions. The executable script invokes uv
-and prepares Python 3.14 and the locked environment automatically; no pip
-packages, Neovim, or separate Python setup command are needed. Lua is needed
-for development checks, but not for launching the manual fixture.
-Keep this checkout and its `.venv` in place while a fixture is active.
-Its wrapper uses that Python interpreter.
-
-Create a fresh fixture:
+Launch from the repository root in an interactive terminal:
 
 ```sh
 test/manual.py
 ```
 
-The command creates the fixture and opens Yazi directly in your current
-terminal, including when that terminal is already inside tmux. No tmux server
-or attach command is needed. Press `q` to return to the shell; the fixture is
-retained. The helper then prints an `export CHEZMOI_YAZI_FIXTURE=...` command.
-For the two-terminal checks below, copy that export into both terminals and
-reopen Yazi in the first one:
+Yazi opens directly in the same terminal. Follow the bottom guide; press `W`
+for controls or full instructions. Fixture edits, failure injection, checks,
+retries, results and cleanup are handled from this session. You do not need
+another terminal, shell commands after launch, or an external checklist.
+
+## Requirements
+
+Have Yazi 26.9.1+, chezmoi and uv on `PATH`. The executable launcher uses the
+locked uv environment; no pip packages, Neovim or tmux are needed for this walk.
+Keep the checkout and its `.venv` in place until the session ends. A terminal
+at least 100 columns wide is convenient; smaller sizes are acceptance cases.
+Public UI and instructions are English. Unicode filenames are intentional.
+Linux and every font/terminal combination are not established by this guide.
+
+Optionally include an existing, read-only git.yazi checkout at startup:
 
 ```sh
-test/manual.py open "$CHEZMOI_YAZI_FIXTURE"
+test/manual.py --git-plugin /absolute/path/to/git.yazi
 ```
 
-To test git.yazi coexistence, create a separate fixture instead:
+Without it, the coexistence case is recorded as `SKIP` with a reason.
 
-```sh
-test/manual.py \
-  --git-plugin "$HOME/.config/yazi/plugins/git.yazi"
-```
+## Walking a case
 
-The helper initializes a Git repository only inside the disposable destination.
-It does not stage or commit anything. The supplied git.yazi checkout is used
-read-only. Its untracked marker is set to `"G "` for easy comparison.
+The guide shows the case, step, operation and expected display. Long text can
+be clipped; `W`, then `d` shows the complete instruction and diagnostics in the
+same terminal. Enter advances that viewer, `b` goes back, and `q` then Enter
+returns to Yazi. It also lists every case number and current result.
 
-Creation opens Yazi immediately after preparing the fixture. Status appears
-as the plugin fetches it; inspect the expected `MM` row below.
-The plugin is symlinked to
-this checkout; restart with a fresh fixture after changing plugin code.
+1. Perform the indicated operation using normal Yazi navigation or the fixture
+   keys below. Preparation formerly done with `cp`, `printf` or `rm` happens
+   when you enter the step. Press `R` or `Y` yourself when instructed.
+2. Inspect the visible result. Press `W`, then `p` to record visual `PASS` and
+   run the file/state checks; use `f` for a failure or `s` to skip with a reason.
+3. Press `W`, then `n` for the next step. Unanswered observations cannot advance.
+   Recorded failures can advance so the rest of the walk remains usable.
+4. Use `W`, then `r` to retry the current case from a fresh fixture, or `j` to
+   enter a case number. Previous attempts remain available as evidence.
 
-### What the fixture contains
+Each case and retry has a new source, destination, database and command cache.
+Steps within a case share those paths. Changing cases clears selection, closes
+extra tabs and restores the baseline theme. Opening guide controls preserves
+ordinary and visual selections. Guide transitions and actions are serialized;
+wait for the current command to return before recording or changing cases.
 
-| Path below the printed root | Purpose |
+The four-row guide sits above the ordinary status bar; short terminals get a
+one-row guide. `W`, then `h` hides/restores it. Hidden mode restores Yazi's normal
+layout and keeps `W` available. Hide it for normal-layout resize/small-pane tests.
+Modal confirmations appear above the guide.
+
+## Keys
+
+Keys are case-sensitive. These overrides affect only the disposable session.
+
+| Key | Operation |
 | --- | --- |
-| `source/` | Disposable chezmoi source state |
-| `dest/` | Destination shown in Yazi |
-| `config/chezmoi.toml`, `chezmoi.db` | Isolated configuration and last-written state |
-| `config/` | Isolated Yazi config, keymaps, plugin symlinks, and themes |
-| `state/`, `cache/`, `data/` | Isolated XDG paths |
-| `state/instrument/calls` | JSON lines recording plugin command arguments |
-| `state/instrument/report.json` | State snapshot, updated by pressing `T` |
-| `state/instrument/control` | Optional injected failure control |
-| `initial.diff` | Scoped diff captured before initial fixture apply |
-| `manual.json` | Ownership marker required for cleanup |
+| `W` | Guide controls |
+| `q` | Results/exit menu; Escape returns to the walk |
+| `j`, `k`, arrows, `h`, `l` | Normal navigation |
+| Space | Toggle hovered selection without moving |
+| `S` | Clear committed selection |
+| `v`, `V` | Normal visual select/unset |
+| `C` | Real chezmoi action menu |
+| `R`, `Y` | Refresh status / reload theme |
+| `a`, `r`, `e`, `E` | Add / Re-add / Edit / Edit and apply |
+| `d`, `p`, `f`, `x` | Diff / Apply / Forget / Destroy |
+| `D` | Destroy with `--recursive=false` |
+| `t`, `z` | Add as template / encrypted Add |
+| `N`, `B` | Enter `.config` / destination root |
+| `G`, `H` | New `.config` tab / tab zero |
+| `1`, `2`, `3` | Reveal `range-a` / `menu-a` / `.config/outside` |
+| `4` | Select all long/deep confirmation targets |
+| `5`, `6`, `7`, `8`, `9`, `0` | Reveal `.local` / `source` / `unmanaged` / `clean` / `.config` / `.exact` |
+| `T` | Write the internal diagnostic probe |
 
-Only the explicitly named ordinary fixture files are applied at creation.
-The pending apply script is added afterward. Nothing in your normal chezmoi
-source/destination or Yazi configuration is changed. Do not run a bare
-`chezmoi apply` during this checklist. Edits below affect only fixture files.
+Commands use real chezmoi and its native prompts, with no forced confirmation.
+Read output and press Enter when the command asks to return to Yazi. For Apply,
+return from the diff first, then answer the plugin confirmation. Destructive
+commands can also have a native chezmoi prompt after plugin confirmation.
 
-### Fixture keymap
+Edit cases use a disposable terminal editor displaying the current source.
+Type the instructed replacement line and Enter to save; Ctrl-C interrupts it.
+It requires no personal editor configuration. Encryption uses a public test age
+identity inside the fixture; it is never suitable for real secrets.
 
-Keys are case-sensitive; use Shift for the uppercase keys.
+## Cases and previous checklist coverage
 
-| Key | Action |
+Instructions and expectations live in `test/manual_cases.py`; this document
+explains the workflow without duplicating the complete step list.
+
+| Cases | Coverage from the former checklist |
 | --- | --- |
-| `j`, `k` or arrows | Move the cursor |
-| `l` / Right, `h` / Left | Enter a directory / go to its parent |
-| `C` | Open the chezmoi action menu |
-| `R` | Refresh chezmoi membership and status |
-| `Y` | Reload theme without refreshing status |
-| `T` | Write a diagnostic state snapshot |
-| `N` | Go to fixture `.config` |
-| `B` | Return to fixture destination root |
-| `G` | Open fixture `.config` in a new tab |
-| `H` | Switch to tab zero |
-| `q` | Quit Yazi |
+| Membership and status | Section 1: clean/modified/unmanaged/ignored/symlink/removal, missing and exact-directory summaries, no background script execution |
+| Names, alignment and colors | Section 2: spaces, Unicode, quotes, backslashes, dash, newline/CR, hover/selection, resizing |
+| Manual refresh | Section 3: resolve and restore a local edit |
+| Membership discovery and removal | Section 4: external source addition/removal |
+| Template failure and recovery | Section 5: isolated failure, repair, partial directory underline and recovery |
+| Membership query failure | Section 6: fail-managed and recovery |
+| Navigation and tabs | Section 7: source edit while away, revisit and tab switch |
+| Theme override and flavor fallback | Section 8: precedence, wide sign, color, restore and unchanged epoch |
+| Add, Re-add and Forget; Destroy | Section 9.1–2: direct/menu actions, cancel, native approval, destination retention/removal, shallow-directory rejection |
+| Scoped Apply | Section 9.3: diff, decline, accept, unchanged unrelated script |
+| Template Add; encrypted Add | Section 9.4: template preservation and disposable credentials |
+| Mixed selection rejection; cross-directory selections | Section 9.5: complete selection, mixed targets and directory Edit rejection |
+| Plain Edit; Edit and Apply; editor interruption | Section 9.6: config apply/watch override, retained source after cancellation, accepted apply, Ctrl-C and restored terminal |
+| Diff and pending script | Section 9.7: preview and deliberately scoped script execution |
+| Confirmation pages | Section 9.8: long/deep/Unicode/control paths, later-page cancellation, resize restart and too-small pane |
+| Visual range and unset; source protection | Additional regressions: direct/menu range capture, guide selection preservation, source directory and its ancestors |
+| git.yazi coexistence | Section 1: `"G "` preceding chezmoi signs without hiding them |
+| Results and exit | Section 10: evidence, retained failures and ownership-checked cleanup |
 
-`C`, `R`, `Y`, `T`, `N`, `B`, `G`, and `H` override normal Yazi bindings only in
-this fixture. Hidden files are visible and the base linemode is `none` so the
-plugin columns are easy to identify.
+## Results, evidence and isolation
 
-## 1. Initial membership and status
+`Files` checks actual contents, existence, script markers and rejected command
+invocations. `State` checks authored expectations against internal plugin records;
+it is a diagnostic, not proof of physical rendering. `Visual` is your judgment.
+Automatic checks never fill in the visual verdict. A step passes only when all
+three pass. Results include `PASS`, `FAIL`, `SKIP`, `NOT RUN`, and harness `ERROR`.
+A skipped or unfinished step is never presented as a pass.
 
-Inspect each row both hovered and unhovered. Spaces in the following displays
-are significant; quotation marks are explanatory, not rendered. The layout
-is `MXYD`, with an additional leading separator space. The last slot is the
-directory summary, reserved but blank for ordinary files.
+Press `q` and choose to save and retain fixtures, or save and clean them. The
+launcher archives results only after Yazi exits, under ignored
+`.dev/manual-runs/<run-id>/`. Evidence includes every attempt, versions, source
+hashes, file/state check failures, observations, command arguments and logs.
+Any failed attempt, interruption, or archive error retains the fixtures even
+if cleanup was requested. Successful cleanup removes only ownership-checked
+fixture roots. Saved reports remain available after cleanup.
 
-| Destination name | Expected display | Reason |
-| --- | --- | --- |
-| `clean`, `bad` | `"C   "` | Managed and unchanged |
-| `local` | `"CMM "` | Edited after initial apply |
-| `source` | `"C M "` | Source changed after initial apply |
-| `unmanaged`, `ignored` | `"    "` | Not managed / ignored by chezmoi |
-| `remove-me` | `"C D "` | Removal declared in `.chezmoiremove` |
-| `link` | `"C   "` | Managed symlink to `clean` |
-| `.config` | `"C  *"` | Missing managed child and pending script |
-| `.exact` | `"C  *"` | Extra destination entry in an exact directory |
+The fixture does not change normal chezmoi state, Yazi config or dotfiles.
+Only named ordinary fixture targets are applied during preparation; pending
+scripts are added afterward. The harness wrapper records commands and injects
+specified failures. Human rendering checks still require your own terminal;
+screenshots, actual editor integration and Linux acceptance are not automated.
 
-Enter `.exact`: `extra` should have `"C D "`, even though there is no ordinary
-source file for it. Enter `.config`: missing targets contribute to the parent
-summary but do not create artificial file rows. Press `B` to return.
+For recovery after interruption, the launcher prints the retained session root.
+Advanced helpers remain available: `test/manual.py open PATH` resumes its saved
+case and step; `test/manual.py status PATH` queries its active chezmoi context;
+`test/manual.py clean PATH` removes the retained session and all its attempts.
+Do not clean while any Yazi process uses that session.
 
-Compare against the same isolated chezmoi context in the second terminal:
+## Automated verification
 
-```sh
-test/manual.py status \
-  "$CHEZMOI_YAZI_FIXTURE"
-```
-
-Clean and unmanaged files are omitted from `chezmoi status`; plugin membership
-also uses `chezmoi managed`. A pending script produces an `R` in chezmoi's
-second column. Its absence from the destination is intentional. Confirm that
-status acquisition has not executed it:
-
-```sh
-test ! -e "$CHEZMOI_YAZI_FIXTURE/script-ran" && echo 'PASS: script not executed'
-```
-
-With git.yazi enabled, look for `"G "` before the chezmoi columns on the same
-untracked row. The git marker must not replace or hide the `CMM` display.
-
-## 2. Names, alignment, and selected-row colors
-
-Inspect `space name`, `日本語`, `quote"name`, `back\slash`, and `-dash`.
-Each starts clean and managed. There are also filenames containing a literal
-newline and carriage return. Yazi may escape or substitute their presentation;
-their plugin records must still be managed and clean.
-
-Press `T`, then inspect `state/instrument/report.json` if a filename is hard to
-identify. JSON escapes preserve its exact path. Move the cursor through all
-rows: hovered signs inherit Yazi's selection colors. Resize the terminal and
-check column spacing, contrast, and clipping visually.
-
-## 3. Manual refresh and resolution
-
-In the second terminal, make the source match the locally edited file:
-
-```sh
-cp "$CHEZMOI_YAZI_FIXTURE/dest/local" "$CHEZMOI_YAZI_FIXTURE/source/local"
-```
-
-Press `R`. `local` must change from `"CMM "` to `"C   "`. A brief unknown
-marker while querying is expected. To restore the original test state:
-
-```sh
-printf 'original\n' > "$CHEZMOI_YAZI_FIXTURE/source/local"
-```
-
-Press `R` and expect `"CMM "` again. Editing source files outside the visible
-folder does not guarantee an automatic refresh; the plugin has no polling loop.
-
-## 4. Membership discovery and removal
-
-```sh
-cp "$CHEZMOI_YAZI_FIXTURE/dest/unmanaged" \
-  "$CHEZMOI_YAZI_FIXTURE/source/unmanaged"
-```
-
-Press `R`: `unmanaged` becomes `"C   "`. Then remove only its source entry:
-
-```sh
-rm -- "$CHEZMOI_YAZI_FIXTURE/source/unmanaged"
-```
-
-Press `R`: its destination file remains, but the `C` marker disappears.
-
-## 5. Template failure and recovery
-
-```sh
-mv "$CHEZMOI_YAZI_FIXTURE/source/bad" "$CHEZMOI_YAZI_FIXTURE/source/bad.tmpl"
-printf '{{ .missing.field }}\n' > "$CHEZMOI_YAZI_FIXTURE/source/bad.tmpl"
-```
-
-Press `R`. `bad` must display `"C!! "`; `clean` must remain `"C   "`.
-A generic warning can appear, without template contents or raw stderr.
-Warnings are throttled, so another immediate failure need not show a new toast.
-A full `status` helper invocation can fail while this template is broken;
-the plugin's scoped recovery can still retain successful independent rows.
-
-Restore the template contents and press `R`:
-
-```sh
-printf 'original\n' > "$CHEZMOI_YAZI_FIXTURE/source/bad.tmpl"
-```
-
-`bad` must return to `"C   "`. To check partial directory coverage:
-
-```sh
-printf '{{ .missing.field }}\n' \
-  > "$CHEZMOI_YAZI_FIXTURE/source/dot_config/broken.tmpl"
-```
-
-Press `R`. `.config` still shows `*` because a difference is known, with the
-`partial` underline style because another descendant failed. After inspecting:
-
-```sh
-rm -- "$CHEZMOI_YAZI_FIXTURE/source/dot_config/broken.tmpl"
-```
-
-Press `R` and confirm the underline disappears.
-
-## 6. Failed membership acquisition
-
-```sh
-printf 'fail-managed' > "$CHEZMOI_YAZI_FIXTURE/state/instrument/control"
-```
-
-Press `R`. Ordinary file rows show `"!   "`, not a clean or unmanaged result;
-directories additionally show an error in their summary slot. Restore:
-
-```sh
-rm -- "$CHEZMOI_YAZI_FIXTURE/state/instrument/control"
-```
-
-Press `R` and compare with the known statuses. This failure injection affects
-only the plugin wrapper; the `status` helper runs the real chezmoi directly.
-
-## 7. Navigation and tabs
-
-Press `N`, then edit `source/source` from the second terminal:
-
-```sh
-cp "$CHEZMOI_YAZI_FIXTURE/dest/source" "$CHEZMOI_YAZI_FIXTURE/source/source"
-```
-
-Press `B`. The `source` row should become clean when the acquisition finishes.
-Press `G`, then `H` to return through a tab switch, and verify consistent state.
-Do not create multiple tabs before this step; `H` always selects tab zero.
-
-## 8. Theme override and flavor fallback
-
-Create an isolated flavor in the second terminal:
-
-```sh
-mkdir -p "$CHEZMOI_YAZI_FIXTURE/config/flavors/manual.yazi"
-cat > "$CHEZMOI_YAZI_FIXTURE/config/flavors/manual.yazi/tmtheme.xml" <<'XML'
-<?xml version="1.0"?><plist version="1.0"><dict><key>name</key><string>manual</string><key>settings</key><array/></dict></plist>
-XML
-cat > "$CHEZMOI_YAZI_FIXTURE/config/flavors/manual.yazi/flavor.toml" <<'TOML'
-[chezmoi]
-managed_sign = "F"
-modified_sign = "m"
-modified = { fg = "#ff8800" }
-TOML
-cp "$CHEZMOI_YAZI_FIXTURE/baseline-theme.toml" \
-  "$CHEZMOI_YAZI_FIXTURE/config/theme.toml"
-cat >> "$CHEZMOI_YAZI_FIXTURE/config/theme.toml" <<'TOML'
-[flavor]
-dark = "manual"
-light = "manual"
-[chezmoi]
-managed_sign = "界"
-TOML
-```
-
-Press `Y`. Expect `界` from the theme, with `m` and orange modified text from
-the flavor. Unhover `local` to inspect its color; hovered text inherits the
-row highlight. Other rows should remain aligned despite the wide sign.
-Status values must not change when reloading the theme. Press `T` to inspect
-`signs` and `epoch` before and after `Y`; the epoch should remain unchanged
-if no navigation or manual status refresh intervened.
-
-Restore the default theme:
-
-```sh
-cp "$CHEZMOI_YAZI_FIXTURE/baseline-theme.toml" \
-  "$CHEZMOI_YAZI_FIXTURE/config/theme.toml"
-```
-
-Press `Y`. Default signs return, preserving `"G "` when git.yazi is enabled.
-
-## 9. Explicit actions
-
-Use a fresh fixture for these checks, separate from the status scenarios above.
-Press `C` to open the menu; Escape cancels. Commands temporarily take over the
-terminal. Press Enter after reading each command's output. Native chezmoi
-prompts accept their indicated keys; do not add `--force` to the fixture.
-
-1. Hover `unmanaged`, choose Add, and verify a `C` marker appears. Edit that
-   destination file in the second terminal, choose Re-add, and inspect the
-   corresponding fixture source file. Choose Forget: cancel once, then confirm
-   both the plugin and native prompt; the destination file must remain.
-2. Add `unmanaged` again, then choose Destroy and confirm both prompts. Source
-   and destination files must disappear, and Yazi's file list must update.
-   A direct `destroy --recursive=false` binding must reject a directory before
-   confirmation; its children must remain in source and destination.
-3. Hover `source`, choose Apply, read the diff, and decline the plugin's
-   confirmation. The destination must remain unchanged. Repeat and accept;
-   the destination must match source and its status must become clean.
-4. Use Add options on a disposable file to create a template. Re-add must not
-   overwrite that template. Encrypted add requires credentials configured in
-   this fixture's `config/chezmoi.toml`; do not copy personal secrets here.
-   The automated command-edge scenario provides a disposable age identity.
-5. Select several files, including one selected in another directory. Verify
-   confirmation pages show all paths. Mix managed and unmanaged files for Edit:
-   the whole operation must stop. Selecting a directory for Edit must ask you
-   to select files inside it instead.
-6. Set `apply=true` and `watch=true` under `[edit]` in the fixture's chezmoi
-   config. Plain Edit must leave the destination unchanged. Use Edit and apply
-   with a terminal editor. Cancel after the diff and verify
-   the source edit survives while the destination stays unchanged. Repeat with
-   an accepted apply. Interrupt the editor with Ctrl-C and verify Yazi returns
-   after the exit prompt and remains usable. The fixture uses your available
-   editor unless you configure `[edit]` in its isolated chezmoi config.
-7. Apply `.config` only after inspecting its diff: this intentionally creates
-   the missing `new` file and runs the disposable pending script. The
-   `script-ran` marker must appear below the fixture root. Background status
-   queries alone must never create it.
-8. Select several long paths and inspect every confirmation page, including a
-   single path that spans pages and escaped control characters. Resize while
-   confirming: accepting the old page must restart review from the first page.
-   Cancel on a later page and verify no files changed. A pane below 32 columns
-   or 8 rows must ask you to enlarge it. Also inspect output readability and
-   return to the file list.
-
-## 10. Evidence and cleanup
-
-Record versions, terminal name, failed step, expected/actual display, and a
-screenshot when reporting a visual issue. Press `T` for a fresh state snapshot.
-Logs are under the fixture's `state/`; command arguments are in
-`state/instrument/calls`. Keep the fixture until you have saved useful evidence.
-
-Press `q` to return to the shell. Use `test/manual.py open` with the fixture
-path to resume. To remove the fixture after exiting Yazi, run:
-
-```sh
-test/manual.py clean \
-  "$CHEZMOI_YAZI_FIXTURE"
-unset CHEZMOI_YAZI_FIXTURE
-```
-
-Cleanup checks the root and ownership marker and removes only that fixture.
-Exit any Yazi instances using it before cleanup. No manual tmux server is
-created; cleanup still handles private sockets from older fixtures.
-A fresh `create` produces the original baseline; it does not overwrite or
-reset an existing fixture. Clean each fixture separately if you created more
-than one. A missing/mismatched ownership marker causes cleanup to refuse.
-
-## Automated coverage and limits
-
-This checklist is for human inspection and repeatable edits. It does not claim
-that every provider, font, or platform is supported. Encryption failure,
-timeout handling, stale-generation cancellation, and exact process-count
-checks have automated coverage in `test/runtime.py`; see
-[validation](../docs/validation.md). Screen-visible status, refresh,
-navigation, failure recovery, and theme reload have black-box coverage in
-`test/e2e.py`. To run the automated suites separately:
-
-```sh
-test/runtime.py
-test/e2e.py
-```
-
-`KEEP_FIXTURE=1` on the runtime suite preserves its **final mutated state**
-after the session stops; use `--keep` with the E2E suite. Use `test/manual.py`
-for the initial states in this checklist.
+Run `test/manual_runtime.py` for the guide's private-tmux integration checks.
+They exercise real display, progress, preparation, retries, selection handling,
+details and exit; they do not record human visual acceptance. Run
+`test/check.py` and `test/runtime.py` for the ordinary development/integration
+checks. See [validation](../docs/validation.md) for measured evidence and limits.
