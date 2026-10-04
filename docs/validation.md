@@ -27,6 +27,27 @@ attempt timed out waiting for the resize-restart notification; the unchanged
 scenario passed on rerun. This is a timing-sensitive terminal assertion, not
 an established product regression.
 
+On 2026-10-04, four guided-session state defects were corrected. Checking a
+skipped step preserves SKIP unless an automatic check fails; leaving a case
+preserves NOT RUN and ERROR instead of promoting them to PASS. The git plugin
+path is resolved before persistence, error markers identify their originating
+attempt/step, and a fresh case clears the completed-walk flag. Seven added
+harness regressions passed, including malformed/missing error-token fallback
+and archival after changing cases. Error markers were injected for attribution
+checks; this does not establish behavior under an actual backend timeout.
+
+`test/manual_runtime.py` passed with Yazi 26.9.1 and chezmoi 2.73.0 on macOS.
+Real `W/s`, `W/d`, and `W/n` interactions preserved a skipped case's saved
+result; restart and jump after completion restored the case title. Separate
+backend CLI processes exercised relative git plugin paths across working
+directories for both restart and jump. That path test used a disposable stub
+plugin and did not validate actual git.yazi rendering or coexistence.
+
+`test/check.py` passed with 51 core assertions, 73 action assertions, and 29
+Python tests; the complete `test/runtime.py` also passed. The first added
+terminal scenario sent the next control before SKIP was recorded and timed
+out. It now waits for the recorded verdict, and the guided suite passed on rerun.
+
 These automated checks do not constitute human visual acceptance of every
 case, font, color, or terminal. The guided launcher with git.yazi, actual editor
 integration, and Linux manual acceptance remain unverified. Earlier direct

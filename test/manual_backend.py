@@ -92,6 +92,11 @@ def current(state):
     return state["attempts"][state["active"]]
 
 
+def case_status(attempt):
+    statuses = {step["status"] for step in attempt["steps"]}
+    return next((status for status in ["ERROR", "FAIL", "NOT RUN", "SKIP"] if status in statuses), "PASS")
+
+
 def view(state):
     attempt = current(state)
     spec = CASES[attempt["case"]]
@@ -129,6 +134,7 @@ def start_case(root, state, index):
             for result in attempt["steps"]:
                 result.update(status="SKIP", visual="SKIP", note="No --git-plugin supplied")
         prepare_step(root, state)
+        state["finished"] = False
     except BaseException:
         if state["attempts"] and state["attempts"][-1]["root"] == str(t.root):
             state["attempts"].pop()
@@ -148,6 +154,7 @@ def prepare_step(root, state):
 
 
 def initialize(root, git_plugin):
+    git_plugin = str(Path(git_plugin).resolve(strict=True)) if git_plugin else None
     versions = {name: run([name, "--version"]).strip() for name in ["yazi", "chezmoi"]}
     diff = run(["git", "diff", "HEAD"], cwd=REPO)
     state = dict(version=1, session=str(root), git_plugin=git_plugin, versions=versions,
@@ -238,7 +245,7 @@ def transition(root, operation, payload):
             result["visual"] = "PASS" if operation == "pass" else "FAIL"
             result["note"] = payload.get("note", "")
         result["status"] = ("FAIL" if "FAIL" in [result["files"], result["diagnostic"], result["visual"]]
-                            else "PASS" if result["visual"] == "PASS" else "NOT RUN")
+                            else result["visual"] if result["visual"] in {"PASS", "SKIP"} else "NOT RUN")
     elif operation == "baseline":
         attempt["epoch_before"] = snapshot.get("epoch")
     elif operation == "skip":
@@ -251,8 +258,7 @@ def transition(root, operation, payload):
             attempt["step"] += 1
             prepare_step(root, state)
         else:
-            statuses = [s["status"] for s in attempt["steps"]]
-            state["results"][attempt["case"]] = "FAIL" if "FAIL" in statuses else "SKIP" if "SKIP" in statuses else "PASS"
+            state["results"][attempt["case"]] = case_status(attempt)
             index = attempt["case"] + 1
             while index < len(CASES) and CASES[index]["optional"] == "git" and not state["git_plugin"]:
                 state["results"][index] = "SKIP"
@@ -271,9 +277,7 @@ def transition(root, operation, payload):
     attempt = current(state)
     if any("FAIL" in [s.get("files"), s.get("diagnostic"), s.get("visual")] or s["status"] == "ERROR" for s in attempt["steps"]):
         attempt["failed"] = True
-    statuses = [s["status"] for s in attempt["steps"]]
-    state["results"][attempt["case"]] = ("ERROR" if "ERROR" in statuses else "FAIL" if "FAIL" in statuses
-                                           else "NOT RUN" if "NOT RUN" in statuses else "SKIP" if "SKIP" in statuses else "PASS")
+    state["results"][attempt["case"]] = case_status(attempt)
     save(root, state)
     return view(state)
 
@@ -319,7 +323,22 @@ def finalize(root):
     root, state = load(root)
     if (root / "manual-error.json").exists():
         state["harness_error"] = json.loads(read(root / "manual-error.json"))
-        state["results"][current(state)["case"]] = "ERROR"
+        attempt = current(state)
+        step = attempt["step"]
+        try:
+            origin, origin_step = map(int, state["harness_error"].get("token").split(":"))
+            if origin < 0 or origin_step < 0:
+                raise ValueError("Negative error token")
+            source = state["attempts"][origin]
+            source["steps"][origin_step]
+        except (AttributeError, TypeError, ValueError, IndexError):
+            # Older or malformed markers cannot identify their originating step.
+            pass
+        else:
+            attempt, step = source, origin_step
+        attempt["steps"][step].update(status="ERROR", error=state["harness_error"].get("error", "Guide error"))
+        attempt["failed"] = True
+        state["results"][attempt["case"]] = "ERROR"
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
     archive = REPO / ".dev/manual-runs" / stamp
     archive.mkdir(parents=True)

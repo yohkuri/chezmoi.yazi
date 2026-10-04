@@ -59,7 +59,31 @@ def test(t):
     t.wait_screen(lambda s: "W: controls" in s, "compact guide")
     t.tmux("resize-window", "-t", "test", "-x", "140", "-y", "40")
     t.wait_screen(lambda s: "[W] Controls" in s, "full guide after resize")
+    jump("names")
+    control("p"); control("n")
+    t.wait_screen(lambda s: "step 2/2" in s, "last names step")
+    control("s")
+    t.wait_screen(lambda s: "Observation / skip reason" in s, "skip reason")
+    enter(t)
+    t.wait_screen(lambda s: "Visual: SKIP" in s, "recorded skip")
+    control("d")
+    t.wait_screen(lambda s: "Enter: next | b: back | q: return to Yazi" in s, "skipped step diagnostics")
+    t.key("q"); enter(t)
+    t.wait_screen(lambda s: "Visual: SKIP" in s, "skip retained after diagnostics")
+    control("n")
+    t.wait_screen(lambda s: "3/24 Manual refresh" in s, "next case after skipped step")
+    assert state()["results"][1] == "SKIP", state()["results"]
+    jump("git")
+    control("n")
+    t.wait_screen(lambda s: "Walk complete" in s, "completed walk")
+    control("r")
+    t.wait_screen(lambda s: "24/24 git.yazi coexistence" in s and "Walk complete" not in s, "reopened last case")
+    assert not state()["finished"]
+    control("n")
+    t.wait_screen(lambda s: "Walk complete" in s, "completed restarted walk")
     root = jump("refresh")
+    assert not state()["finished"]
+    print("PASS guide: SKIP survives diagnostics/case change; restart and jump restore case titles after completion")
     control("p"); control("n")
     assert (root / "source/local").read_text() == "local edit\n"
     t.key("R")
@@ -152,7 +176,40 @@ def foreground_launcher():
     print("PASS foreground launcher: one process, in-Yazi exit, archive then ownership-checked cleanup")
 
 
+def backend_paths():
+    """Exercise real fixture setup and separate CLI processes, without git UI."""
+    import shutil
+    import sys
+    from support import run
+    with fixture(probe=False, instrument=False) as t:
+        write(t.root / "manual.json", json.dumps(dict(version=1, root=str(t.root), repo=str(REPO))))
+        write(t.root / "baseline-theme.toml", "")
+        plugin = t.root / "git.yazi"
+        plugin.mkdir()
+        write(plugin / "main.lua", "return { setup = function() end }\n")
+        code = ('import sys; from pathlib import Path; sys.path.insert(0, sys.argv[1]); '
+                'from manual_backend import initialize; initialize(Path(sys.argv[2]), sys.argv[3])')
+        try:
+            run([sys.executable, "-c", code, str(REPO / "test"), str(t.root), "git.yazi"], cwd=t.root, env=t.env)
+            value = load(t.root)[1]
+            assert value["git_plugin"] == str(plugin), value["git_plugin"]
+            token = "0:0"
+            for operation in ["restart", "jump"]:
+                # Yazi's backend cwd differs from the original invocation cwd.
+                result = json.loads(run([sys.executable, str(REPO / "test/manual_backend.py"), str(t.root), operation,
+                                         json.dumps(dict(token=token, index=1))], cwd=t.dest, env=t.env))
+                assert result["result"]["status"] == "NOT RUN", result
+                assert (Path(result["root"]) / "config/plugins/git.yazi").resolve() == plugin
+                token = result["token"]
+        finally:
+            if (t.root / "walk.json").exists():
+                for attempt in load(t.root)[1]["attempts"]:
+                    shutil.rmtree(owned(attempt["root"]))
+    print("PASS backend CLI: relative git plugin persists across cwd changes, restart and jump")
+
+
 def main():
+    backend_paths()
     with fixture() as t:
         try:
             test(t)
