@@ -10,6 +10,20 @@ from manual_cases import CASES
 from support import REPO, fixture, read, write, owned, stop
 
 
+def control(t, key, settle=0.3):
+    t.key("W")
+    t.wait_screen(lambda s: "Next step" in s, "guide controls")
+    t.key(key, settle=settle)
+
+
+def choose_case(t, number, settle=0.3):
+    control(t, "j", settle=settle)
+    t.wait_screen(lambda s: "Case number" in s, "case chooser")
+    t.key(str(number))
+    enter(t)
+    t.wait_screen(lambda s: f"{number}/{len(CASES)} " in s, "new case")
+
+
 def test(t):
     write(t.root / "manual.json", json.dumps(dict(version=1, root=str(t.root), repo=str(REPO))))
     write(t.root / "baseline-theme.toml", "")
@@ -24,112 +38,103 @@ def test(t):
         result = state()["attempts"][-1]["steps"][index]
         assert result["status"] == "PASS", result
 
-    def control(key):
-        t.key("W")
-        t.wait_screen(lambda s: "Next step" in s, "guide controls")
-        t.key(key, settle=0.3)
-
     def jump(key):
         number = next(i + 1 for i, case in enumerate(CASES) if case["key"] == key)
-        control("j")
-        t.wait_screen(lambda s: "Case number" in s, "case chooser")
-        t.key(str(number))
-        enter(t)
-        t.wait_screen(lambda s: f"{number}/{len(CASES)} " in s, "new case")
+        choose_case(t, number)
         root = Path(state()["attempts"][-1]["root"])
         t.wait(lambda s: s["cwd"] == str(root / "dest") and not s["running"])
         return root
 
     t.wait_screen(lambda s: "[W] Controls" in s and "CMM" in s, "initial guide and rows")
-    control("n")
+    control(t, "n")
     assert state()["attempts"][0]["step"] == 0, "Unanswered observation advanced"
-    control("p")
+    control(t, "p")
     t.wait_screen(lambda s: "Visual: PASS" in s, "recorded observation")
-    control("n")
+    control(t, "n")
     t.wait_screen(lambda s: "step 2/2" in s, "next step")
     original = Path(v["root"])
-    control("r")
+    control(t, "r")
     t.wait_screen(lambda s: "step 1/2" in s, "fresh restart")
     assert Path(state()["attempts"][-1]["root"]) != original and original.exists()
-    control("h")
+    control(t, "h")
     assert "[W] Controls" not in t.capture(), "Hidden guide still rendered"
-    control("h")
+    control(t, "h")
     t.wait_screen(lambda s: "[W] Controls" in s, "guide restored")
     t.tmux("resize-window", "-t", "test", "-x", "80", "-y", "18")
     t.wait_screen(lambda s: "W: controls" in s, "compact guide")
     t.tmux("resize-window", "-t", "test", "-x", "140", "-y", "40")
     t.wait_screen(lambda s: "[W] Controls" in s, "full guide after resize")
     jump("names")
-    control("p"); control("n")
+    control(t, "p"); control(t, "n")
     t.wait_screen(lambda s: "step 2/2" in s, "last names step")
-    control("s")
+    control(t, "s")
     t.wait_screen(lambda s: "Observation / skip reason" in s, "skip reason")
     enter(t)
     t.wait_screen(lambda s: "Visual: SKIP" in s, "recorded skip")
-    control("d")
+    control(t, "d")
     t.wait_screen(lambda s: "Enter: next | b: back | q: return to Yazi" in s, "skipped step diagnostics")
     t.key("q"); enter(t)
     t.wait_screen(lambda s: "Visual: SKIP" in s, "skip retained after diagnostics")
-    control("n")
+    control(t, "n")
     t.wait_screen(lambda s: "3/24 Manual refresh" in s, "next case after skipped step")
     assert state()["results"][1] == "SKIP", state()["results"]
     jump("git")
-    control("n")
+    control(t, "n")
     t.wait_screen(lambda s: "Walk complete" in s, "completed walk")
-    control("r")
+    control(t, "r")
     t.wait_screen(lambda s: "24/24 git.yazi coexistence" in s and "Walk complete" not in s, "reopened last case")
     assert not state()["finished"]
-    control("n")
+    control(t, "n")
     t.wait_screen(lambda s: "Walk complete" in s, "completed restarted walk")
     root = jump("refresh")
     assert not state()["finished"]
     print("PASS guide: SKIP survives diagnostics/case change; restart and jump restore case titles after completion")
-    control("p"); control("n")
+    control(t, "p"); control(t, "n")
     assert read(root / "source/local") == "local edit\n"
     t.key("R")
     t.wait(lambda s: (s.get("records") or {}).get(str(root / "dest/local"), {}).get("xy") == "  ")
-    control("p")
+    control(t, "p")
     assert_pass(1)
-    control("n"); t.key("R")
+    control(t, "n"); t.key("R")
     t.wait(lambda s: (s.get("records") or {}).get(str(root / "dest/local"), {}).get("xy") == "MM")
     print("PASS guide: display, verdict gate, fresh restart, hide, resize, preparation and real refresh")
     root = jump("visual-unset")
     t.key("1"); t.key(" "); t.key("j"); t.key(" "); t.key("j"); t.key(" ")
     t.key("1"); t.key("V"); t.key("j")
-    control("h")  # Opening/closing controls must not escape visual mode.
+    control(t, "h")  # Opening/closing controls must not escape visual mode.
     t.key("a")
     t.wait_screen(lambda s: "Press Enter to return to Yazi" in s, "visual unset Add")
     enter(t)
     t.wait(lambda s: not s["action_busy"])
     assert (root / "source/range-c").exists()
     assert not (root / "source/range-a").exists() and not (root / "source/range-b").exists()
-    control("h")
+    control(t, "h")
     print("PASS guide controls preserve visual unset selection for real actions")
     jump("theme")
-    control("p"); control("n"); t.key("Y")
-    control("p")
+    control(t, "p"); control(t, "n"); t.key("Y")
+    control(t, "p")
     assert_pass(1)
-    control("n"); t.key("Y"); control("p")
+    control(t, "n"); t.key("Y"); control(t, "p")
     assert_pass(2)
     jump("edit")
     t.key("6"); t.key("e")
     t.wait_screen(lambda s: "New source content" in s, "fixture editor")
     t.key("edited by fixture"); enter(t)
     finish(t)
-    control("p")
+    control(t, "p")
     assert_pass(0)
     jump("encryption")
-    t.key("7"); t.key("z"); finish(t); control("p")
+    t.key("7"); t.key("z"); finish(t); control(t, "p")
     assert_pass(0)
     jump("template-add")
-    t.key("7"); t.key("t"); finish(t); control("p")
+    t.key("7"); t.key("t"); finish(t); control(t, "p")
     assert_pass(0)
     jump("edit-apply")
     t.key("6"); t.key("E")
     t.wait_screen(lambda s: "New source content" in s, "edit-and-apply editor")
     t.key("edited by fixture"); enter(t)
     finish(t, next_command=True); finish(t, next_confirm=True); confirm(t, False)
-    control("p")
+    control(t, "p")
     assert_pass(0)
     jump("navigation")
     t.key("G"); t.key("H")
@@ -143,7 +148,7 @@ def test(t):
     jump("source-protection")
     t.key("5"); t.key("x")
     t.wait_screen(lambda s: "contains the source" in s, "source-ancestor rejection")
-    control("d")
+    control(t, "d")
     t.wait_screen(lambda s: "Enter: next | b: back | q: return to Yazi" in s, "same-terminal details")
     t.key("q"); enter(t)
     t.wait_screen(lambda s: "[W] Controls" in s, "return from details")
@@ -156,14 +161,24 @@ def test(t):
 
 
 def foreground_launcher():
-    import sys
     before = set((REPO / ".dev/manual-runs").glob("*/results.json"))
     with fixture() as t:
         t.tmux("new-session", "-d", "-s", "test", "-x", "140", "-y", "40",
-               sys.executable, str(REPO / "test/manual.py"))
+               "-c", str(REPO), str(REPO / "test/manual.py"))
         t.started = True
         t.tmux("set-option", "-w", "remain-on-exit", "on")
         t.wait_screen(lambda s: "[W] Controls" in s and "CMM" in s, "foreground launcher")
+        number = next(i + 1 for i, case in enumerate(CASES) if case["key"] == "interrupt")
+        choose_case(t, number, settle=0.1)
+        t.wait_screen(lambda s: f"{number}/{len(CASES)} Editor interruption" in s, "launcher interrupt case")
+        for _ in range(2):
+            t.key("6", settle=0.5); t.key("E")
+            t.wait_screen(lambda s: "New source content" in s, "launcher fixture editor")
+            t.tmux("send-keys", "-t", "test", "C-c")
+            finish(t, success=False)
+            t.wait_screen(lambda s: "[W] Controls" in s, "launcher survives editor Ctrl-C")
+        control(t, "p", settle=0.1)
+        t.wait_screen(lambda s: "Visual: PASS" in s, "unchanged files after interruption")
         t.key("q")
         t.wait_screen(lambda s: "Save and exit; clean fixtures" in s, "launcher finish menu")
         t.key("c")
@@ -171,9 +186,10 @@ def foreground_launcher():
     reports = set((REPO / ".dev/manual-runs").glob("*/results.json")) - before
     assert len(reports) == 1, reports
     report = json.loads(read(next(iter(reports))))
+    assert report["results"][number - 1] == "PASS", report["attempts"][-1]
     assert not Path(report["session"]).exists()
     assert all(not Path(a["root"]).exists() for a in report["attempts"])
-    print("PASS foreground launcher: one process, in-Yazi exit, archive then ownership-checked cleanup")
+    print("PASS foreground launcher: repeated editor Ctrl-C returns to usable Yazi; unchanged files, archive and cleanup")
 
 
 def backend_paths():

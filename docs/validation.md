@@ -84,6 +84,40 @@ After cleanup, `test/check.py` passed all 31 Python tests, 51 core assertions,
 and 73 action assertions; the complete `test/manual_runtime.py` and
 `test/runtime.py` passed on the same macOS/Yazi/chezmoi versions.
 
+A further correctness review on 2026-10-11 reproduced three guide defects.
+Ctrl-C in the fixture editor also interrupted the waiting launcher; stale
+backend requests changed the current case to ERROR; a second guide error
+overwrote the first marker. The launcher now catches SIGINT while waiting,
+allowing foreground children to handle it, and restores its handler afterward.
+Stale requests return the current view and a message without changing saved
+progress. Guide failures append to `manual-errors.jsonl`; the next valid request
+or finalization imports new entries once, records their originating steps, and
+retains the complete history. Legacy single markers remain supported.
+
+Three added regressions passed, covering stale CLI responses without persisted
+changes, multiple error origins and archived history, and successful rechecks
+without old errors being reapplied. An actual backend CLI process also returned
+the unchanged PASS result for a stale token. A private-tmux test launched the
+executable `test/manual.py`, interrupted its fixture editor twice, continued
+guide controls, recorded PASS for unchanged files, and verified archive/cleanup.
+Two injected diagnostic-command failures in real Yazi produced separate Lua
+journal entries and ERROR for both originating cases in the saved report.
+This tests the error path, not an actual backend timeout.
+
+After these fixes, `test/check.py` passed 34 Python tests, 51 core assertions,
+and 73 action assertions. The complete `test/manual_runtime.py` and
+`test/runtime.py` passed on macOS with Yazi 26.9.1, chezmoi 2.73.0, and
+Python 3.14.8. Initial added terminal checks advanced before action completion
+or journal append; their waits were corrected before the passing runs.
+
+Quality cleanup of that follow-up commit shared the terminal guide controls
+and case chooser between the guide suite and foreground launcher, preserving
+their existing key order and settle intervals. The multiple-error regression
+now reuses one loaded state for its assertion and subsequent updates.
+`test/check.py` again passed 34 Python tests, 51 core assertions, and 73 action
+assertions. The complete `test/manual_runtime.py` and `test/runtime.py` also
+passed after this cleanup on the same macOS/Yazi/chezmoi/Python versions.
+
 These automated checks do not constitute human visual acceptance of every
 case, font, color, or terminal. The guided launcher with git.yazi, actual editor
 integration, and Linux manual acceptance remain unverified. Earlier direct

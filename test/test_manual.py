@@ -82,6 +82,23 @@ class ManualTests(unittest.TestCase):
             transition(self.session, "next", {"token": "previous-attempt:0"})
         self.assertEqual(before, (self.session / "walk.json").read_bytes())
 
+    def test_stale_cli_request_returns_latest_view_without_changing_results(self):
+        for status in ["PASS", "FAIL", "ERROR"]:
+            with self.subTest(status=status):
+                for result in self.state["attempts"][0]["steps"]:
+                    result.update(status=status, visual="PASS")
+                save(self.session, self.state)
+                before = (self.session / "walk.json").read_bytes()
+                output = StringIO()
+                with patch("sys.argv", ["manual_backend.py", str(self.session), "check", '{"token":"older-token"}']), patch("sys.stdout", output):
+                    main()
+                value = json.loads(output.getvalue())
+                self.assertEqual(value["token"], "0:0")
+                self.assertEqual(value["result"]["status"], status)
+                self.assertIn("Stale", value["result"]["message"])
+                self.assertEqual(value["cases"][2]["result"], status)
+                self.assertEqual(before, (self.session / "walk.json").read_bytes())
+
     def test_declining_apply_is_verified_from_files(self):
         self.state["attempts"][0].update(case=10, step=0)
         write(self.fixture / "dest/source", "original\n")
@@ -204,6 +221,47 @@ class ManualTests(unittest.TestCase):
         self.assertEqual(report["attempts"][0]["steps"][1]["status"], "ERROR")
         self.assertEqual(report["attempts"][0]["steps"][0]["status"], "NOT RUN")
         self.assertTrue(report["attempts"][0]["failed"])
+
+    def test_multiple_guide_errors_preserve_origin_results_and_complete_history(self):
+        for result in self.state["attempts"][0]["steps"]:
+            result.update(status="PASS", visual="PASS")
+        save(self.session, self.state)
+        first = dict(token="0:1", error="First guide error")
+        second = dict(token="1:0", error="Second guide error")
+        journal = self.session / "manual-errors.jsonl"
+        write(journal, json.dumps(first) + "\n")
+        with self.fresh_cases():
+            latest = self.request("jump", index=0)
+        state = load(self.session)[1]
+        self.assertEqual(state["results"][2], "ERROR")
+        for result in state["attempts"][-1]["steps"]:
+            result.update(status="PASS", visual="PASS")
+        save(self.session, state)
+        with journal.open("a") as log:
+            log.write(json.dumps(second) + "\n")
+        transition(self.session, "baseline", dict(token=latest["token"]))
+        self.assertEqual(load(self.session)[1]["results"][0], "ERROR")
+        with tempfile.TemporaryDirectory() as archive_repo, patch("manual_backend.REPO", Path(archive_repo)):
+            archive = finalize(self.session)
+            report = json.loads(read(archive / "results.json"))
+            self.assertEqual(read(archive / "manual-errors.jsonl"), read(journal))
+        self.assertEqual(report["harness_errors"], [first, second])
+        self.assertEqual(report["results"][2], "ERROR")
+        self.assertEqual(report["results"][0], "ERROR")
+        self.assertTrue(all(attempt["failed"] for attempt in report["attempts"]))
+
+    def test_imported_guide_error_does_not_override_successful_recheck(self):
+        marker = dict(token="0:0", error="Transient guide failure")
+        write(self.session / "manual-errors.jsonl", json.dumps(marker) + "\n")
+        self.assertEqual(self.request("pass")["result"]["status"], "PASS")
+        for result in load(self.session)[1]["attempts"][0]["steps"][1:]:
+            self.assertEqual(result["status"], "NOT RUN")
+        with tempfile.TemporaryDirectory() as archive_repo, patch("manual_backend.REPO", Path(archive_repo)):
+            report = json.loads(read(finalize(self.session) / "results.json"))
+        self.assertEqual(report["attempts"][0]["steps"][0]["status"], "PASS")
+        self.assertEqual(report["harness_errors"], [marker])
+        self.assertTrue(report["attempts"][0]["failed"])
+        self.assertTrue(self.fixture.exists())
 
     def test_backend_exception_updates_passing_case_and_saved_report(self):
         for result in self.state["attempts"][0]["steps"]:
