@@ -67,6 +67,23 @@ The complete `test/manual_runtime.py` and `test/runtime.py` passed on macOS
 with Yazi 26.9.1 and chezmoi 2.73.0, using isolated fixtures and private tmux
 sockets outside the restricted sandbox. No new Linux validation was run.
 
+Follow-up quality cleanup on the same date centralized result aggregation at
+save/archive boundaries, reused the shared text reader, and simplified fixture
+and verdict code. Guide requests now copy full status snapshots only for
+operations that inspect them; acquisition waits use lightweight progress data.
+Forbidden-command checks seek to the relevant log offset and stream records,
+while diagnostics select the same first 80 paths without sorting the full tree.
+
+A focused comparison against the preceding commit confirmed identical results
+for multibyte log records with byte offsets, the first 80 sorted paths, and all
+16 combinations of automatic and visual verdicts. Existing exception/retry
+regressions and isolated encrypted-file checks also passed. These checks do not
+measure startup latency or memory savings.
+
+After cleanup, `test/check.py` passed all 31 Python tests, 51 core assertions,
+and 73 action assertions; the complete `test/manual_runtime.py` and
+`test/runtime.py` passed on the same macOS/Yazi/chezmoi versions.
+
 These automated checks do not constitute human visual acceptance of every
 case, font, color, or terminal. The guided launcher with git.yazi, actual editor
 integration, and Linux manual acceptance remain unverified. Earlier direct

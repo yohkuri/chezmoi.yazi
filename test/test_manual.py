@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import Mock, patch
 from manual_backend import check, finalize, initialize, load, main, save, transition, view
 from manual_cases import CASES
-from support import REPO, lua, write
+from support import REPO, lua, read, write
 
 
 class ManualTests(unittest.TestCase):
@@ -171,7 +171,7 @@ class ManualTests(unittest.TestCase):
         def archive(root):
             self.assertTrue(child.terminate.called)
             self.assertEqual(child.wait.call_count, 2)
-            self.assertTrue(json.loads((root / "walk.json").read_text())["exit"]["keep"])
+            self.assertTrue(json.loads(read(root / "walk.json"))["exit"]["keep"])
         with patch("manual.install_guide"), patch("manual.subprocess.Popen", return_value=child), patch("manual_backend.finalize", side_effect=archive):
             with self.assertRaises(KeyboardInterrupt):
                 open_fixture(self.session)
@@ -182,7 +182,7 @@ class ManualTests(unittest.TestCase):
         write(self.session / "manual-error.json", json.dumps({"error": "Backend timeout"}))
         with tempfile.TemporaryDirectory() as archive_repo, patch("manual_backend.REPO", Path(archive_repo)):
             archive = finalize(self.session)
-            report = json.loads((archive / "results.json").read_text())
+            report = json.loads(read(archive / "results.json"))
             self.assertEqual(report["results"][2], "ERROR")
             self.assertTrue((archive / "manual-error.json").exists())
         self.assertTrue(self.fixture.exists())
@@ -198,7 +198,7 @@ class ManualTests(unittest.TestCase):
         save(self.session, state)
         with tempfile.TemporaryDirectory() as archive_repo, patch("manual_backend.REPO", Path(archive_repo)):
             archive = finalize(self.session)
-            report = json.loads((archive / "results.json").read_text())
+            report = json.loads(read(archive / "results.json"))
         self.assertEqual(report["results"][2], "ERROR")
         self.assertEqual(report["results"][0], "PASS")
         self.assertEqual(report["attempts"][0]["steps"][1]["status"], "ERROR")
@@ -218,7 +218,7 @@ class ManualTests(unittest.TestCase):
         self.assertEqual(value["cases"][2]["result"], "ERROR")
         self.assertEqual(load(self.session)[1]["results"][2], "ERROR")
         with tempfile.TemporaryDirectory() as archive_repo, patch("manual_backend.REPO", Path(archive_repo)):
-            report = json.loads((finalize(self.session) / "results.json").read_text())
+            report = json.loads(read(finalize(self.session) / "results.json"))
         self.assertEqual(report["results"][2], "ERROR")
         self.assertTrue(report["attempts"][0]["failed"])
 
@@ -237,7 +237,7 @@ class ManualTests(unittest.TestCase):
                     transition(self.session, "jump", {"token": retry["token"], "index": 0})
                 with tempfile.TemporaryDirectory() as archive_repo, patch("manual_backend.REPO", Path(archive_repo)):
                     archive = finalize(self.session)
-                    report = json.loads((archive / "results.json").read_text())
+                    report = json.loads(read(archive / "results.json"))
                     self.assertTrue((archive / "manual-error.json").exists())
                 self.assertEqual(report["results"][2], status)
                 self.assertEqual(report["results"][0], "NOT RUN")
@@ -252,7 +252,7 @@ class ManualTests(unittest.TestCase):
                 write(self.session / "manual-error.json", json.dumps({"token": token, "error": "Backend timeout"}))
                 with tempfile.TemporaryDirectory() as archive_repo, patch("manual_backend.REPO", Path(archive_repo)):
                     archive = finalize(self.session)
-                    report = json.loads((archive / "results.json").read_text())
+                    report = json.loads(read(archive / "results.json"))
                 self.assertEqual(report["results"][2], "ERROR")
                 self.assertEqual(report["attempts"][0]["steps"][0]["status"], "ERROR")
 

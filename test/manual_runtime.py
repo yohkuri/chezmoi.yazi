@@ -7,7 +7,7 @@ from action_cases import confirm, enter, finish
 from manual import configure_guide
 from manual_backend import load
 from manual_cases import CASES
-from support import REPO, fixture, write, owned, stop
+from support import REPO, fixture, read, write, owned, stop
 
 
 def test(t):
@@ -85,7 +85,7 @@ def test(t):
     assert not state()["finished"]
     print("PASS guide: SKIP survives diagnostics/case change; restart and jump restore case titles after completion")
     control("p"); control("n")
-    assert (root / "source/local").read_text() == "local edit\n"
+    assert read(root / "source/local") == "local edit\n"
     t.key("R")
     t.wait(lambda s: (s.get("records") or {}).get(str(root / "dest/local"), {}).get("xy") == "  ")
     control("p")
@@ -105,42 +105,42 @@ def test(t):
     assert not (root / "source/range-a").exists() and not (root / "source/range-b").exists()
     control("h")
     print("PASS guide controls preserve visual unset selection for real actions")
-    root = jump("theme")
+    jump("theme")
     control("p"); control("n"); t.key("Y")
     control("p")
     assert_pass(1)
     control("n"); t.key("Y"); control("p")
     assert_pass(2)
-    root = jump("edit")
+    jump("edit")
     t.key("6"); t.key("e")
     t.wait_screen(lambda s: "New source content" in s, "fixture editor")
     t.key("edited by fixture"); enter(t)
     finish(t)
     control("p")
     assert_pass(0)
-    root = jump("encryption")
+    jump("encryption")
     t.key("7"); t.key("z"); finish(t); control("p")
     assert_pass(0)
-    root = jump("template-add")
+    jump("template-add")
     t.key("7"); t.key("t"); finish(t); control("p")
     assert_pass(0)
-    root = jump("edit-apply")
+    jump("edit-apply")
     t.key("6"); t.key("E")
     t.wait_screen(lambda s: "New source content" in s, "edit-and-apply editor")
     t.key("edited by fixture"); enter(t)
     finish(t, next_command=True); finish(t, next_confirm=True); confirm(t, False)
     control("p")
     assert_pass(0)
-    root = jump("navigation")
+    jump("navigation")
     t.key("G"); t.key("H")
     root = jump("confirmation")
     # Changing cases must dispose of old tabs, and select every exact target.
     t.key("4", settle=0.8); t.key("x")
     t.wait_screen(lambda s: "Continue?" in s and "Targets: 6" in s, "long target selection")
     confirm(t, yes=False)
-    assert all((root / "dest" / name).exists() for name in json.loads((root / "long.json").read_text()))
+    assert all((root / "dest" / name).exists() for name in json.loads(read(root / "long.json")))
     print("PASS guide: theme epoch, terminal editor, encrypted Add, tab reset and exact long targets")
-    root = jump("source-protection")
+    jump("source-protection")
     t.key("5"); t.key("x")
     t.wait_screen(lambda s: "contains the source" in s, "source-ancestor rejection")
     control("d")
@@ -170,7 +170,7 @@ def foreground_launcher():
         t.wait_screen(lambda s: "Results:" in s, "archived launcher report")
     reports = set((REPO / ".dev/manual-runs").glob("*/results.json")) - before
     assert len(reports) == 1, reports
-    report = json.loads(next(iter(reports)).read_text())
+    report = json.loads(read(next(iter(reports))))
     assert not Path(report["session"]).exists()
     assert all(not Path(a["root"]).exists() for a in report["attempts"])
     print("PASS foreground launcher: one process, in-Yazi exit, archive then ownership-checked cleanup")
