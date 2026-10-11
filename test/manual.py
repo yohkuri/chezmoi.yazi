@@ -3,6 +3,7 @@
 import argparse
 import json
 import shutil
+import signal
 import sys
 import subprocess
 from support import REPO, Runtime, chezmoi_args, environment, owned, run, stop, write
@@ -49,7 +50,10 @@ def open_fixture(root):
     destination = current(state)["opts"]["destination"]
     print("W: guide controls and full instructions. q: results and finish.", flush=True)
     child = None
+    previous_interrupt = signal.signal(signal.SIGINT, lambda *_: None)
     try:
+        # Ctrl-C belongs to the foreground editor/Yazi, not this waiting parent.
+        # A caught handler resets on exec, so children still receive SIGINT.
         child = subprocess.Popen(["yazi", destination], cwd=root, env=environment(root))
         code = child.wait()
         if code:
@@ -71,6 +75,7 @@ def open_fixture(root):
         save(root, state)
         raise
     finally:
+        signal.signal(signal.SIGINT, previous_interrupt)
         try:
             finalize(root)
         except Exception:

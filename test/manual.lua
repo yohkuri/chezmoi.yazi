@@ -335,9 +335,9 @@ function M:entry(job)
 			ya.notify { title = "Manual guide", content = result.result.message, timeout = 5 }
 		end
 	else
-		local file = io.open(session .. "/manual-error.json", "w")
+		local file = io.open(session .. "/manual-errors.jsonl", "a")
 		if file then
-			file:write(ya.json_encode { token = v.token, error = tostring(result) })
+			file:write(ya.json_encode { token = v.token, error = tostring(result) }, "\n")
 			file:close()
 		end
 		release()

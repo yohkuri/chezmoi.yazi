@@ -11,6 +11,10 @@ from manual_cases import CASES
 from support import REPO, Runtime, baseline, environment, owned, read, run, write
 
 
+class StaleRequest(ValueError):
+    """A delayed guide request must not change the current observation."""
+
+
 def save(root, state):
     update_results(state)
     temporary = root / "walk.json.tmp"
@@ -103,6 +107,38 @@ def update_results(state):
     # Attempts are chronological; the latest retry determines each case result.
     for attempt in state["attempts"]:
         state["results"][attempt["case"]] = case_status(attempt)
+
+
+def import_harness_errors(root, state):
+    # Include old single-marker sessions; new guides append one JSON line per error.
+    markers = []
+    legacy = root / "manual-error.json"
+    journal = root / "manual-errors.jsonl"
+    if legacy.exists():
+        markers.append(json.loads(read(legacy)))
+    if journal.exists():
+        markers.extend(json.loads(line) for line in read(journal).splitlines() if line.strip())
+    history = state.setdefault("harness_errors", [])
+    pending = markers[len(history):]
+    for marker in pending:
+        attempt = current(state)
+        step = attempt["step"]
+        try:
+            origin, origin_step = map(int, marker.get("token").split(":"))
+            if origin < 0 or origin_step < 0:
+                raise ValueError("Negative error token")
+            source = state["attempts"][origin]
+            source["steps"][origin_step]
+        except (AttributeError, TypeError, ValueError, IndexError):
+            # Older or malformed markers cannot identify their originating step.
+            pass
+        else:
+            attempt, step = source, origin_step
+        attempt["steps"][step].update(status="ERROR", error=marker.get("error", "Guide error"))
+        attempt["failed"] = True
+        history.append(marker)
+    if pending:
+        save(root, state)
 
 
 def view(state):
@@ -242,7 +278,8 @@ def transition(root, operation, payload):
     attempt = current(state)
     token = f'{state["active"]}:{attempt["step"]}'
     if payload.get("token") != token:
-        raise ValueError("Stale guide request; reopen controls")
+        raise StaleRequest("Stale guide request; reopen controls")
+    import_harness_errors(root, state)
     snapshot = payload.get("snapshot", {})
     result = attempt["steps"][attempt["step"]]
     result.pop("message", None)
@@ -334,23 +371,7 @@ def details(root):
 
 def finalize(root):
     root, state = load(root)
-    if (root / "manual-error.json").exists():
-        state["harness_error"] = json.loads(read(root / "manual-error.json"))
-        attempt = current(state)
-        step = attempt["step"]
-        try:
-            origin, origin_step = map(int, state["harness_error"].get("token").split(":"))
-            if origin < 0 or origin_step < 0:
-                raise ValueError("Negative error token")
-            source = state["attempts"][origin]
-            source["steps"][origin_step]
-        except (AttributeError, TypeError, ValueError, IndexError):
-            # Older or malformed markers cannot identify their originating step.
-            pass
-        else:
-            attempt, step = source, origin_step
-        attempt["steps"][step].update(status="ERROR", error=state["harness_error"].get("error", "Guide error"))
-        attempt["failed"] = True
+    import_harness_errors(root, state)
     update_results(state)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
     archive = REPO / ".dev/manual-runs" / stamp
@@ -367,9 +388,10 @@ def finalize(root):
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(path, target)
     shutil.copytree(root / "state", archive / "session-state")
-    if (root / "manual-error.json").exists():
-        shutil.copyfile(root / "manual-error.json", archive / "manual-error.json")
-    failed = (root / "manual-error.json").exists() or any(
+    for name in ["manual-error.json", "manual-errors.jsonl"]:
+        if (root / name).exists():
+            shutil.copyfile(root / name, archive / name)
+    failed = bool(state["harness_errors"]) or any(
         attempt.get("failed") or any(
             step["status"] in {"FAIL", "ERROR"} or step.get("files") == "FAIL" or step.get("diagnostic") == "FAIL"
             for step in attempt["steps"])
@@ -397,6 +419,10 @@ def main():
         root = owned(args.root)
         try:
             value = transition(root, args.operation, json.loads(args.payload))
+        except StaleRequest as error:
+            _, state = load(root)
+            value = view(state)
+            value["result"] = dict(value["result"], message=str(error))
         except Exception as error:
             _, state = load(root)
             attempt = current(state)
