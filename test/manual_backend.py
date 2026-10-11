@@ -2,6 +2,7 @@
 import argparse
 from datetime import datetime, timezone
 import hashlib
+import heapq
 import json
 from pathlib import Path
 import shutil
@@ -11,6 +12,7 @@ from support import REPO, Runtime, baseline, environment, owned, read, run, writ
 
 
 def save(root, state):
+    update_results(state)
     temporary = root / "walk.json.tmp"
     write(temporary, json.dumps(state, indent=2, ensure_ascii=True))
     temporary.replace(root / "walk.json")
@@ -56,7 +58,7 @@ def prepare(t, operations, session):
         elif name == "ranges":
             for prefix in ["range", "menu"]:
                 for char in "abc":
-                    write(t.dest / f"{prefix}-{char}", f"range {char}\n" if prefix == "range" else f"menu {char}\n")
+                    write(t.dest / f"{prefix}-{char}", f"{prefix} {char}\n")
             write(t.dest / ".config/outside", "outside\n")
         elif name == "nested-source":
             t.source = t.dest / ".local/share/chezmoi"
@@ -95,6 +97,12 @@ def current(state):
 def case_status(attempt):
     statuses = {step["status"] for step in attempt["steps"]}
     return next((status for status in ["ERROR", "FAIL", "NOT RUN", "SKIP"] if status in statuses), "PASS")
+
+
+def update_results(state):
+    # Attempts are chronological; the latest retry determines each case result.
+    for attempt in state["attempts"]:
+        state["results"][attempt["case"]] = case_status(attempt)
 
 
 def view(state):
@@ -182,10 +190,13 @@ def check(state, snapshot):
     calls = root / "state/instrument/calls"
     if spec["no_action"]:
         offset = attempt["call_offset"] if spec["special"] == "no-new-destroy" else 0
-        for line in (calls.read_bytes()[offset:].decode() if calls.exists() else "").splitlines():
-            args = json.loads(line)
-            if "--no-tty" not in args and spec["no_action"] in args:
-                failures.append(f'Interactive {spec["no_action"]} must not be invoked')
+        if calls.exists():
+            with calls.open("rb") as log:
+                log.seek(offset)
+                for line in log:
+                    args = json.loads(line)
+                    if "--no-tty" not in args and spec["no_action"] in args:
+                        failures.append(f'Interactive {spec["no_action"]} must not be invoked')
     diagnostic = []
     for name, expected in spec["records"].items():
         actual = (snapshot.get("records") or {}).get(str(root / "dest" / name), {})
@@ -244,8 +255,12 @@ def transition(root, operation, payload):
         if operation != "check":
             result["visual"] = "PASS" if operation == "pass" else "FAIL"
             result["note"] = payload.get("note", "")
-        result["status"] = ("FAIL" if "FAIL" in [result["files"], result["diagnostic"], result["visual"]]
-                            else result["visual"] if result["visual"] in {"PASS", "SKIP"} else "NOT RUN")
+        if "FAIL" in [result["files"], result["diagnostic"], result["visual"]]:
+            result["status"] = "FAIL"
+        elif result["visual"] in {"PASS", "SKIP"}:
+            result["status"] = result["visual"]
+        else:
+            result["status"] = "NOT RUN"
     elif operation == "baseline":
         attempt["epoch_before"] = snapshot.get("epoch")
     elif operation == "skip":
@@ -258,7 +273,6 @@ def transition(root, operation, payload):
             attempt["step"] += 1
             prepare_step(root, state)
         else:
-            state["results"][attempt["case"]] = case_status(attempt)
             index = attempt["case"] + 1
             while index < len(CASES) and CASES[index]["optional"] == "git" and not state["git_plugin"]:
                 state["results"][index] = "SKIP"
@@ -277,7 +291,6 @@ def transition(root, operation, payload):
     attempt = current(state)
     if any("FAIL" in [s.get("files"), s.get("diagnostic"), s.get("visual")] or s["status"] == "ERROR" for s in attempt["steps"]):
         attempt["failed"] = True
-    state["results"][attempt["case"]] = case_status(attempt)
     save(root, state)
     return view(state)
 
@@ -301,7 +314,7 @@ def details(root):
             lines += ["", relative, read(path)[-24000:]]
     lines += ["", "SOURCE / DEST CONTENTS (JSON escaped; at most 80 files per tree)"]
     for directory in [Path(attempt["opts"]["source"]), fixture / "dest"]:
-        for path in sorted(directory.rglob("*"))[:80]:
+        for path in heapq.nsmallest(80, directory.rglob("*")):
             if path.is_file() and not path.is_symlink() and path.stat().st_size <= 4096:
                 lines.append(json.dumps({str(path.relative_to(fixture)): read(path)}, ensure_ascii=True))
     for path in (root / "state").rglob("*.log"):
@@ -338,9 +351,7 @@ def finalize(root):
             attempt, step = source, origin_step
         attempt["steps"][step].update(status="ERROR", error=state["harness_error"].get("error", "Guide error"))
         attempt["failed"] = True
-    # Attempts are chronological; the latest retry determines each case result.
-    for attempt in state["attempts"]:
-        state["results"][attempt["case"]] = case_status(attempt)
+    update_results(state)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
     archive = REPO / ".dev/manual-runs" / stamp
     archive.mkdir(parents=True)
@@ -358,7 +369,11 @@ def finalize(root):
     shutil.copytree(root / "state", archive / "session-state")
     if (root / "manual-error.json").exists():
         shutil.copyfile(root / "manual-error.json", archive / "manual-error.json")
-    failed = (root / "manual-error.json").exists() or any(a.get("failed") or s["status"] in {"FAIL", "ERROR"} or s.get("files") == "FAIL" or s.get("diagnostic") == "FAIL" for a in state["attempts"] for s in a["steps"])
+    failed = (root / "manual-error.json").exists() or any(
+        attempt.get("failed") or any(
+            step["status"] in {"FAIL", "ERROR"} or step.get("files") == "FAIL" or step.get("diagnostic") == "FAIL"
+            for step in attempt["steps"])
+        for attempt in state["attempts"])
     keep = state.get("exit", {}).get("keep", True) or failed
     print(f"Results: {archive / 'results.json'}")
     if keep:
@@ -387,7 +402,6 @@ def main():
             attempt = current(state)
             attempt["steps"][attempt["step"]].update(status="ERROR", error=str(error))
             attempt["failed"] = True
-            state["results"][attempt["case"]] = case_status(attempt)
             save(root, state)
             value = view(state)
         print(json.dumps(value))

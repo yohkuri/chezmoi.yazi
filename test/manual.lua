@@ -83,16 +83,19 @@ local release = ya.sync(function(st, value)
 	st.busy = false
 	ui.render()
 end)
-local snapshot = ya.sync(function()
+local snapshot = ya.sync(function(_, full)
 	local st = require("chezmoi")
-	return {
-		records = st.records,
+	local result = {
 		epoch = st.epoch,
-		signs = st.theme.signs,
-		cwd = tostring(cx.active.current.cwd),
 		running = st.running or false,
-		action_busy = st.action_busy or false,
 	}
+	if full then
+		result.records = st.records
+		result.signs = st.theme.signs
+		result.cwd = tostring(cx.active.current.cwd)
+		result.action_busy = st.action_busy or false
+	end
+	return result
 end)
 local switch = ya.sync(function(_, v)
 	for _ = 2, #cx.tabs do
@@ -190,13 +193,17 @@ end
 
 local function request(v, operation, extra)
 	local payload = extra or {}
-	payload.token, payload.snapshot = v.token, snapshot()
+	payload.token = v.token
 	if operation == "pass" or operation == "fail" or operation == "check" then
 		local deadline = ya.time() + 8
-		while payload.snapshot.running and ya.time() < deadline do
+		while snapshot().running and ya.time() < deadline do
 			ya.sleep(0.05)
-			payload.snapshot = snapshot()
 		end
+	end
+	if operation == "pass" or operation == "fail" or operation == "check" or operation == "next" then
+		payload.snapshot = snapshot(true)
+	elseif operation == "baseline" then
+		payload.snapshot = { epoch = snapshot().epoch }
 	end
 	local output, err =
 		require("chezmoi.process").run(python, { backend, session, operation, ya.json_encode(payload) }, 30, 4194304)
@@ -309,10 +316,9 @@ function M:entry(job)
 			level = "warn",
 		}
 	end
-	local old = v.root
 	local ok, result = pcall(function()
 		local result = controls(v, job.args[1] == "exit")
-		if result.root ~= old then
+		if result.root ~= v.root then
 			switch(result)
 		end
 		if result.token ~= v.token then
