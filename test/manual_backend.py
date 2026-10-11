@@ -338,7 +338,9 @@ def finalize(root):
             attempt, step = source, origin_step
         attempt["steps"][step].update(status="ERROR", error=state["harness_error"].get("error", "Guide error"))
         attempt["failed"] = True
-        state["results"][attempt["case"]] = "ERROR"
+    # Attempts are chronological; the latest retry determines each case result.
+    for attempt in state["attempts"]:
+        state["results"][attempt["case"]] = case_status(attempt)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
     archive = REPO / ".dev/manual-runs" / stamp
     archive.mkdir(parents=True)
@@ -382,8 +384,10 @@ def main():
             value = transition(root, args.operation, json.loads(args.payload))
         except Exception as error:
             _, state = load(root)
-            current(state)["steps"][current(state)["step"]].update(status="ERROR", error=str(error))
-            current(state)["failed"] = True
+            attempt = current(state)
+            attempt["steps"][attempt["step"]].update(status="ERROR", error=str(error))
+            attempt["failed"] = True
+            state["results"][attempt["case"]] = case_status(attempt)
             save(root, state)
             value = view(state)
         print(json.dumps(value))

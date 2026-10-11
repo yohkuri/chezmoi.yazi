@@ -1,12 +1,13 @@
 """Progress and evidence invariants without launching Yazi or chezmoi."""
 import json
 from contextlib import contextmanager
+from io import StringIO
 from pathlib import Path
 import shutil
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
-from manual_backend import check, finalize, initialize, load, save, transition, view
+from manual_backend import check, finalize, initialize, load, main, save, transition, view
 from manual_cases import CASES
 from support import REPO, lua, write
 
@@ -203,6 +204,47 @@ class ManualTests(unittest.TestCase):
         self.assertEqual(report["attempts"][0]["steps"][1]["status"], "ERROR")
         self.assertEqual(report["attempts"][0]["steps"][0]["status"], "NOT RUN")
         self.assertTrue(report["attempts"][0]["failed"])
+
+    def test_backend_exception_updates_passing_case_and_saved_report(self):
+        for result in self.state["attempts"][0]["steps"]:
+            result.update(status="PASS", visual="PASS")
+        self.state["results"][2] = "PASS"
+        save(self.session, self.state)
+        output = StringIO()
+        with patch("sys.argv", ["manual_backend.py", str(self.session), "check", '{"token":"0:0"}']), patch("sys.stdout", output), patch("manual_backend.check", side_effect=RuntimeError("Decryption failed")):
+            main()
+        value = json.loads(output.getvalue())
+        self.assertEqual(value["result"]["status"], "ERROR")
+        self.assertEqual(value["cases"][2]["result"], "ERROR")
+        self.assertEqual(load(self.session)[1]["results"][2], "ERROR")
+        with tempfile.TemporaryDirectory() as archive_repo, patch("manual_backend.REPO", Path(archive_repo)):
+            report = json.loads((finalize(self.session) / "results.json").read_text())
+        self.assertEqual(report["results"][2], "ERROR")
+        self.assertTrue(report["attempts"][0]["failed"])
+
+    def test_old_harness_error_preserves_latest_retry_result_after_case_change(self):
+        for status in ["PASS", "SKIP", "NOT RUN", "FAIL", "ERROR"]:
+            with self.subTest(status=status):
+                save(self.session, self.state)
+                write(self.session / "manual-error.json", json.dumps({"token": "0:1", "error": "Backend timeout"}))
+                with self.fresh_cases():
+                    retry = self.request("restart")
+                    state = load(self.session)[1]
+                    for result in state["attempts"][-1]["steps"]:
+                        result.update(status=status, visual=status)
+                    state["results"][2] = status
+                    save(self.session, state)
+                    transition(self.session, "jump", {"token": retry["token"], "index": 0})
+                with tempfile.TemporaryDirectory() as archive_repo, patch("manual_backend.REPO", Path(archive_repo)):
+                    archive = finalize(self.session)
+                    report = json.loads((archive / "results.json").read_text())
+                    self.assertTrue((archive / "manual-error.json").exists())
+                self.assertEqual(report["results"][2], status)
+                self.assertEqual(report["results"][0], "NOT RUN")
+                self.assertEqual(report["attempts"][0]["steps"][1]["status"], "ERROR")
+                self.assertEqual(report["attempts"][0]["steps"][1]["error"], "Backend timeout")
+                self.assertTrue(report["attempts"][0]["failed"])
+                self.assertTrue(self.fixture.exists())
 
     def test_invalid_error_token_falls_back_to_current_step(self):
         for token in [None, "invalid", "-1:0", "0:-1", "99:0", "0:99", 1]:
