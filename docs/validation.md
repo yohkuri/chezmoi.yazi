@@ -48,6 +48,25 @@ Python tests; the complete `test/runtime.py` also passed. The first added
 terminal scenario sent the next control before SKIP was recorded and timed
 out. It now waits for the recorded verdict, and the guided suite passed on rerun.
 
+On 2026-10-11, both follow-up review findings were reproduced and corrected.
+Backend exceptions now update the case aggregate as well as the step. Saved
+case results are recomputed from the latest attempt for each case, so an older
+attempt's error cannot overwrite a successful retry. The originating error,
+marker, and failed fixtures remain available for diagnosis.
+
+Two added regressions cover exception responses, persisted and archived
+aggregates, and old errors after retrying and changing cases. They preserve
+the latest PASS, SKIP, NOT RUN, FAIL, or ERROR. `test/check.py` passed with 51
+core assertions, 73 action assertions, and 31 Python tests. An isolated real
+chezmoi encrypted-file corruption produced a decryption exception: the step,
+case, and archive all recorded ERROR after the fix. A fresh encrypted Add
+retry then archived PASS while preserving the older error marker. The marker
+was injected; an actual backend timeout was not induced.
+
+The complete `test/manual_runtime.py` and `test/runtime.py` passed on macOS
+with Yazi 26.9.1 and chezmoi 2.73.0, using isolated fixtures and private tmux
+sockets outside the restricted sandbox. No new Linux validation was run.
+
 These automated checks do not constitute human visual acceptance of every
 case, font, color, or terminal. The guided launcher with git.yazi, actual editor
 integration, and Linux manual acceptance remain unverified. Earlier direct
