@@ -7,7 +7,8 @@ compatibility claim for every newer/older release or platform.
 ## Manual fixture
 
 See the [guided manual acceptance walk](../test/MANUAL.md). `test/manual.py`
-opens one foreground Yazi with a bottom guide and `W` controls. Preparation,
+opens one foreground Yazi with a bottom guide, single-key `P` acceptance and
+`W` controls. Preparation,
 verdicts, retries, diagnostics, saving and cleanup are available in that session.
 Each case/retry gets fresh chezmoi paths; steps within a case share state.
 
@@ -117,6 +118,66 @@ now reuses one loaded state for its assertion and subsequent updates.
 `test/check.py` again passed 34 Python tests, 51 core assertions, and 73 action
 assertions. The complete `test/manual_runtime.py` and `test/runtime.py` also
 passed after this cleanup on the same macOS/Yazi/chezmoi/Python versions.
+
+On 2026-10-16, a human walk of the preceding guide recorded 22 PASS and two
+SKIP cases, with no final FAIL or ERROR. Manual refresh was skipped because
+automatic acquisition updated the signs before `R`; git coexistence was skipped
+because no git plugin was supplied. The walk exposed unclear observations,
+unnecessary navigation/selection keys, repeated verdict/next menus, clipped
+instructions, missing command visibility, and stale instructions at completion.
+
+The revised English guide uses `P` to record visual PASS, check files/state and
+advance only on success. Failed checks stay on the current step, rapid repeated
+presses are ignored, and stale requests cannot answer the next step. `N`, `B`
+and `S` overrides were removed in favor of normal navigation and Escape. Wrapped
+instructions include concrete expectations and intended command stages; completed
+screens show case results. The manual-refresh case holds its cache for 24 hours
+and checks that a new acquisition occurred. Interactive execution displays actual
+argv, and fixture reports retain interactive command argv and exit codes.
+
+Five new unit regressions cover acceptance/advancement, failed-check gating,
+persistence before preparation errors, forced-refresh evidence and completed
+results. Archive checks also verify that command history survives cleanup.
+`test/check.py` passed 39 Python tests, 51 core and 73 action assertions. The
+complete `test/runtime.py` and `test/manual_runtime.py` passed with isolated
+fixtures and private tmux sockets on macOS, Yazi 26.9.1 and chezmoi 2.73.1.
+The guide suite checked repeated `P`, wrapping at 80 columns, failed acceptance
+before `R`, real refresh, actual argv/history, cancelled apply, standard Escape,
+completion, and repeated foreground editor interruption with archive/cleanup.
+
+Initial added terminal assertions needed to await fixture preparation, account
+for wrapped text, and separate Escape from the following digit so it was not
+decoded as Alt+digit. Those test issues were corrected before the passing run.
+The revised controls and instructions have not yet had another human acceptance
+walk, and no new Linux, personal-editor or actual git coexistence run was done.
+
+Follow-up cleanup on 2026-10-16 colocated command descriptions and epoch/cache
+policies with case/step definitions. Baseline snapshots now run only for the four
+steps that inspect epochs. Layout and redraw share wrapped guide lines, and
+acceptance and Next share advancement while retaining the PASS save before
+preparation. Prepared attempts are published only after preparation succeeds.
+Existing refresh, command-finish, current-attempt and owned-cleanup helpers are
+reused; empty preparation avoids context reconstruction. Result aggregation
+examines only the latest attempt per case, while retaining all historical errors.
+Saved-state fields, attempt metadata and case-wide forbidden-command checks remain.
+
+A comparison of all 24 cases and 49 steps preserved the existing instructions,
+expectations, preparation and command descriptions. An added regression verifies
+that failed case preparation preserves the previous attempt. `test/check.py`
+passed 40 Python tests, 51 core and 73 action assertions; the complete
+`test/manual_runtime.py` and `test/runtime.py` passed. The first runtime attempt
+timed out waiting for the existing resize-restart notification; the unchanged
+suite passed on rerun. These checks used isolated macOS/Yazi 26.9.1/chezmoi 2.73.1
+fixtures and do not measure latency or replace human acceptance of the revised UI.
+
+A subsequent review reproduced a saved-session regression: reopening Manual
+refresh at step 2 or 3 cleared its epoch baseline without collecting a new one,
+so recording PASS still failed after `R`. Guide startup now captures the new
+process baseline before accepting actions. Added real-terminal regressions run
+`test/manual.py open PATH` at both saved steps, reject PASS before `R`, and verify
+that `R` followed by `P` records PASS and advances. Both resumed-step checks passed.
+`test/check.py` (40 Python tests, 51 core and 73 action assertions) and the complete
+`test/manual_runtime.py` and `test/runtime.py` also passed after the fix.
 
 These automated checks do not constitute human visual acceptance of every
 case, font, color, or terminal. The guided launcher with git.yazi, actual editor

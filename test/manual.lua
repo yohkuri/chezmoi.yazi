@@ -16,23 +16,55 @@ local function summary(v)
 	return "Files: " .. (r.files or "pending") .. " | State: " .. (r.diagnostic or "pending") .. " | Visual: " .. r.visual
 end
 
+local function guide_lines(v, width)
+	local title = string.format("%d/%d %s - step %d/%d", v.case, v.total, v.title, v.step, v.steps)
+	local lines
+	if v.finished then
+		local counts = {}
+		for _, case in ipairs(v.cases) do
+			counts[case.result] = (counts[case.result] or 0) + 1
+		end
+		local totals = {}
+		for _, result in ipairs { "PASS", "FAIL", "ERROR", "SKIP", "NOT RUN" } do
+			totals[#totals + 1] = result .. ": " .. (counts[result] or 0)
+		end
+		lines =
+			{ "Walk complete - q: results and finish", table.concat(totals, " | "), "W/d: case results and command history" }
+	else
+		lines = { title, "Do: " .. v.instruction, "Expect: " .. v.expect, "Command: " .. v.command, summary(v) }
+		if v.result.message then
+			lines[#lines + 1] = v.result.message
+		end
+	end
+	return ui.lines(table.concat(lines, "\n"), { width = math.max(1, width), wrap = ui.Wrap.YES, tab_size = 4 })
+end
+
 function M:setup()
-	self.view, self.hidden = initial, false
+	-- Capture the new process epoch before a resumed step can run actions.
+	self.view, self.hidden, self.busy = initial, false, initial.needs_baseline
 	local layout, build = Root.layout, Root.build
 	local guide = { _id = "manual-guide" }
 	function guide:new(area) return setmetatable({ _area = area }, { __index = self }) end
 	function guide:reflow() return { self } end
 	function guide:redraw()
 		local v = M.view
-		local title = v.finished and "Walk complete - q: results and finish"
-			or string.format("%d/%d %s - step %d/%d", v.case, v.total, v.title, v.step, v.steps)
-		local lines = self._area.h == 1 and { title .. " | W: controls" }
-			or {
-				title,
-				"Do: " .. v.instruction,
-				"Expect: " .. v.expect,
-				"[W] Controls | " .. (M.busy and "Preparing/checking..." or summary(v)),
-			}
+		local lines = {}
+		local controls = v.finished and "q: results and finish | W: controls" or "P: PASS/check/next | W: controls"
+		if M.busy then
+			controls = "Preparing/checking..."
+		end
+		if self._area.h == 1 then
+			lines[1] = ui.Line(controls)
+		else
+			local content = M.guide_content
+			for i = 1, math.min(#content, self._area.h - 1) do
+				lines[#lines + 1] = content[i]
+			end
+			if #content > self._area.h - 1 then
+				lines[self._area.h - 1] = ui.Line("W/d: full instructions and command history")
+			end
+			lines[self._area.h] = ui.Line(controls)
+		end
 		local text = ui.Text(lines):wrap(ui.Wrap.NO)
 		text:area(self._area)
 		return { text }
@@ -41,13 +73,15 @@ function M:setup()
 		if M.hidden then
 			return layout(self)
 		end
+		M.guide_content = self._area.h < 20 and {} or guide_lines(M.view, self._area.w)
+		local height = self._area.h < 20 and 1 or math.min(#M.guide_content + 1, math.floor(self._area.h / 2))
 		self._chunks = Layout()
 			:direction(Layout.VERTICAL)
 			:constraints({
 				ui.Constraint.Length(1),
 				ui.Constraint.Length(Tabs.height()),
 				ui.Constraint.Fill(1),
-				ui.Constraint.Length(self._area.h < 20 and 1 or 4),
+				ui.Constraint.Length(height),
 				ui.Constraint.Length(1),
 			})
 			:split(self._area)
@@ -66,10 +100,20 @@ function M:setup()
 			Modal:new(self._area),
 		}
 	end
+	if self.busy then
+		ya.emit("plugin", { "manual", "baseline" })
+	end
 end
 
-local lock = ya.sync(function(st)
-	if st.busy or st.action_pending or require("chezmoi").action_busy then
+local lock = ya.sync(function(st, accept, baseline)
+	if accept then
+		local now, previous = ya.time(), st.accept_at
+		st.accept_at = now
+		if previous and now - previous < 0.75 then
+			return nil
+		end
+	end
+	if (st.busy and not baseline) or st.action_pending or require("chezmoi").action_busy then
 		return nil
 	end
 	st.busy = true
@@ -134,10 +178,6 @@ local navigate = ya.sync(function(st, key)
 		ya.emit("tab_switch", { 0 })
 	elseif key == "G" then
 		ya.emit("tab_create", { dest .. "/.config" })
-	elseif key == "N" then
-		ya.emit("cd", { dest .. "/.config" })
-	elseif key == "B" then
-		ya.emit("cd", { dest })
 	else
 		local target = ({
 			["1"] = "/range-a",
@@ -194,13 +234,13 @@ end
 local function request(v, operation, extra)
 	local payload = extra or {}
 	payload.token = v.token
-	if operation == "pass" or operation == "fail" or operation == "check" then
+	if operation == "accept" or operation == "fail" or operation == "check" then
 		local deadline = ya.time() + 8
 		while snapshot().running and ya.time() < deadline do
 			ya.sleep(0.05)
 		end
 	end
-	if operation == "pass" or operation == "fail" or operation == "check" or operation == "next" then
+	if operation == "accept" or operation == "fail" or operation == "check" or operation == "next" then
 		payload.snapshot = snapshot(true)
 	elseif operation == "baseline" then
 		payload.snapshot = { epoch = snapshot().epoch }
@@ -230,32 +270,30 @@ end
 local function controls(v, exit)
 	local keys = exit
 			and {
-				{ "d", "Results and diagnostics" },
-				{ "k", "Save, retain fixtures and exit" },
-				{ "c", "Save and exit; clean fixtures unless any attempt failed" },
+				{ on = "d", desc = "Results and diagnostics" },
+				{ on = "k", desc = "Save, retain fixtures and exit" },
+				{ on = "c", desc = "Save and exit; clean fixtures unless any attempt failed" },
 			}
 		or {
-			{ "n", "Next step (requires visual verdict or skip)" },
-			{ "p", "Record visual PASS and check files/state" },
-			{ "f", "Record visual FAIL" },
-			{ "s", "Skip current step" },
-			{ "r", "Restart case with fresh fixture" },
-			{ "j", "Jump to case" },
-			{ "d", "Full instructions, results, files and logs" },
-			{ "h", "Hide/show guide (normal layout)" },
-			{ "q", "Results and finish" },
+			{ on = "n", desc = "Next step (requires visual verdict or skip)" },
+			{ on = "p", desc = "PASS, check and next (same as P)" },
+			{ on = "f", desc = "Record visual FAIL" },
+			{ on = "s", desc = "Skip current step" },
+			{ on = "r", desc = "Restart case with fresh fixture" },
+			{ on = "j", desc = "Jump to case" },
+			{ on = "d", desc = "Full instructions, results, files and logs" },
+			{ on = "h", desc = "Hide/show guide (normal layout)" },
+			{ on = "q", desc = "Results and finish" },
 		}
-	local cands = {}
-	for _, item in ipairs(keys) do
-		cands[#cands + 1] = { on = item[1], desc = item[2] }
-	end
-	local choice = ya.which { cands = cands }
+	local choice = ya.which { cands = keys }
 	if not choice then
 		return v
 	end
-	local key = keys[choice][1]
+	local key = keys[choice].on
 	if key == "d" then
-		v = request(v, "check")
+		if not v.finished then
+			v = request(v, "check")
+		end
 		details()
 	elseif key == "h" then
 		toggle()
@@ -271,7 +309,7 @@ local function controls(v, exit)
 			v = request(v, "jump", { index = index - 1 })
 		end
 	else
-		local operation = ({ n = "next", p = "pass", f = "fail", s = "skip", r = "restart" })[key]
+		local operation = ({ n = "next", p = "accept", f = "fail", s = "skip", r = "restart" })[key]
 		local extra = {}
 		if key == "f" or key == "s" then
 			local note, event = ya.input { title = "Observation / skip reason (optional):", pos = { "center", w = 60 } }
@@ -307,8 +345,13 @@ function M:entry(job)
 		end
 		return navigate(job.args[2])
 	end
-	local v = lock()
+	local accept = job.args[1] == "accept"
+	local baseline = job.args[1] == "baseline"
+	local v = lock(accept, baseline)
 	if not v then
+		if accept then
+			return
+		end
 		return ya.notify {
 			title = "Manual guide",
 			content = "An action or guide operation is still running.",
@@ -317,11 +360,14 @@ function M:entry(job)
 		}
 	end
 	local ok, result = pcall(function()
-		local result = controls(v, job.args[1] == "exit")
+		if baseline then
+			return request(v, "baseline")
+		end
+		local result = accept and (v.finished and v or request(v, "accept")) or controls(v, job.args[1] == "exit")
 		if result.root ~= v.root then
 			switch(result)
 		end
-		if result.token ~= v.token then
+		if result.token ~= v.token and result.needs_baseline then
 			result = request(result, "baseline")
 		end
 		return result

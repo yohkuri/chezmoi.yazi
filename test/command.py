@@ -15,7 +15,16 @@ if "managed" in args and mode == "fail-managed":
     sys.exit(1)
 if "--no-tty" not in args:
     # Explicit actions must retain their real terminal and have no query deadline.
-    sys.exit(subprocess.run([chezmoi, *args]).returncode)
+    code = None
+    try:
+        code = subprocess.run([chezmoi, *args]).returncode
+    except KeyboardInterrupt:
+        code = 130
+        raise
+    finally:
+        with (root / "actions.jsonl").open("a") as stream:
+            stream.write(json.dumps(dict(argv=[chezmoi, *args], exit_code=code)) + "\n")
+    sys.exit(code)
 try:
     result = subprocess.run([chezmoi, *args], capture_output=True, timeout=10)
 except subprocess.TimeoutExpired:

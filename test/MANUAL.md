@@ -6,9 +6,11 @@ Launch from the repository root in an interactive terminal:
 test/manual.py
 ```
 
-Yazi opens directly in the same terminal. Follow the bottom guide; press `W`
-for controls or full instructions. Fixture edits, failure injection, checks,
-retries, results and cleanup are handled from this session. You do not need
+Yazi opens directly in the same terminal. Follow the bottom guide; press `P`
+to record visual PASS, check files/state and advance on success. Press `W`
+for other verdicts, controls or full instructions. Fixture edits, failure
+injection, checks, retries, results and cleanup are handled from this session.
+You do not need
 another terminal, shell commands after launch, or an external checklist.
 
 ## Requirements
@@ -30,18 +32,23 @@ Without it, the coexistence case is recorded as `SKIP` with a reason.
 
 ## Walking a case
 
-The guide shows the case, step, operation and expected display. Long text can
-be clipped; `W`, then `d` shows the complete instruction and diagnostics in the
-same terminal. Enter advances that viewer, `b` goes back, and `q` then Enter
+The guide shows the case, step, operation, expected display and intended command.
+Text wraps to the terminal width. If it exceeds the available guide height,
+the guide directs you to `W`, then `d` for complete instructions and diagnostics
+in the same terminal. Enter advances that viewer, `b` goes back, and `q` then Enter
 returns to Yazi. It also lists every case number and current result.
 
 1. Perform the indicated operation using normal Yazi navigation or the fixture
    keys below. Preparation formerly done with `cp`, `printf` or `rm` happens
    when you enter the step. Press `R` or `Y` yourself when instructed.
-2. Inspect the visible result. Press `W`, then `p` to record visual `PASS` and
-   run the file/state checks; use `f` for a failure or `s` to skip with a reason.
-3. Press `W`, then `n` for the next step. Unanswered observations cannot advance.
-   Recorded failures can advance so the rest of the walk remains usable.
+2. Inspect the visible result. Press uppercase `P` (Shift+p) once to record visual
+   `PASS`, run the file/state checks, and advance only if every check passes.
+   `W`, then `p` does the same. Failed checks retain the current step and explain
+   the failure; `W`, then `d` shows details. Rapid repeated `P` presses are ignored
+   until there has been a short pause between presses.
+3. Use `W`, then `f` to record failure or `s` to skip with a reason. These keep
+   the current step for inspection; `W`, then `n` continues afterward. Unanswered
+   observations cannot advance. Automatic checks never supply your visual verdict.
 4. Use `W`, then `r` to retry the current case from a fresh fixture, or `j` to
    enter a case number. Previous attempts remain available as evidence.
 
@@ -51,9 +58,11 @@ extra tabs and restores the baseline theme. Opening guide controls preserves
 ordinary and visual selections. Guide transitions and actions are serialized;
 wait for the current command to return before recording or changing cases.
 
-The four-row guide sits above the ordinary status bar; short terminals get a
-one-row guide. `W`, then `h` hides/restores it. Hidden mode restores Yazi's normal
-layout and keeps `W` available. Hide it for normal-layout resize/small-pane tests.
+The wrapped guide uses at most half the terminal height above the ordinary
+status bar; short terminals show a one-row key reminder. `W`, then `d` remains
+available for full instructions. `W`, then `h` hides/restores the guide. Hidden
+mode restores Yazi's normal layout and keeps `W` available. Hide it for
+normal-layout resize/small-pane tests.
 Modal confirmations appear above the guide.
 
 ## Keys
@@ -62,11 +71,12 @@ Keys are case-sensitive. These overrides affect only the disposable session.
 
 | Key | Operation |
 | --- | --- |
+| `P` | Record visual PASS, check files/state, and advance on success |
 | `W` | Guide controls |
 | `q` | Results/exit menu; Escape returns to the walk |
 | `j`, `k`, arrows, `h`, `l` | Normal navigation |
 | Space | Toggle hovered selection without moving |
-| `S` | Clear committed selection |
+| Escape | Standard Yazi selection/mode escape; press again if still selected |
 | `v`, `V` | Normal visual select/unset |
 | `C` | Real chezmoi action menu |
 | `R`, `Y` | Refresh status / reload theme |
@@ -74,14 +84,23 @@ Keys are case-sensitive. These overrides affect only the disposable session.
 | `d`, `p`, `f`, `x` | Diff / Apply / Forget / Destroy |
 | `D` | Destroy with `--recursive=false` |
 | `t`, `z` | Add as template / encrypted Add |
-| `N`, `B` | Enter `.config` / destination root |
 | `G`, `H` | New `.config` tab / tab zero |
 | `1`, `2`, `3` | Reveal `range-a` / `menu-a` / `.config/outside` |
 | `4` | Select all long/deep confirmation targets |
 | `5`, `6`, `7`, `8`, `9`, `0` | Reveal `.local` / `source` / `unmanaged` / `clean` / `.config` / `.exact` |
 | `T` | Write the internal diagnostic probe |
 
+Enter directories with `l` and return with `h`; there are no `N`, `B` or `S`
+test shortcuts. Select a directory before pressing `l`.
+
 Commands use real chezmoi and its native prompts, with no forced confirmation.
+The guide's command description omits shared fixture context and abbreviates
+target paths. Each actual execution screen shows the complete executable and
+argument vector as JSON, preserving quotes and control characters. `W`, then
+`d` lists executed interactive commands and exit codes separately from background
+status queries; this history is included in the saved report. A cancelled or
+rejected action may run validation queries, but does not execute the rejected
+interactive command. Edit and Apply runs edit, diff, then apply only after approval.
 Read output and press Enter when the command asks to return to Yazi. For Apply,
 return from the diff first, then answer the plugin confirmation. Destructive
 commands can also have a native chezmoi prompt after plugin confirmation.
@@ -90,6 +109,12 @@ Edit cases use a disposable terminal editor displaying the current source.
 Type the instructed replacement line and Enter to save; Ctrl-C interrupts it.
 It requires no personal editor configuration. Encryption uses a public test age
 identity inside the fixture; it is never suitable for real secrets.
+
+The manual-refresh case holds its status cache for 24 hours, keeping the old
+display after guide preparation. Press `R` to force acquisition, then `P` to
+verify the new display. Recording PASS before refresh fails the checks. Other
+cases retain their short cache, so automatic acquisition can update them before
+you press `R`. Intentional failure cases say which warning and signs to expect.
 
 ## Cases and previous checklist coverage
 
@@ -127,6 +152,9 @@ three pass. Results include `PASS`, `FAIL`, `SKIP`, `NOT RUN`, and harness `ERRO
 A skipped or unfinished step is never presented as a pass.
 
 Press `q` and choose to save and retain fixtures, or save and clean them. The
+completed guide replaces old operation instructions with case-result counts;
+these totals describe the latest attempt for each case. Optional git coexistence
+is SKIP when no git plugin was supplied. The
 launcher archives results only after Yazi exits, under ignored
 `.dev/manual-runs/<run-id>/`. Evidence includes every attempt, versions, source
 hashes, file/state check failures, observations, command arguments and logs.
