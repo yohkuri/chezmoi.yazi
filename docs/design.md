@@ -91,6 +91,12 @@ is read without following the selected symlink. Other applicability decisions
 and recursive entry exclusions remain chezmoi's responsibility; a successful
 command does not claim every entry was changed. Failure can leave partial work.
 
+Each interactive stage displays its actual executable and argument vector as
+JSON before execution, alongside the effect and targets. Argument boundaries,
+quotes and control characters stay visible without constructing a shell command.
+An edit/apply action displays edit, diff and approved apply separately; cancelled
+or rejected stages do not appear as executed commands.
+
 Standalone diff inherits its configured filters. Apply has no corresponding
 `[apply].include`/`exclude` settings in the baseline chezmoi runtime. Its preview
 therefore explicitly uses all types with no exclusions, just like the apply

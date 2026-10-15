@@ -12,8 +12,7 @@ from support import REPO, Runtime, chezmoi_args, environment, owned, run, stop, 
 def configure_guide(t, git_plugin):
     from manual_backend import initialize
     initial = initialize(t.root, git_plugin)
-    install_guide(t, initial, git_plugin)
-    keys = {"W": "plugin manual", "Y": "app:theme", "T": "plugin probe", "<Space>": "toggle", "q": "plugin manual -- exit", "S": "escape --select",
+    keys = {"W": "plugin manual", "P": "plugin manual -- accept", "Y": "app:theme", "T": "plugin probe", "<Space>": "toggle", "q": "plugin manual -- exit",
             "C": "plugin manual -- action menu", "R": "plugin manual -- action refresh",
             "a": "plugin manual -- action add", "r": "plugin manual -- action re-add",
             "e": "plugin manual -- action edit", "E": "plugin manual -- action edit --apply",
@@ -21,7 +20,7 @@ def configure_guide(t, git_plugin):
             "f": "plugin manual -- action forget", "x": "plugin manual -- action destroy",
             "D": "plugin manual -- action destroy --recursive=false",
             "t": "plugin manual -- action add --template", "z": "plugin manual -- action add --encrypt"}
-    keys.update({key: "plugin manual -- nav " + key for key in "NBGH1234567890"})
+    keys.update({key: "plugin manual -- nav " + key for key in "GH1234567890"})
     write(t.root / "config/keymap.toml", ''.join(
         f'[[mgr.prepend_keymap]]\non={json.dumps(k)}\nrun={json.dumps(v)}\n' for k, v in keys.items()))
     return initial
@@ -48,7 +47,7 @@ def open_fixture(root):
     t.root = root
     install_guide(t, view(state), state["git_plugin"])
     destination = current(state)["opts"]["destination"]
-    print("W: guide controls and full instructions. q: results and finish.", flush=True)
+    print("P: visual PASS, check and next. W: controls/details. q: results and finish.", flush=True)
     child = None
     previous_interrupt = signal.signal(signal.SIGINT, lambda *_: None)
     try:
@@ -113,10 +112,9 @@ def main():
         if args.action == "clean":
             stop(root)
             if (root / "walk.json").exists():
-                from manual_backend import load
+                from manual_backend import load, remove_attempts
                 _, state = load(root)
-                for attempt in state["attempts"]:
-                    shutil.rmtree(owned(attempt["root"]))
+                remove_attempts(state)
             shutil.rmtree(root)
             print(f"Removed manual fixture: {root}")
         else:

@@ -105,8 +105,19 @@ def case_status(attempt):
 
 def update_results(state):
     # Attempts are chronological; the latest retry determines each case result.
+    latest = {attempt["case"]: attempt for attempt in state["attempts"]}
+    for index, attempt in latest.items():
+        state["results"][index] = case_status(attempt)
+
+
+def step_failed(step):
+    return step["status"] in {"FAIL", "ERROR"} or "FAIL" in [step.get(key) for key in ["files", "diagnostic", "visual"]]
+
+
+def remove_attempts(state):
+    """Remove only owned attempts, after the caller has stopped their Yazi."""
     for attempt in state["attempts"]:
-        state["results"][attempt["case"]] = case_status(attempt)
+        shutil.rmtree(owned(attempt["root"]))
 
 
 def import_harness_errors(root, state):
@@ -146,12 +157,14 @@ def view(state):
     spec = CASES[attempt["case"]]
     instruction = spec["steps"][attempt["step"]]
     unavailable = spec["optional"] == "git" and not state["git_plugin"]
+    targets = Path(attempt["root"]) / "long.json"
     return dict(title=spec["title"], case=attempt["case"] + 1, total=len(CASES),
                 step=attempt["step"] + 1, steps=len(spec["steps"]), instruction="SKIP: no --git-plugin supplied. W/n continues." if unavailable else instruction["do"],
-                expect=instruction["expect"], result=attempt["steps"][attempt["step"]],
+                expect=instruction["expect"], command=instruction["command"], needs_baseline=bool(instruction["epoch"]),
+                result=attempt["steps"][attempt["step"]],
                 root=attempt["root"], opts=attempt["opts"], token=f'{state["active"]}:{attempt["step"]}',
                 cases=[dict(title=c["title"], optional=c["optional"], result=state["results"][i]) for i, c in enumerate(CASES)],
-                targets=json.loads(read(Path(attempt["root"]) / "long.json")) if spec["key"] == "confirmation" else [],
+                targets=json.loads(read(targets)) if targets.is_file() else [],
                 finished=state.get("finished", False))
 
 
@@ -167,32 +180,28 @@ def start_case(root, state, index):
         prepare(t, spec["setup"], root)
         opts = dict(command=str(t.root / "chezmoi-wrapper"), config=str(t.cfg), source=str(t.source),
                     destination=str(t.dest), persistent_state=str(t.root / "chezmoi.db"), cache=str(t.root / "cache/chezmoi"),
-                    timeout=1, cache_ttl=0.2, error_backoff=0.5)
+                    timeout=1, cache_ttl=spec["cache_ttl"], error_backoff=0.5)
         write(t.root / "attempt.json", json.dumps(dict(opts=opts)))
         attempt = dict(case=index, root=str(t.root), opts=opts, step=0,
                        steps=[dict(visual="unanswered", status="NOT RUN") for _ in spec["steps"]])
-        state["attempts"].append(attempt)
-        state["active"] = len(state["attempts"]) - 1
-        state["results"][index] = "NOT RUN"
         if spec["optional"] == "git" and not state["git_plugin"]:
             for result in attempt["steps"]:
                 result.update(status="SKIP", visual="SKIP", note="No --git-plugin supplied")
-        prepare_step(root, state)
+        prepare_step(root, attempt)
+        state["attempts"].append(attempt)
+        state["active"] = len(state["attempts"]) - 1
         state["finished"] = False
     except BaseException:
-        if state["attempts"] and state["attempts"][-1]["root"] == str(t.root):
-            state["attempts"].pop()
-            state["active"] = max(0, len(state["attempts"]) - 1)
         t.close()
         raise
 
 
-def prepare_step(root, state):
-    attempt = current(state)
-    t = context(attempt["root"])
+def prepare_step(root, attempt):
+    fixture = owned(attempt["root"])
     spec = CASES[attempt["case"]]["steps"][attempt["step"]]
-    prepare(t, spec["prep"], root)
-    calls = t.root / "state/instrument/calls"
+    if spec["prep"]:
+        prepare(context(fixture), spec["prep"], root)
+    calls = fixture / "state/instrument/calls"
     attempt["call_offset"] = calls.stat().st_size if calls.exists() else 0
     attempt["epoch_before"] = None
 
@@ -266,11 +275,35 @@ def check(state, snapshot):
             diagnostic.append("Expected flavor modified sign m")
         if signs.get("managed") != expected:
             diagnostic.append(f"Expected managed sign {expected!r}, got {signs}")
-        if attempt["epoch_before"] is not None and snapshot.get("epoch") != attempt["epoch_before"]:
-            diagnostic.append("Theme reload advanced status epoch")
+    before = attempt.get("epoch_before")
+    if spec["epoch"] == "same" and before is not None and snapshot.get("epoch") != before:
+        diagnostic.append("Theme reload advanced status epoch")
+    if spec["epoch"] == "advance" and (before is None or snapshot.get("epoch", -1) <= before):
+        diagnostic.append("Press R to force a new status acquisition before recording PASS.")
     write(root / "snapshot.json", json.dumps(snapshot, indent=2))
     return dict(files="FAIL" if failures else "PASS", failures=failures,
                 diagnostic="FAIL" if diagnostic else "PASS", diagnostic_failures=diagnostic)
+
+
+def advance(root, state, snapshot):
+    attempt = current(state)
+    result = attempt["steps"][attempt["step"]]
+    if result["visual"] not in {"PASS", "FAIL", "SKIP"}:
+        result.update(check(state, snapshot))
+        result["message"] = "Record visual PASS/FAIL or SKIP before advancing."
+    elif attempt["step"] + 1 < len(attempt["steps"]):
+        attempt["step"] += 1
+        prepare_step(root, attempt)
+    else:
+        index = attempt["case"] + 1
+        while index < len(CASES) and CASES[index]["optional"] == "git" and not state["git_plugin"]:
+            state["results"][index] = "SKIP"
+            state.setdefault("skip_reasons", {})[str(index)] = "No --git-plugin supplied"
+            index += 1
+        if index < len(CASES):
+            start_case(root, state, index)
+        else:
+            state["finished"] = True
 
 
 def transition(root, operation, payload):
@@ -283,14 +316,14 @@ def transition(root, operation, payload):
     snapshot = payload.get("snapshot", {})
     result = attempt["steps"][attempt["step"]]
     result.pop("message", None)
-    if CASES[attempt["case"]]["optional"] == "git" and not state["git_plugin"] and operation in {"check", "pass", "fail"}:
+    if CASES[attempt["case"]]["optional"] == "git" and not state["git_plugin"] and operation in {"check", "pass", "fail", "accept"}:
         save(root, state)
         return view(state)
-    if operation in {"check", "pass", "fail"}:
+    if operation in {"check", "pass", "fail", "accept"}:
         result.pop("error", None)
         result.update(check(state, snapshot))
         if operation != "check":
-            result["visual"] = "PASS" if operation == "pass" else "FAIL"
+            result["visual"] = "FAIL" if operation == "fail" else "PASS"
             result["note"] = payload.get("note", "")
         if "FAIL" in [result["files"], result["diagnostic"], result["visual"]]:
             result["status"] = "FAIL"
@@ -298,27 +331,19 @@ def transition(root, operation, payload):
             result["status"] = result["visual"]
         else:
             result["status"] = "NOT RUN"
+        if operation == "accept":
+            save(root, state)
+            if result["status"] == "PASS":
+                advance(root, state, snapshot)
+            else:
+                failures = result["failures"] + result["diagnostic_failures"]
+                result["message"] = "Checks failed; staying on this step: " + "; ".join(failures[:2]) + ". W/d: details; W/n: continue after failure."
     elif operation == "baseline":
         attempt["epoch_before"] = snapshot.get("epoch")
     elif operation == "skip":
         result.update(status="SKIP", visual="SKIP", note=payload.get("note") or "Skipped by tester")
     elif operation == "next":
-        if result["visual"] not in {"PASS", "FAIL", "SKIP"}:
-            result.update(check(state, snapshot))
-            result["message"] = "Record visual PASS/FAIL or SKIP before advancing."
-        elif attempt["step"] + 1 < len(attempt["steps"]):
-            attempt["step"] += 1
-            prepare_step(root, state)
-        else:
-            index = attempt["case"] + 1
-            while index < len(CASES) and CASES[index]["optional"] == "git" and not state["git_plugin"]:
-                state["results"][index] = "SKIP"
-                state.setdefault("skip_reasons", {})[str(index)] = "No --git-plugin supplied"
-                index += 1
-            if index < len(CASES):
-                start_case(root, state, index)
-            else:
-                state["finished"] = True
+        advance(root, state, snapshot)
     elif operation in {"restart", "jump"}:
         start_case(root, state, attempt["case"] if operation == "restart" else int(payload["index"]))
     elif operation == "finish":
@@ -326,7 +351,7 @@ def transition(root, operation, payload):
     else:
         raise ValueError(f"Unknown guide operation: {operation}")
     attempt = current(state)
-    if any("FAIL" in [s.get("files"), s.get("diagnostic"), s.get("visual")] or s["status"] == "ERROR" for s in attempt["steps"]):
+    if any(step_failed(step) for step in attempt["steps"]):
         attempt["failed"] = True
     save(root, state)
     return view(state)
@@ -339,11 +364,17 @@ def details(root):
     spec = CASES[attempt["case"]]
     lines = [f'{spec["title"]} - step {attempt["step"] + 1}/{len(spec["steps"])}', "",
              "DO: " + spec["steps"][attempt["step"]]["do"], "", "EXPECT: " + spec["steps"][attempt["step"]]["expect"], "",
+             "COMMAND: " + spec["steps"][attempt["step"]]["command"], "",
              "Signs are MXYD (plus leading separator). C=managed; XY=chezmoi status; *=directory change; !=failure.",
              "Spaces are significant: clean='C   ', local='CMM ', source='C M ', unmanaged='    '.", "",
              "CURRENT RESULT", json.dumps(attempt["steps"][attempt["step"]], indent=2), "",
              "CASES"]
+    if state.get("finished"):
+        lines = ["Walk complete - saved case verdicts", "", "CASES"]
     lines += [f'{i + 1:2}. {c["title"]}: {state["results"][i]}' for i, c in enumerate(CASES)]
+    lines += ["", "EXECUTED ACTIONS (argv and exit code; background queries excluded)"]
+    actions = fixture / "state/instrument/actions.jsonl"
+    lines += read(actions).splitlines() if actions.exists() else ["No interactive chezmoi command executed in this attempt."]
     lines += ["", "VERSIONS", json.dumps(state["versions"], indent=2), "", f"Fixture: {fixture}"]
     for relative in ["snapshot.json", "state/instrument/calls", "editor-targets.json"]:
         path = fixture / relative
@@ -381,7 +412,7 @@ def finalize(root):
         fixture = owned(attempt["root"])
         directory = archive / f"attempt-{i + 1}"
         directory.mkdir()
-        for relative in ["snapshot.json", "initial.diff", "state/instrument/calls", "editor-targets.json", "attempt.json"]:
+        for relative in ["snapshot.json", "initial.diff", "state/instrument/calls", "state/instrument/actions.jsonl", "editor-targets.json", "attempt.json"]:
             path = fixture / relative
             if path.is_file():
                 target = directory / relative
@@ -392,17 +423,14 @@ def finalize(root):
         if (root / name).exists():
             shutil.copyfile(root / name, archive / name)
     failed = bool(state["harness_errors"]) or any(
-        attempt.get("failed") or any(
-            step["status"] in {"FAIL", "ERROR"} or step.get("files") == "FAIL" or step.get("diagnostic") == "FAIL"
-            for step in attempt["steps"])
+        attempt.get("failed") or any(step_failed(step) for step in attempt["steps"])
         for attempt in state["attempts"])
     keep = state.get("exit", {}).get("keep", True) or failed
     print(f"Results: {archive / 'results.json'}")
     if keep:
         print(f"Fixtures retained: {root}")
     else:
-        for attempt in state["attempts"]:
-            shutil.rmtree(owned(attempt["root"]))
+        remove_attempts(state)
         shutil.rmtree(root)
     return archive
 

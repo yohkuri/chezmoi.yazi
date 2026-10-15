@@ -7,7 +7,7 @@ import shutil
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
-from manual_backend import check, finalize, initialize, load, main, save, transition, view
+from manual_backend import check, details, finalize, initialize, load, main, save, start_case, transition, view
 from manual_cases import CASES
 from support import REPO, lua, read, write
 
@@ -70,6 +70,62 @@ class ManualTests(unittest.TestCase):
         self.assertEqual(value["result"]["files"], "PASS")
         self.assertEqual(value["result"]["diagnostic"], "FAIL")
         self.assertEqual(value["result"]["status"], "FAIL")
+
+    def test_accept_saves_pass_and_advances_without_answering_the_next_step(self):
+        with patch("manual_backend.prepare_step"):
+            value = self.request("accept")
+        report = load(self.session)[1]
+        self.assertEqual(report["attempts"][0]["steps"][0]["status"], "PASS")
+        self.assertEqual(value["step"], 2)
+        self.assertEqual(value["result"]["visual"], "unanswered")
+        before = (self.session / "walk.json").read_bytes()
+        with self.assertRaisesRegex(ValueError, "Stale"):
+            self.request("accept")
+        self.assertEqual(before, (self.session / "walk.json").read_bytes())
+
+    def test_accept_stays_when_file_or_state_checks_fail(self):
+        self.snapshot["records"] = {}
+        value = self.request("accept")
+        self.assertEqual(value["step"], 1)
+        self.assertEqual(value["result"]["visual"], "PASS")
+        self.assertEqual(value["result"]["status"], "FAIL")
+        self.assertIn("staying", value["result"]["message"])
+
+    def test_accept_preserves_verdict_if_preparing_next_step_fails(self):
+        with patch("manual_backend.prepare_step", side_effect=RuntimeError("Preparation failed")):
+            with self.assertRaisesRegex(RuntimeError, "Preparation failed"):
+                self.request("accept")
+        saved = load(self.session)[1]["attempts"][0]
+        self.assertEqual(saved["step"], 0)
+        self.assertEqual(saved["steps"][0]["status"], "PASS")
+
+    def test_case_preparation_failure_preserves_the_previous_attempt(self):
+        previous = list(self.state["attempts"])
+        with self.fresh_cases(), patch("manual_backend.prepare_step", side_effect=RuntimeError("Preparation failed")):
+            with self.assertRaisesRegex(RuntimeError, "Preparation failed"):
+                start_case(self.session, self.state, 0)
+        self.assertEqual(self.state["attempts"], previous)
+        self.assertEqual(self.state["active"], 0)
+
+    def test_refresh_requires_a_new_acquisition_even_if_records_match(self):
+        attempt = self.state["attempts"][0]
+        attempt.update(step=1, epoch_before=3)
+        write(self.fixture / "source/local", "local edit\n")
+        snapshot = dict(epoch=3, records={str(self.fixture / "dest/local"): {"membership": "managed", "xy": "  "}})
+        self.assertEqual(check(self.state, snapshot)["diagnostic"], "FAIL")
+        snapshot["epoch"] = 4
+        self.assertEqual(check(self.state, snapshot)["diagnostic"], "PASS")
+
+    def test_completed_details_show_results_instead_of_old_instructions(self):
+        self.state["finished"] = True
+        self.state["attempts"][0]["opts"]["source"] = str(self.fixture / "source")
+        save(self.session, self.state)
+        output = StringIO()
+        with patch("sys.stdout", output), patch("builtins.input", return_value="q"):
+            details(self.session)
+        self.assertIn("Walk complete", output.getvalue())
+        self.assertIn("CASES", output.getvalue())
+        self.assertNotIn("DO:", output.getvalue())
 
     def test_failed_auto_check_still_requires_visual_verdict(self):
         self.snapshot["records"] = {}
@@ -209,7 +265,6 @@ class ManualTests(unittest.TestCase):
         with self.fresh_cases():
             self.request("jump", index=0)
         state = load(self.session)[1]
-        state["results"][0] = "PASS"
         for result in state["attempts"][-1]["steps"]:
             result.update(status="PASS", visual="PASS")
         save(self.session, state)
@@ -266,7 +321,6 @@ class ManualTests(unittest.TestCase):
     def test_backend_exception_updates_passing_case_and_saved_report(self):
         for result in self.state["attempts"][0]["steps"]:
             result.update(status="PASS", visual="PASS")
-        self.state["results"][2] = "PASS"
         save(self.session, self.state)
         output = StringIO()
         with patch("sys.argv", ["manual_backend.py", str(self.session), "check", '{"token":"0:0"}']), patch("sys.stdout", output), patch("manual_backend.check", side_effect=RuntimeError("Decryption failed")):
@@ -290,7 +344,6 @@ class ManualTests(unittest.TestCase):
                     state = load(self.session)[1]
                     for result in state["attempts"][-1]["steps"]:
                         result.update(status=status, visual=status)
-                    state["results"][2] = status
                     save(self.session, state)
                     transition(self.session, "jump", {"token": retry["token"], "index": 0})
                 with tempfile.TemporaryDirectory() as archive_repo, patch("manual_backend.REPO", Path(archive_repo)):
@@ -317,9 +370,13 @@ class ManualTests(unittest.TestCase):
     def test_successful_cleanup_happens_after_archiving(self):
         self.state["exit"] = {"keep": False}
         save(self.session, self.state)
+        action_log = "state/instrument/actions.jsonl"
+        record = json.dumps(dict(argv=["chezmoi", "edit", "--", "source"], exit_code=0)) + "\n"
+        write(self.fixture / action_log, record)
         with tempfile.TemporaryDirectory() as archive_repo, patch("manual_backend.REPO", Path(archive_repo)):
             archive = finalize(self.session)
             self.assertTrue((archive / "results.json").exists())
+            self.assertEqual(read(archive / "attempt-1" / action_log), record)
         self.assertFalse(self.fixture.exists())
         self.assertFalse(self.session.exists())
 
