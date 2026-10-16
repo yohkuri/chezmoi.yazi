@@ -24,9 +24,14 @@ def choose_case(t, number, settle=0.3):
     t.wait_screen(lambda s: f"{number}/{len(CASES)} " in s, "new case")
 
 
+def assert_mode_colors(t, mode, background):
+    t.wait_screen(lambda s: f" {mode} " in s, f"{mode} mode status bar")
+    line = next(line for line in t.capture(ansi=True).splitlines() if f" {mode} " in line)
+    assert "38;2;30;30;46" in line and f"48;2;{background}" in line, line
+
+
 def test(t):
     write(t.root / "manual.json", json.dumps(dict(version=1, root=str(t.root), repo=str(REPO))))
-    write(t.root / "baseline-theme.toml", "")
     v = configure_guide(t, None)
     install_guide(t, v, None)
     t.dest = Path(v["opts"]["destination"])
@@ -76,6 +81,23 @@ def test(t):
         return root
 
     t.wait_screen(lambda s: "P: PASS/check/next" in s and "S: SKIP/next" in s and "CMM" in s, "initial guide and rows")
+    for light, report in [(True, 2), (False, 1)]:
+        t.tmux("send-keys", "-t", "test", "-l", f"\x1b[?997;{report}n")
+        t.wait(lambda s: s.get("light") is light)
+        t.key("Y")
+        assert_mode_colors(t, "NOR", "137;180;250")
+    assert_mode_colors(t, "NOR", "137;180;250")
+    t.key("v")
+    assert_mode_colors(t, "SEL", "148;226;213")
+    t.tmux("send-keys", "-t", "test", "Escape")
+    assert_mode_colors(t, "NOR", "137;180;250")
+    t.key("V")
+    assert_mode_colors(t, "UNS", "242;205;205")
+    t.tmux("send-keys", "-t", "test", "Escape")
+    assert_mode_colors(t, "NOR", "137;180;250")
+    t.tmux("send-keys", "-t", "test", "Escape")
+    time.sleep(0.3)  # Decode the final Escape before the following guide key.
+    print("PASS manual status colors: dark/light terminal reports, normal/select/unset modes")
     control(t, "n")
     assert state()["attempts"][0]["step"] == 0, "Unanswered observation advanced"
     t.tmux("send-keys", "-t", "test", "P", "P", "P")
@@ -176,8 +198,10 @@ def test(t):
     print("PASS guide controls preserve visual unset selection for real actions")
     jump("theme")
     accept(); t.key("Y")
+    assert_mode_colors(t, "NOR", "137;180;250")
     accept()
     t.key("Y"); accept()
+    assert_mode_colors(t, "NOR", "137;180;250")
     root = jump("edit")
     t.key("6"); t.key("e")
     t.wait_screen(lambda s: "New source content" in s, "fixture editor")
@@ -295,7 +319,6 @@ def resumed_refresh():
     for step in [1, 2]:
         with fixture() as t:
             write(t.root / "manual.json", json.dumps(dict(version=1, root=str(t.root), repo=str(REPO))))
-            write(t.root / "baseline-theme.toml", "")
             try:
                 value = configure_guide(t, None)
                 index = next(i for i, case in enumerate(CASES) if case["key"] == "refresh")

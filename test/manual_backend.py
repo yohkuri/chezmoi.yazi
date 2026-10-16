@@ -231,7 +231,7 @@ def initialize(root, git_plugin):
     state = dict(version=1, session=str(root), git_plugin=git_plugin, versions=versions,
                  head=run(["git", "rev-parse", "HEAD"], cwd=REPO).strip(), diff_sha256=hashlib.sha256(diff.encode()).hexdigest(),
                  source_hashes={str(p.relative_to(REPO)): hashlib.sha256(p.read_bytes()).hexdigest()
-                                for pattern in ["*.lua", "test/*.lua", "test/*.py"] for p in REPO.glob(pattern)},
+                                for pattern in ["*.lua", "test/*.lua", "test/*.py", "test/manual-theme.toml"] for p in REPO.glob(pattern)},
                  results=["NOT RUN"] * len(CASES), attempts=[], finished=False)
     start_case(root, state, 0)
     save(root, state)

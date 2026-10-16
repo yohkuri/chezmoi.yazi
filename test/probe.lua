@@ -25,6 +25,7 @@ return {
 			signs = st.theme.signs,
 			cwd = tostring(cx.active.current.cwd),
 			instance = os.getenv("YAZI_ID"),
+			light = rt.term.light(),
 		})
 		out:close()
 	end,

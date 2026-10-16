@@ -24,6 +24,13 @@ at least 100 columns wide is convenient; smaller sizes are acceptance cases.
 Public UI and instructions are English. Unicode filenames are intentional.
 Linux and every font/terminal combination are not established by this guide.
 
+The session uses explicit Catppuccin Mocha colors for the status bar and tabs
+in both dark and light terminal appearances. It reads the bundled
+`test/manual-theme.toml`, without loading personal configuration or downloading
+a flavor. Case 8 changes chezmoi signs and colors while retaining these UI
+colors. Start a new session to use this palette; retained sessions keep their
+saved baseline theme.
+
 Optionally include an existing, read-only git.yazi checkout at startup:
 
 ```sh

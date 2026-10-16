@@ -5,9 +5,10 @@ from io import StringIO
 from pathlib import Path
 import shutil
 import tempfile
+import tomllib
 import unittest
 from unittest.mock import Mock, patch
-from manual_backend import check, details, finalize, initialize, load, main, save, start_case, transition, view
+from manual_backend import check, details, finalize, initialize, load, main, prepare, save, start_case, transition, view
 from manual_cases import CASES
 from support import REPO, lua, read, write
 
@@ -69,6 +70,20 @@ class ManualTests(unittest.TestCase):
         self.assertEqual(value["result"]["status"], "NOT RUN")
         self.assertEqual(self.request("next")["step"], 1)
         self.assertEqual(self.request("pass")["result"]["status"], "PASS")
+
+    def test_theme_switching_preserves_readable_modes_and_git_context(self):
+        from manual import configure_guide
+        for git_plugin in [None, "git.yazi"]:
+            with self.subTest(git_plugin=git_plugin), patch("manual_backend.initialize"):
+                configure_guide(Mock(root=self.session), git_plugin)
+                for theme in ["custom", "base"]:
+                    prepare(None, [("theme", theme)], self.session)
+                    actual = tomllib.loads(read(self.session / "config/theme.toml"))
+                    for mode in ["normal", "select", "unset"]:
+                        self.assertEqual(actual["mode"][mode + "_main"]["fg"], "#1e1e2e")
+                        self.assertNotEqual(actual["mode"][mode + "_main"]["bg"], "#1e1e2e")
+                    self.assertEqual(actual.get("git"), {"untracked_sign": "G "} if git_plugin else None)
+                    self.assertEqual(actual.get("flavor"), {"dark": "manual", "light": "manual"} if theme == "custom" else None)
 
     def test_internal_state_mismatch_cannot_be_overridden_by_visual_pass(self):
         self.snapshot["records"] = {}
