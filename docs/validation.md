@@ -7,8 +7,8 @@ compatibility claim for every newer/older release or platform.
 ## Manual fixture
 
 See the [guided manual acceptance walk](../test/MANUAL.md). `test/manual.py`
-opens one foreground Yazi with a bottom guide, single-key `P` acceptance and
-`W` controls. Preparation,
+opens one foreground Yazi with a bottom guide, single-key `P` acceptance,
+`S` skip/advance and `W` controls. Preparation,
 verdicts, retries, diagnostics, saving and cleanup are available in that session.
 Each case/retry gets fresh chezmoi paths; steps within a case share state.
 
@@ -194,6 +194,38 @@ suite injected a real Restart preparation failure and verified unchanged verdict
 the intended target in the notification, and error history in foreground details.
 Its first run sent PASS before a rejected action released its lock; explicit
 action-completion waits were added before the successful complete rerun.
+
+The human guide now presents numbered English instructions in execution order,
+placing each visible check immediately after its action. Command names are
+included with the keys that invoke them, and each existing step ends with one
+`P` verdict rather than adding verdicts for individual instructions. The bottom
+guide and foreground details share this prose without separate Do, Expect or
+Command sections. A comparison of all 24 cases and 49 steps confirmed unchanged
+case order, setup, preparation, file/state expectations, epoch policies and cache
+settings. `test/check.py` passed 42 Python tests, 51 core and 73 action assertions.
+The complete `test/manual_runtime.py` passed, including instruction order at 80
+columns, matching prose in foreground details, saved-session resume and cleanup.
+The complete `test/runtime.py` also passed with isolated fixtures and private
+tmux sockets.
+
+Single-key `S` now records SKIP for the current step and advances without a
+reason prompt or file/state checks. `W/s` still accepts an optional reason and
+stays on the step. The new binding replaces content search only in the manual
+session and is refreshed when reopening retained sessions. `P` and `S` share
+the repeat-key guard; completed walks ignore both. A narrow guide uses a shorter
+reminder that fits `P`, `S` and `W` at 40 columns.
+
+Three added unit regressions cover SKIP advancement without checks or answering
+the following step, persistence across preparation failure, and completion
+without PASS. Existing case-preparation checks now include SKIP advancement.
+`test/check.py` passed 45 Python tests, 51 core and 73 action assertions.
+The complete `test/manual_runtime.py` verified within-case and cross-case SKIP,
+mixed/repeated verdict keys, the 40-column reminder, unchanged `W/s` behavior,
+completed-walk handling and the new binding when resuming an older keymap.
+The complete `test/runtime.py` also passed on macOS with Yazi 26.9.1 and chezmoi
+2.73.1. Initial added checks needed a complete fixture and explicit separation
+from the repeat-key guard; the terminal sequence also avoids reentering the
+case it has just reached and waits for the first verdict before sending repeats.
 
 These automated checks do not constitute human visual acceptance of every
 case, font, color, or terminal. The guided launcher with git.yazi, actual editor

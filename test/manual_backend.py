@@ -167,8 +167,11 @@ def view(state):
     unavailable = spec["optional"] == "git" and not state["git_plugin"]
     targets = Path(attempt["root"]) / "long.json"
     return dict(title=spec["title"], case=attempt["case"] + 1, total=len(CASES),
-                step=attempt["step"] + 1, steps=len(spec["steps"]), instruction="SKIP: no --git-plugin supplied. W/n continues." if unavailable else instruction["do"],
-                expect=instruction["expect"], command=instruction["command"], needs_baseline=bool(instruction["epoch"]),
+                step=attempt["step"] + 1, steps=len(spec["steps"]),
+                instruction="This case was skipped because no git.yazi path was supplied. Press W, then n to continue." if unavailable else instruction["instruction"],
+                # Retained sessions may still have a guide that reads these fields.
+                expect="", command="",
+                needs_baseline=bool(instruction["epoch"]),
                 result=attempt["steps"][attempt["step"]],
                 root=attempt["root"], opts=attempt["opts"], token=f'{state["active"]}:{attempt["step"]}',
                 cases=[dict(title=c["title"], optional=c["optional"], result=state["results"][i]) for i, c in enumerate(CASES)],
@@ -355,8 +358,11 @@ def transition(root, operation, payload):
                 result["message"] = "Checks failed; staying on this step: " + "; ".join(failures[:2]) + ". W/d: details; W/n: continue after failure."
     elif operation == "baseline":
         attempt["epoch_before"] = snapshot.get("epoch")
-    elif operation == "skip":
+    elif operation in {"skip", "skip-next"}:
         result.update(status="SKIP", visual="SKIP", note=payload.get("note") or "Skipped by tester")
+        if operation == "skip-next":
+            save(root, state)
+            advance(root, state, snapshot)
     elif operation == "next":
         advance(root, state, snapshot)
     elif operation in {"restart", "jump"}:
@@ -378,8 +384,7 @@ def details(root):
     fixture = owned(attempt["root"])
     spec = CASES[attempt["case"]]
     lines = [f'{spec["title"]} - step {attempt["step"] + 1}/{len(spec["steps"])}', "",
-             "DO: " + spec["steps"][attempt["step"]]["do"], "", "EXPECT: " + spec["steps"][attempt["step"]]["expect"], "",
-             "COMMAND: " + spec["steps"][attempt["step"]]["command"], "",
+             view(state)["instruction"], "",
              "Signs are MXYD (plus leading separator). C=managed; XY=chezmoi status; *=directory change; !=failure.",
              "Spaces are significant: clean='C   ', local='CMM ', source='C M ', unmanaged='    '.", "",
              "CURRENT RESULT", json.dumps(attempt["steps"][attempt["step"]], indent=2), "",

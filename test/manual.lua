@@ -31,7 +31,7 @@ local function guide_lines(v, width)
 		lines =
 			{ "Walk complete - q: results and finish", table.concat(totals, " | "), "W/d: case results and command history" }
 	else
-		lines = { title, "Do: " .. v.instruction, "Expect: " .. v.expect, "Command: " .. v.command, summary(v) }
+		lines = { title, v.instruction, summary(v) }
 		if v.result.message then
 			lines[#lines + 1] = v.result.message
 		end
@@ -49,7 +49,11 @@ function M:setup()
 	function guide:redraw()
 		local v = M.view
 		local lines = {}
-		local controls = v.finished and "q: results and finish | W: controls" or "P: PASS/check/next | W: controls"
+		local controls = v.finished and "q: results and finish | W: controls"
+			or "P: PASS/check/next | S: SKIP/next | W: controls"
+		if not v.finished and self._area.w < 60 then
+			controls = "P: PASS | S: SKIP | W: controls"
+		end
 		if M.busy then
 			controls = "Preparing/checking..."
 		end
@@ -105,10 +109,10 @@ function M:setup()
 	end
 end
 
-local lock = ya.sync(function(st, accept, baseline)
-	if accept then
-		local now, previous = ya.time(), st.accept_at
-		st.accept_at = now
+local lock = ya.sync(function(st, verdict, baseline)
+	if verdict then
+		local now, previous = ya.time(), st.verdict_at
+		st.verdict_at = now
 		if previous and now - previous < 0.75 then
 			return nil
 		end
@@ -345,11 +349,11 @@ function M:entry(job)
 		end
 		return navigate(job.args[2])
 	end
-	local accept = job.args[1] == "accept"
+	local verdict = job.args[1] == "accept" or job.args[1] == "skip-next"
 	local baseline = job.args[1] == "baseline"
-	local v = lock(accept, baseline)
+	local v = lock(verdict, baseline)
 	if not v then
-		if accept then
+		if verdict then
 			return
 		end
 		return ya.notify {
@@ -363,7 +367,7 @@ function M:entry(job)
 		if baseline then
 			return request(v, "baseline")
 		end
-		local result = accept and (v.finished and v or request(v, "accept")) or controls(v, job.args[1] == "exit")
+		local result = verdict and (v.finished and v or request(v, job.args[1])) or controls(v, job.args[1] == "exit")
 		if result.root ~= v.root then
 			switch(result)
 		end
