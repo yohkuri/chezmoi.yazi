@@ -84,7 +84,12 @@ end
 function M.interactive(opts, args, summary)
 	local permit = ui.hide()
 	local ok, success = pcall(function()
-		io.write("\27[2J\27[Hchezmoi\n" .. summary .. "\n\n")
+		local argv = { opts.command }
+		for _, arg in ipairs(args) do
+			argv[#argv + 1] = arg
+		end
+		-- JSON quoting preserves argument boundaries and makes control paths readable.
+		io.write("\27[2J\27[Hchezmoi\n" .. summary .. "\n\nRunning (argv):\n" .. ya.json_encode(argv) .. "\n\n")
 		io.flush()
 		local status =
 			Command(opts.command):arg(args):stdin(Command.INHERIT):stdout(Command.INHERIT):stderr(Command.INHERIT):status()

@@ -1,0 +1,5 @@
+---@meta _
+-- Fixture-only APIs missing from the pinned declarations, used by the Yazi
+-- v26.9.1 Root component and yazi-plugin/src/utils/json.rs.
+---@class ya
+---@field json_decode fun(text: string): table?, Error?
