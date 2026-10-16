@@ -6,11 +6,13 @@ import shutil
 import signal
 import sys
 import subprocess
-from support import REPO, Runtime, chezmoi_args, environment, owned, run, stop, write
+from support import REPO, Runtime, chezmoi_args, environment, owned, read, run, stop, write
 
 
 def configure_guide(t, git_plugin):
     from manual_backend import initialize
+    theme = read(REPO / "test/manual-theme.toml")
+    write(t.root / "baseline-theme.toml", theme + ('\n[git]\nuntracked_sign="G "\n' if git_plugin else ""))
     return initialize(t.root, git_plugin)
 
 
@@ -99,7 +101,6 @@ def main():
     if args.action == "create":
         t = Runtime(args.git_plugin)
         try:
-            write(t.root / "baseline-theme.toml", '[git]\nuntracked_sign="G "\n' if args.git_plugin else "")
             write(t.root / "manual.json", json.dumps(dict(version=1, root=str(t.root), repo=str(REPO))))
             configure_guide(t, args.git_plugin)
         except BaseException:

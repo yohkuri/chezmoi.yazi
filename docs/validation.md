@@ -227,6 +227,18 @@ The complete `test/runtime.py` also passed on macOS with Yazi 26.9.1 and chezmoi
 from the repeat-key guard; the terminal sequence also avoids reentering the
 case it has just reached and waits for the first verdict before sending repeats.
 
+The manual session now bundles explicit Catppuccin Mocha status-bar and tab
+colors in `test/manual-theme.toml`. No personal flavor or network download is
+required. The baseline persists across case changes and chezmoi theme overrides;
+retained sessions keep their saved baseline. Reports include the palette's source
+hash. A regression covers custom/base theme transitions with and without git
+context. `test/check.py` passed 46 Python tests, 51 core and 73 action assertions.
+The complete `test/manual_runtime.py` injected light and dark terminal reports,
+verified Yazi's own appearance detection, and checked rendered RGB colors in
+normal, select and unset status modes, plus preservation through Case 8.
+The complete `test/runtime.py` also passed on macOS with Yazi 26.9.1 and chezmoi
+2.73.1. These captures verify emitted colors, not physical display calibration.
+
 These automated checks do not constitute human visual acceptance of every
 case, font, color, or terminal. The guided launcher with git.yazi, actual editor
 integration, and Linux manual acceptance remain unverified. Earlier direct
