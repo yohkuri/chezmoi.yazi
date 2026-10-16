@@ -179,6 +179,22 @@ that `R` followed by `P` records PASS and advances. Both resumed-step checks pas
 `test/check.py` (40 Python tests, 51 core and 73 action assertions) and the complete
 `test/manual_runtime.py` and `test/runtime.py` also passed after the fix.
 
+A later independent review exposed an exception-handling gap: `transition()`
+saved PASS before preparation, but the CLI error handler overwrote that verdict
+with ERROR if preparing the next step or case failed. CLI-path regressions
+reproduced the overwrite for acceptance, Next, Jump and Restart, including
+unanswered steps. Preparation failures now retain the saved position and verdicts,
+record the intended case/step and operation separately, appear in `W/d`, and
+retain fixtures after later successful retries. Check exceptions still mark
+their current step ERROR, and preparation history does not consume guide-error
+journal entries. `test/check.py` passed 42 Python tests, 51 core and 73 action
+assertions, including archive retention and diagnostic-history checks.
+The complete `test/manual_runtime.py` and `test/runtime.py` also passed. The guide
+suite injected a real Restart preparation failure and verified unchanged verdicts,
+the intended target in the notification, and error history in foreground details.
+Its first run sent PASS before a rejected action released its lock; explicit
+action-completion waits were added before the successful complete rerun.
+
 These automated checks do not constitute human visual acceptance of every
 case, font, color, or terminal. The guided launcher with git.yazi, actual editor
 integration, and Linux manual acceptance remain unverified. Earlier direct

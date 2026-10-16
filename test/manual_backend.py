@@ -15,6 +15,14 @@ class StaleRequest(ValueError):
     """A delayed guide request must not change the current observation."""
 
 
+class PreparationError(RuntimeError):
+    """Fixture preparation failed before the target step became active."""
+
+    def __init__(self, case, step, error):
+        super().__init__(str(error))
+        self.case, self.step = case, step
+
+
 def save(root, state):
     update_results(state)
     temporary = root / "walk.json.tmp"
@@ -172,9 +180,10 @@ def start_case(root, state, index):
     if index < 0 or index >= len(CASES):
         raise ValueError("Invalid case index")
     spec = CASES[index]
-    write(root / "config/theme.toml", read(root / "baseline-theme.toml"))
-    t = Runtime(state["git_plugin"], probe=False)
+    t = None
     try:
+        write(root / "config/theme.toml", read(root / "baseline-theme.toml"))
+        t = Runtime(state["git_plugin"], probe=False)
         write(t.root / "manual.json", json.dumps(dict(version=1, root=str(t.root), repo=str(REPO))))
         baseline(t)
         prepare(t, spec["setup"], root)
@@ -191,19 +200,25 @@ def start_case(root, state, index):
         state["attempts"].append(attempt)
         state["active"] = len(state["attempts"]) - 1
         state["finished"] = False
-    except BaseException:
-        t.close()
+    except BaseException as error:
+        if t is not None:
+            t.close()
+        if isinstance(error, Exception):
+            raise PreparationError(index, 0, error) from error
         raise
 
 
 def prepare_step(root, attempt):
-    fixture = owned(attempt["root"])
-    spec = CASES[attempt["case"]]["steps"][attempt["step"]]
-    if spec["prep"]:
-        prepare(context(fixture), spec["prep"], root)
-    calls = fixture / "state/instrument/calls"
-    attempt["call_offset"] = calls.stat().st_size if calls.exists() else 0
-    attempt["epoch_before"] = None
+    try:
+        fixture = owned(attempt["root"])
+        spec = CASES[attempt["case"]]["steps"][attempt["step"]]
+        if spec["prep"]:
+            prepare(context(fixture), spec["prep"], root)
+        calls = fixture / "state/instrument/calls"
+        attempt["call_offset"] = calls.stat().st_size if calls.exists() else 0
+        attempt["epoch_before"] = None
+    except Exception as error:
+        raise PreparationError(attempt["case"], attempt["step"], error) from error
 
 
 def initialize(root, git_plugin):
@@ -372,6 +387,11 @@ def details(root):
     if state.get("finished"):
         lines = ["Walk complete - saved case verdicts", "", "CASES"]
     lines += [f'{i + 1:2}. {c["title"]}: {state["results"][i]}' for i, c in enumerate(CASES)]
+    if state.get("preparation_errors"):
+        lines += ["", "PREPARATION ERRORS"]
+        for error in state["preparation_errors"]:
+            title = CASES[error["case"]]["title"]
+            lines.append(f'{error["operation"]}: case {error["case"] + 1} ({title}), step {error["step"] + 1}: {error["error"]}')
     lines += ["", "EXECUTED ACTIONS (argv and exit code; background queries excluded)"]
     actions = fixture / "state/instrument/actions.jsonl"
     lines += read(actions).splitlines() if actions.exists() else ["No interactive chezmoi command executed in this attempt."]
@@ -422,7 +442,7 @@ def finalize(root):
     for name in ["manual-error.json", "manual-errors.jsonl"]:
         if (root / name).exists():
             shutil.copyfile(root / name, archive / name)
-    failed = bool(state["harness_errors"]) or any(
+    failed = bool(state["harness_errors"]) or bool(state.get("preparation_errors")) or any(
         attempt.get("failed") or any(step_failed(step) for step in attempt["steps"])
         for attempt in state["attempts"])
     keep = state.get("exit", {}).get("keep", True) or failed
@@ -451,6 +471,14 @@ def main():
             _, state = load(root)
             value = view(state)
             value["result"] = dict(value["result"], message=str(error))
+        except PreparationError as error:
+            _, state = load(root)
+            value = view(state)
+            state.setdefault("preparation_errors", []).append(dict(
+                operation=args.operation, token=value["token"], case=error.case, step=error.step, error=str(error)))
+            save(root, state)
+            message = f"Could not prepare case {error.case + 1}, step {error.step + 1}: {error}. W/d: details; retry the operation."
+            value["result"] = dict(value["result"], message=message)
         except Exception as error:
             _, state = load(root)
             attempt = current(state)

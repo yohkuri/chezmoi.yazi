@@ -179,11 +179,13 @@ def test(t):
     jump("mixed")
     t.key("8"); t.key(" "); t.key("7"); t.key(" "); t.key("e")
     t.wait_screen(lambda s: "Not managed" in s, "mixed Edit rejection")
+    t.wait(lambda s: not s["action_busy"] and not s["running"])
     accept()
     t.tmux("send-keys", "-t", "test", "Escape")
     time.sleep(0.3)  # Let the terminal decode Escape before the digit shortcut.
     t.key("9"); t.key("e")
     t.wait_screen(lambda s: "Select files inside" in s, "standard Escape cleared selection")
+    t.wait(lambda s: not s["action_busy"] and not s["running"])
     accept()
     jump("navigation")
     t.key("G"); t.key("H")
@@ -197,8 +199,28 @@ def test(t):
     jump("source-protection")
     t.key("5"); t.key("x")
     t.wait_screen(lambda s: "contains the source" in s, "source-ancestor rejection")
+    previous = state()
+    theme = t.root / "baseline-theme.toml"
+    original_theme = read(theme)
+    theme.unlink()
+    try:
+        control(t, "r")
+        number = current(previous)["case"] + 1
+        t.wait_screen(lambda s: f"Could not prepare case {number}, step 1" in s, "preparation failure notification")
+        failed = state()
+        assert failed["attempts"] == previous["attempts"], failed
+        assert failed["results"] == previous["results"], failed
+        error = failed["preparation_errors"][-1]
+        assert error["operation"] == "restart" and error["case"] == number - 1 and error["step"] == 0, error
+    finally:
+        write(theme, original_theme)
     control(t, "d")
     t.wait_screen(lambda s: "Enter: next | b: back | q: return to Yazi" in s, "same-terminal details")
+    deadline = time.monotonic() + 5
+    while "PREPARATION ERRORS" not in t.capture():
+        assert time.monotonic() < deadline, t.capture()
+        enter(t)
+    assert "restart: case" in t.capture(), t.capture()
     t.key("q"); enter(t)
     t.wait_screen(lambda s: "W: controls" in s, "return from details")
     t.key("q")
@@ -206,7 +228,7 @@ def test(t):
     t.key("k")
     time.sleep(0.3)
     assert state()["exit"]["keep"] is True
-    print("PASS guide: source protection, foreground details and saved exit choice")
+    print("PASS guide: source protection, preparation failure attribution, foreground details and saved exit choice")
 
 
 def foreground_launcher():
