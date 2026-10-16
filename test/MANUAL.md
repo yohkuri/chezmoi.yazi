@@ -151,6 +151,12 @@ Automatic checks never fill in the visual verdict. A step passes only when all
 three pass. Results include `PASS`, `FAIL`, `SKIP`, `NOT RUN`, and harness `ERROR`.
 A skipped or unfinished step is never presented as a pass.
 
+If preparing a step or case fails, the guide keeps your saved verdicts and
+position. The message identifies the intended case and step; `W/d` shows the
+preparation-error history. Retry the same operation after resolving the cause.
+These errors are archived separately from step verdicts and retain fixtures,
+even if a later retry succeeds and cleanup was requested.
+
 Press `q` and choose to save and retain fixtures, or save and clean them. The
 completed guide replaces old operation instructions with case-result counts;
 these totals describe the latest attempt for each case. Optional git coexistence

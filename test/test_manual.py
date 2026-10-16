@@ -43,6 +43,12 @@ class ManualTests(unittest.TestCase):
     def request(self, operation, **extra):
         return transition(self.session, operation, dict(token="0:0", snapshot=self.snapshot, **extra))
 
+    def cli(self, operation, **payload):
+        output = StringIO()
+        with patch("sys.argv", ["manual_backend.py", str(self.session), operation, json.dumps(payload)]), patch("sys.stdout", output):
+            main()
+        return json.loads(output.getvalue())
+
     @contextmanager
     def fresh_cases(self):
         def setup(t, git_plugin, instrument, probe):
@@ -92,12 +98,82 @@ class ManualTests(unittest.TestCase):
         self.assertIn("staying", value["result"]["message"])
 
     def test_accept_preserves_verdict_if_preparing_next_step_fails(self):
-        with patch("manual_backend.prepare_step", side_effect=RuntimeError("Preparation failed")):
-            with self.assertRaisesRegex(RuntimeError, "Preparation failed"):
-                self.request("accept")
-        saved = load(self.session)[1]["attempts"][0]
+        write(self.fixture / "attempt.json", json.dumps(dict(opts=dict(source=str(self.fixture / "source")))))
+        write(self.fixture / "dest/local", "local edit\n")
+        with patch("manual_backend.prepare", side_effect=RuntimeError("Preparation failed")):
+            value = self.cli("accept", token="0:0", snapshot=self.snapshot)
+        report = load(self.session)[1]
+        saved = report["attempts"][0]
         self.assertEqual(saved["step"], 0)
         self.assertEqual(saved["steps"][0]["status"], "PASS")
+        self.assertEqual(saved["steps"][1]["status"], "NOT RUN")
+        self.assertNotIn("error", saved["steps"][0])
+        self.assertFalse(saved.get("failed", False))
+        self.assertEqual(report["preparation_errors"], [dict(operation="accept", token="0:0", case=2, step=1, error="Preparation failed")])
+        self.assertIn("case 3, step 2", value["result"]["message"])
+        self.assertEqual(value["result"]["status"], "PASS")
+        # A retry prepares the next step without erasing the historical failure.
+        self.assertEqual(self.cli("accept", token="0:0", snapshot=self.snapshot)["step"], 2)
+        self.assertEqual(len(load(self.session)[1]["preparation_errors"]), 1)
+
+    def test_case_preparation_cli_failure_preserves_existing_results(self):
+        for operation, status in [("accept", "PASS"), ("next", "PASS"), ("jump", "PASS"),
+                                  ("restart", "PASS"), ("jump", "NOT RUN"), ("restart", "NOT RUN")]:
+            with self.subTest(operation=operation, status=status):
+                attempt = self.state["attempts"][0]
+                attempt.update(step=2, epoch_before=2)
+                for result in attempt["steps"]:
+                    result.update(status=status, visual="PASS" if status == "PASS" else "unanswered")
+                save(self.session, self.state)
+                target = 2 if operation == "restart" else 11 if operation == "jump" else 3
+                with self.fresh_cases(), patch("manual_backend.baseline", side_effect=RuntimeError("Baseline failed")):
+                    value = self.cli(operation, token="0:2", index=11, snapshot=dict(self.snapshot, epoch=3))
+                report = load(self.session)[1]
+                self.assertEqual(len(report["attempts"]), 1)
+                self.assertEqual(report["active"], 0)
+                self.assertEqual(report["attempts"][0]["step"], 2)
+                self.assertEqual([r["status"] for r in report["attempts"][0]["steps"]], [status] * 3)
+                self.assertEqual(report["results"][2], status)
+                self.assertFalse(report["attempts"][0].get("failed", False))
+                self.assertEqual(report["preparation_errors"], [dict(operation=operation, token="0:2", case=target, step=0, error="Baseline failed")])
+                self.assertEqual(value["result"]["status"], status)
+                self.assertIn(f"case {target + 1}, step 1", value["result"]["message"])
+
+    def test_preparation_error_history_retains_fixtures_without_changing_verdicts(self):
+        write(self.fixture / "attempt.json", json.dumps(dict(opts=dict(source=str(self.fixture / "source")))))
+        with patch("manual_backend.prepare", side_effect=RuntimeError("Preparation failed")):
+            self.cli("accept", token="0:0", snapshot=self.snapshot)
+        marker = dict(token="0:2", error="Later guide error")
+        write(self.session / "manual-errors.jsonl", json.dumps(marker) + "\n")
+        self.cli("baseline", token="0:0", snapshot=dict(epoch=3))
+        report = load(self.session)[1]
+        self.assertEqual(report["harness_errors"], [marker])
+        self.assertEqual(report["attempts"][0]["steps"][2]["status"], "ERROR")
+        report["attempts"][0]["opts"]["source"] = str(self.fixture / "source")
+        save(self.session, report)
+        output = StringIO()
+        with patch("sys.stdout", output), patch("builtins.input", return_value="q"), patch("manual_backend.shutil.get_terminal_size", return_value=Mock(columns=140, lines=1000)):
+            details(self.session)
+        self.assertIn("PREPARATION ERRORS", output.getvalue())
+        self.assertIn("case 3", output.getvalue())
+        self.assertIn("step 2", output.getvalue())
+        self.assertIn("Preparation failed", output.getvalue())
+        # Isolate retention due to preparation history, even after a successful retry.
+        report["harness_errors"] = []
+        (self.session / "manual-errors.jsonl").unlink()
+        for result in report["attempts"][0]["steps"]:
+            result.clear()
+            result.update(status="PASS", visual="PASS")
+        report["attempts"][0].pop("failed", None)
+        report["exit"] = dict(keep=False)
+        save(self.session, report)
+        with tempfile.TemporaryDirectory() as archive_repo, patch("manual_backend.REPO", Path(archive_repo)):
+            archive = finalize(self.session)
+            saved = json.loads(read(archive / "results.json"))
+        self.assertEqual(saved["results"][2], "PASS")
+        self.assertEqual(saved["preparation_errors"], report["preparation_errors"])
+        self.assertTrue(self.fixture.exists())
+        self.assertTrue(self.session.exists())
 
     def test_case_preparation_failure_preserves_the_previous_attempt(self):
         previous = list(self.state["attempts"])
