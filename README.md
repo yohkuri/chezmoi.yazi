@@ -349,8 +349,10 @@ acquisition measurements. Run these commands from the repository root with
 the required tools on `PATH`; none invokes mise.
 
 Start an interactive fixture with `test/manual.py`. The command starts Yazi
-directly in your terminal with a bottom guide. Press `P` to record visual PASS,
-check files/state and advance on success. `W` opens other verdicts, retries and
+directly in your terminal with ordered English instructions in a bottom guide.
+Press `P` once after each step to record visual PASS,
+check files/state and advance on success, or `S` to skip the current step and
+advance. `W` opens other verdicts, retries and
 diagnostics; `q` saves results and offers cleanup. No
 second terminal, subsequent shell commands or tmux is needed. See the
 [guided manual acceptance walk](test/MANUAL.md) for controls and coverage.

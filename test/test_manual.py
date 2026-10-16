@@ -117,13 +117,13 @@ class ManualTests(unittest.TestCase):
         self.assertEqual(len(load(self.session)[1]["preparation_errors"]), 1)
 
     def test_case_preparation_cli_failure_preserves_existing_results(self):
-        for operation, status in [("accept", "PASS"), ("next", "PASS"), ("jump", "PASS"),
+        for operation, status in [("accept", "PASS"), ("skip-next", "SKIP"), ("next", "PASS"), ("jump", "PASS"),
                                   ("restart", "PASS"), ("jump", "NOT RUN"), ("restart", "NOT RUN")]:
             with self.subTest(operation=operation, status=status):
                 attempt = self.state["attempts"][0]
                 attempt.update(step=2, epoch_before=2)
                 for result in attempt["steps"]:
-                    result.update(status=status, visual="PASS" if status == "PASS" else "unanswered")
+                    result.update(status=status, visual=status if status in {"PASS", "SKIP"} else "unanswered")
                 save(self.session, self.state)
                 target = 2 if operation == "restart" else 11 if operation == "jump" else 3
                 with self.fresh_cases(), patch("manual_backend.baseline", side_effect=RuntimeError("Baseline failed")):
@@ -201,7 +201,7 @@ class ManualTests(unittest.TestCase):
             details(self.session)
         self.assertIn("Walk complete", output.getvalue())
         self.assertIn("CASES", output.getvalue())
-        self.assertNotIn("DO:", output.getvalue())
+        self.assertNotIn(CASES[2]["steps"][0]["instruction"].splitlines()[0], output.getvalue())
 
     def test_failed_auto_check_still_requires_visual_verdict(self):
         self.snapshot["records"] = {}
@@ -240,8 +240,46 @@ class ManualTests(unittest.TestCase):
 
     def test_skipped_step_records_reason(self):
         value = self.request("skip", note="Font comparison deferred")
+        self.assertEqual(value["step"], 1)
         self.assertEqual(value["result"]["status"], "SKIP")
         self.assertEqual(value["result"]["note"], "Font comparison deferred")
+
+    def test_skip_next_does_not_check_or_answer_the_following_step(self):
+        with patch("manual_backend.check", side_effect=AssertionError("Skip must not check")), patch("manual_backend.prepare_step"):
+            value = self.request("skip-next")
+        report = load(self.session)[1]
+        skipped = report["attempts"][0]["steps"][0]
+        self.assertEqual(skipped["status"], "SKIP")
+        self.assertEqual(skipped["visual"], "SKIP")
+        self.assertEqual(skipped["note"], "Skipped by tester")
+        self.assertNotIn("files", skipped)
+        self.assertEqual(value["step"], 2)
+        self.assertEqual(value["result"], dict(status="NOT RUN", visual="unanswered"))
+        before = (self.session / "walk.json").read_bytes()
+        with self.assertRaisesRegex(ValueError, "Stale"):
+            self.request("skip-next")
+        self.assertEqual(before, (self.session / "walk.json").read_bytes())
+
+    def test_skip_next_preserves_skip_when_preparing_next_step_fails(self):
+        write(self.fixture / "attempt.json", json.dumps(dict(opts=dict(source=str(self.fixture / "source")))))
+        write(self.fixture / "dest/local", "local edit\n")
+        with patch("manual_backend.prepare", side_effect=RuntimeError("Preparation failed")):
+            value = self.cli("skip-next", token="0:0")
+        report = load(self.session)[1]
+        self.assertEqual(value["step"], 1)
+        self.assertEqual(value["result"]["status"], "SKIP")
+        self.assertEqual(report["attempts"][0]["steps"][1]["status"], "NOT RUN")
+        self.assertEqual(report["preparation_errors"], [dict(operation="skip-next", token="0:0", case=2, step=1, error="Preparation failed")])
+        self.assertEqual(self.cli("skip-next", token="0:0")["step"], 2)
+
+    def test_skip_next_finishes_the_last_case_without_recording_pass(self):
+        self.state["attempts"][0].update(case=len(CASES) - 1, steps=[dict(status="NOT RUN", visual="unanswered")])
+        save(self.session, self.state)
+        value = self.request("skip-next")
+        report = load(self.session)[1]
+        self.assertTrue(value["finished"])
+        self.assertEqual(value["result"]["status"], "SKIP")
+        self.assertEqual(report["results"][-1], "SKIP")
 
     def test_check_preserves_skip_but_does_not_hide_failed_diagnostics(self):
         self.request("skip", note="Font comparison deferred")

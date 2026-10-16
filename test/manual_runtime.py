@@ -75,7 +75,7 @@ def test(t):
         t.wait(lambda s: s["cwd"] == str(root / "dest") and not s["running"])
         return root
 
-    t.wait_screen(lambda s: "P: PASS/check/next" in s and "CMM" in s, "initial guide and rows")
+    t.wait_screen(lambda s: "P: PASS/check/next" in s and "S: SKIP/next" in s and "CMM" in s, "initial guide and rows")
     control(t, "n")
     assert state()["attempts"][0]["step"] == 0, "Unanswered observation advanced"
     t.tmux("send-keys", "-t", "test", "P", "P", "P")
@@ -84,22 +84,44 @@ def test(t):
     assert state()["attempts"][0]["steps"][0]["status"] == "PASS"
     assert state()["attempts"][0]["steps"][1]["visual"] == "unanswered", "Repeated P answered the next step"
     t.tmux("resize-window", "-t", "test", "-x", "80", "-y", "30")
-    t.wait_screen(lambda s: "Inside .config: no files" in s and "Back at root" in " ".join(s.split())
-                  and "P: PASS/check/next" in s, "wrapped concrete expectations")
+    screen = t.wait_screen(lambda s: "Check that it is empty" in " ".join(s.split()) and "still shows *" in " ".join(s.split())
+                           and "P: PASS/check/next" in s, "wrapped ordered instructions")
+    text = " ".join(screen.split())
+    assert text.index("Move to .exact") < text.index("Check that it is empty") < text.index("still shows *"), screen
+    assert all(label not in screen for label in ["Do:", "Expect:", "Command:"]), screen
     t.tmux("resize-window", "-t", "test", "-x", "140", "-y", "40")
     original = Path(v["root"])
     control(t, "r")
-    t.wait_screen(lambda s: "step 1/2" in s, "fresh restart")
+    t.wait_screen(lambda s: "step 1/2" in s and "Preparing/checking..." not in s, "fresh restart")
     assert Path(state()["attempts"][-1]["root"]) != original and original.exists()
+    active = state()["active"]
+    remaining = 0.8 - (time.monotonic() - last_pass)
+    if remaining > 0:
+        time.sleep(remaining)
+    t.key("S", settle=0)
+    last_pass = time.monotonic()
+    skipped = wait_state(lambda s: current(s)["step"] == 1, "single-key SKIP within case")
+    assert skipped["attempts"][active]["steps"][0]["status"] == "SKIP", skipped
+    assert "files" not in skipped["attempts"][active]["steps"][0], "SKIP ran checks"
+    t.tmux("send-keys", "-t", "test", "P", "S", "S")
+    last_pass = time.monotonic()
+    t.wait_screen(lambda s: "step 2/2" in s and "Preparing/checking..." not in s, "guide ready after SKIP")
+    assert current(state())["steps"][1]["visual"] == "unanswered", "Repeated or mixed verdict keys answered the next step"
+    time.sleep(0.8)
+    t.key("S")
+    last_pass = time.monotonic()
+    t.wait_screen(lambda s: "2/24 Names" in s and "Preparing/checking..." not in s, "single-key SKIP to next case")
+    assert state()["results"][0] == "SKIP"
+    assert current(state())["steps"][0]["visual"] == "unanswered"
+    print("PASS guide: single-key SKIP within/across cases, no checks/reason prompt, shared verdict-key guard")
     control(t, "h")
     assert "W: controls" not in t.capture(), "Hidden guide still rendered"
     control(t, "h")
     t.wait_screen(lambda s: "W: controls" in s, "guide restored")
-    t.tmux("resize-window", "-t", "test", "-x", "80", "-y", "18")
-    t.wait_screen(lambda s: "W: controls" in s, "compact guide")
+    t.tmux("resize-window", "-t", "test", "-x", "40", "-y", "18")
+    t.wait_screen(lambda s: "P: PASS | S: SKIP | W: controls" in s, "compact guide")
     t.tmux("resize-window", "-t", "test", "-x", "140", "-y", "40")
     t.wait_screen(lambda s: "W: controls" in s, "full guide after resize")
-    jump("names")
     accept()
     t.wait_screen(lambda s: "step 2/2" in s, "last names step")
     control(t, "s")
@@ -116,7 +138,10 @@ def test(t):
     jump("git")
     control(t, "n")
     t.wait_screen(lambda s: "Walk complete" in s and "SKIP:" in s, "completed walk")
-    assert "Do:" not in t.capture() and "Expect:" not in t.capture(), "Stale instructions after completion"
+    completed = state()
+    t.key("S")
+    assert state() == completed, "SKIP changed a completed walk"
+    assert CASES[-1]["steps"][0]["instruction"].splitlines()[0] not in t.capture(), "Stale instructions after completion"
     control(t, "r")
     t.wait_screen(lambda s: "24/24 git.yazi coexistence" in s and "Walk complete" not in s, "reopened last case")
     assert not state()["finished"]
@@ -215,7 +240,9 @@ def test(t):
     finally:
         write(theme, original_theme)
     control(t, "d")
-    t.wait_screen(lambda s: "Enter: next | b: back | q: return to Yazi" in s, "same-terminal details")
+    screen = t.wait_screen(lambda s: "Enter: next | b: back | q: return to Yazi" in s, "same-terminal details")
+    assert "Press 5 to move to .local" in " ".join(screen.split()), screen
+    assert all(label not in screen for label in ["DO:", "EXPECT:", "COMMAND:"]), screen
     deadline = time.monotonic() + 5
     while "PREPARATION ERRORS" not in t.capture():
         assert time.monotonic() < deadline, t.capture()
@@ -281,6 +308,8 @@ def resumed_refresh():
                 current(saved)["epoch_before"] = 50  # The previous Yazi process had its own epoch.
                 save(t.root, saved)
                 root = Path(value["root"])
+                # A retained session may predate the single-key SKIP binding.
+                write(t.root / "config/keymap.toml", '[[mgr.prepend_keymap]]\non="P"\nrun="plugin manual -- accept"\n')
                 t.tmux("new-session", "-d", "-s", "test", "-x", "140", "-y", "40",
                        "-c", str(REPO), str(REPO / "test/manual.py"), "open", str(t.root))
                 t.started = True
@@ -304,6 +333,11 @@ def resumed_refresh():
                 # Step 2 advances within the attempt and replaces its baseline for step 3.
                 if step == 2:
                     assert attempt["epoch_before"] == snapshot["epoch"], attempt
+                if step == 1:
+                    time.sleep(0.8)
+                    t.key("S")
+                    t.wait_screen(lambda s: "4/24 Membership discovery" in s, "resumed session has SKIP binding")
+                    assert load(t.root)[1]["attempts"][active]["steps"][2]["status"] == "SKIP"
                 t.key("q")
                 t.wait_screen(lambda s: "Save, retain fixtures and exit" in s, "resumed finish menu")
                 t.key("k")

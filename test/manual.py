@@ -11,8 +11,13 @@ from support import REPO, Runtime, chezmoi_args, environment, owned, run, stop, 
 
 def configure_guide(t, git_plugin):
     from manual_backend import initialize
-    initial = initialize(t.root, git_plugin)
-    keys = {"W": "plugin manual", "P": "plugin manual -- accept", "Y": "app:theme", "T": "plugin probe", "<Space>": "toggle", "q": "plugin manual -- exit",
+    return initialize(t.root, git_plugin)
+
+
+def install_guide(t, initial, git_plugin):
+    from support import lua
+    keys = {"W": "plugin manual", "P": "plugin manual -- accept", "S": "plugin manual -- skip-next",
+            "Y": "app:theme", "T": "plugin probe", "<Space>": "toggle", "q": "plugin manual -- exit",
             "C": "plugin manual -- action menu", "R": "plugin manual -- action refresh",
             "a": "plugin manual -- action add", "r": "plugin manual -- action re-add",
             "e": "plugin manual -- action edit", "E": "plugin manual -- action edit --apply",
@@ -23,15 +28,11 @@ def configure_guide(t, git_plugin):
     keys.update({key: "plugin manual -- nav " + key for key in "GH1234567890"})
     write(t.root / "config/keymap.toml", ''.join(
         f'[[mgr.prepend_keymap]]\non={json.dumps(k)}\nrun={json.dumps(v)}\n' for k, v in keys.items()))
-    return initial
-
-
-def install_guide(t, initial, git_plugin):
-    from support import lua
     t.plugin("manual", dict(python=sys.executable, backend=REPO / "test/manual_backend.py",
                             session=t.root, initial=initial))
     write(t.root / "config/init.lua", 'require("chezmoi"):setup ' + lua(initial["opts"]) + '\n'
           + ('require("git"):setup()\n' if git_plugin else '') + 'require("manual"):setup()\n')
+
 
 def open_fixture(root):
     """One foreground Yazi process; archive and clean only after it exits."""
@@ -47,7 +48,7 @@ def open_fixture(root):
     t.root = root
     install_guide(t, view(state), state["git_plugin"])
     destination = current(state)["opts"]["destination"]
-    print("P: visual PASS, check and next. W: controls/details. q: results and finish.", flush=True)
+    print("P: visual PASS, check and next. S: SKIP and next. W: controls/details. q: results and finish.", flush=True)
     child = None
     previous_interrupt = signal.signal(signal.SIGINT, lambda *_: None)
     try:
