@@ -42,6 +42,9 @@ def open_fixture(root):
         raise ValueError("Legacy fixture: create a new guided session with test/manual.py")
     from manual_backend import current, finalize, load
     _, state = load(root)
+    from manual_cases import CASES
+    if state.get("version") != 2 or state.get("case_keys") != [case["key"] for case in CASES]:
+        raise ValueError("This session uses an older case list. Start a new session with test/manual.py; saved results and fixtures are preserved.")
     from manual_backend import save, view
     state.pop("exit", None)
     current(state)["epoch_before"] = None

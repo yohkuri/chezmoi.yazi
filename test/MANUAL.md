@@ -13,7 +13,15 @@ Press `W` for other verdicts, controls or full instructions. Fixture edits, fail
 injection, checks, retries, results and cleanup are handled from this session.
 You do not need another terminal, shell commands after launch, or an external
 checklist. The [case list](#cases) gives the number, title and purpose of all
-24 cases.
+12 cases.
+
+Human acceptance covers what is readable and understandable in your terminal:
+status signs and colors, command effects and targets, menus, diff/approval
+stages, native prompts, cancellation, interruption, warnings and return to Yazi.
+File contents, deletion, encryption, rejected invocations and plugin state are
+checked automatically when you press `P`; you do not need to inspect them by hand.
+Refresh/cache correctness, membership discovery, tab/navigation state and visual
+unset bookkeeping remain automated tests rather than separate human cases.
 
 ## Requirements
 
@@ -27,7 +35,7 @@ Linux and every font/terminal combination are not established by this guide.
 The session uses explicit Catppuccin Mocha colors for the status bar and tabs
 in both dark and light terminal appearances. It reads the bundled
 `test/manual-theme.toml`, without loading personal configuration or downloading
-a flavor. Case 8 changes chezmoi signs and colors while retaining these UI
+a flavor. Case 3 changes chezmoi signs and colors while retaining these UI
 colors. Start a new session to use this palette; retained sessions keep their
 saved baseline theme.
 
@@ -37,14 +45,14 @@ Optionally include an existing, read-only git.yazi checkout at startup:
 test/manual.py --git-plugin /absolute/path/to/git.yazi
 ```
 
-Without it, case 24 is automatically recorded as `SKIP` with a reason. The
-walk can therefore finish after case 23 while still reporting 24 case results.
+Without it, case 12 is automatically recorded as `SKIP` with a reason. The
+walk can therefore finish after case 11 while still reporting 12 case results.
 
 ## Walking a case
 
-Start with case 1 and follow its guide. A heading such as `1/24 ... - step 1/2`
-means case 1 of 24, step 1 of that case's two steps. The complete walk has
-49 steps; each step contains several numbered instructions.
+Start with case 1 and follow its guide. A heading such as `1/12 ... - step 1/2`
+means case 1 of 12, step 1 of that case's two steps. The complete walk has
+34 steps; each step contains several numbered instructions.
 
 The guide shows the case and step, followed by numbered English instructions
 in execution order. Each action is followed by what to check before the next
@@ -78,7 +86,8 @@ and current result under `CASES`; continue through its pages to reach that list.
 
 In case 1, `.config` is intentionally empty even though its row has `*`:
 the source contains changes that have not been applied to the destination.
-You inspect the destination in Yazi, so there should be no `new` file yet.
+You inspect the destination in Yazi. This explains the sign; opening the
+directory to verify its contents is not a separate human acceptance step.
 
 Each case and retry has a new source, destination, database and command cache.
 Steps within a case share those paths. Changing cases clears selection, closes
@@ -164,7 +173,7 @@ names a sign.
 | `C!!` | Managed file whose status query failed |
 | `!` in the managed column | Membership query failed |
 
-Directory summaries can also have a partial-result underline. Case 8 changes
+Directory summaries can also have a partial-result underline. Case 3 changes
 the default signs and colors temporarily; its guide gives the expected values.
 
 ### Commands and refresh
@@ -186,14 +195,13 @@ Type the instructed replacement line and Enter to save; Ctrl-C interrupts it.
 It requires no personal editor configuration. Encryption uses a public test age
 identity inside the fixture; it is never suitable for real secrets.
 
-The manual-refresh case holds its status cache for 24 hours, keeping the old
-display after guide preparation. Press `R` to force acquisition, then `P` to
-verify the new display. Recording PASS before refresh fails the checks. Other
-cases retain their short cache, so automatic acquisition can update them before
-you press `R`. When resuming a saved refresh step, the first acquisition may
-already show the new state; still press `R` before `P`. Intentional failure
-cases say which warning and signs to expect; an expected warning alone does
-not mean that the test failed.
+Press `R` when the warning/recovery guide requests acquisition. These cases
+use a short cache, so automatic acquisition may update signs before `R`; this
+is acceptable because the human verdict concerns the display and warning.
+Intentional failures say which warning and signs to expect; an expected warning
+alone does not mean that the test failed. Theme steps use `Y`, which reloads
+appearance without refreshing status. Refresh/cache semantics are checked by
+the automated runtime suite.
 
 ## Cases
 
@@ -202,32 +210,20 @@ Detailed instructions, preparation and automatic checks live in
 [`manual_cases.py`](manual_cases.py). Use `W` then `d` to see the current
 session's case results.
 
-| Case | Title | What to check |
+| Case | Title | Human UI check |
 | --- | --- | --- |
-| 1 | Membership and status | Clean, modified, unmanaged, ignored, symlink and removal signs; empty `.config` and exact-directory summaries |
-| 2 | Names, alignment and colors | Spaces, Unicode, quotes, backslashes, dash and control characters; hover/selection readability and terminal resizing |
-| 3 | Manual refresh | Cached signs stay unchanged until `R`; refresh resolves and restores a local difference |
-| 4 | Membership discovery and removal | Source additions/removals change membership while retaining destination files |
-| 5 | Template failure and recovery | A broken template fails locally; repair restores signs and clears the partial-result underline |
-| 6 | Membership query failure | Failed membership queries show errors; recovery restores normal signs |
-| 7 | Navigation and tabs | Returning to a directory and switching tabs retain correct status after a source edit |
-| 8 | Theme override and flavor fallback | Theme precedence, wide signs, flavor colors and restoration without a status refresh |
-| 9 | Add, Re-add and Forget | Direct/menu actions, cancelled Forget, native approval and destination retention |
-| 10 | Destroy and shallow-directory rejection | Approved Destroy removes source and destination; nonrecursive directory Destroy is rejected |
-| 11 | Scoped Apply, decline and accept | Diff precedes approval; cancellation preserves the destination and accepted Apply leaves unrelated scripts alone |
-| 12 | Template Add and protected Re-add | Add creates a template; Re-add preserves it instead of importing a destination edit |
-| 13 | Disposable encrypted Add | Add creates decryptable age-encrypted source while preserving the destination |
-| 14 | Mixed selection rejection | Edit rejects mixed managed/unmanaged selections and directory targets |
-| 15 | Plain Edit ignores config apply/watch | Edit updates source only, overriding fixture config that enables apply/watch |
-| 16 | Edit and Apply cancellation and acceptance | Cancel keeps the source edit without applying; approval makes source and destination match |
-| 17 | Editor interruption | Ctrl-C stops Edit and Apply before diff/apply and returns to usable Yazi |
-| 18 | Diff and pending script | Diff does not run scripts; scoped Apply includes the pending script only after approval |
-| 19 | Visual range, direct action and menu | Direct Add and menu Add include the whole visual range |
-| 20 | Visual unset and guide selection preservation | Guide controls preserve the visual unset range; Add uses only the remaining selection |
-| 21 | Selections across directories | Add includes both an existing selection in another directory and the current visual range |
-| 22 | Source directory and ancestor protection | Destroy rejects the source directory and its ancestors without losing source state |
-| 23 | Confirmation pages, resizing and small pane | Escaped paths, final-page cancellation, restart after resize and refusal in a too-small pane |
-| 24 | git.yazi coexistence | Git signs precede readable chezmoi signs; automatically skipped without `--git-plugin` |
+| 1 | Status, names and readability | Distinct signs, special filenames, aligned columns, selection/hover contrast, status bar and narrow layouts |
+| 2 | Warnings, error signs and recovery | Template/membership warnings, error signs, partial-result underline and readable recovery |
+| 3 | Theme, wide signs and colors | Default/custom/restored colors and wide signs, with readable status-bar colors |
+| 4 | Add, Re-add, template and encryption | Direct/menu execution, effects, targets, options, output and return to Yazi |
+| 5 | Forget confirmation and cancellation | Keep-destination wording, cancellation, plugin/native approval and return |
+| 6 | Destroy confirmation and execution | Delete-source-and-destination warning, plugin/native approval and return |
+| 7 | Diff, Apply preview and approval | Readable standalone diff, cancelled Apply, directory/script scope and approved Apply |
+| 8 | Edit, Edit and Apply, and interruption | Editor/diff/approval stages, cancellation, Ctrl-C result and return to usable Yazi |
+| 9 | Rejected actions and safety messages | Mixed/unmanaged targets, directory Edit, shallow Destroy and source protection explanations |
+| 10 | Multiple targets, direct action and menu | Target counts and readable paths, including another directory, from direct/menu Add |
+| 11 | Confirmation pages and terminal resizing | Escaped long paths, final-page cancellation, resize restart and small-pane guidance |
+| 12 | git.yazi coexistence | Distinct readable git/chezmoi signs; automatically skipped without `--git-plugin` |
 
 ## Results, evidence and isolation
 
@@ -288,8 +284,13 @@ test/manual.py open PATH
 ```
 
 This resumes the saved case and step in Yazi with the current checkout's guide,
-key bindings and backend. Keep the checkout available; resume refresh steps by pressing
-`R` again as instructed.
+key bindings and backend. Keep the checkout available. Theme steps capture a
+fresh status epoch when reopened; press `Y` as instructed.
+
+The earlier 24-case sessions use different case numbers and cannot be resumed
+with this 12-case guide. The launcher rejects that mismatch before changing
+saved progress or opening Yazi. Start a fresh `test/manual.py` session; old
+reports and fixtures remain available for inspection, `status` or explicit cleanup.
 
 For diagnostics outside the walk, `test/manual.py status PATH` queries its
 active chezmoi context. When the session is no longer needed,

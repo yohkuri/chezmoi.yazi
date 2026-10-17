@@ -12,6 +12,14 @@ opens one foreground Yazi with a bottom guide, single-key `P` acceptance,
 verdicts, retries, diagnostics, saving and cleanup are available in that session.
 Each case/retry gets fresh chezmoi paths; steps within a case share state.
 
+The current walk has 12 cases and 34 steps focused on human UI acceptance:
+readability, command effects/targets/options, menu and native prompts, diff and
+approval stages, cancellation, interruption, rejection messages and terminal
+return. File/state outcomes are checked automatically. Refresh/cache behavior,
+membership discovery, navigation/tabs and visual-unset bookkeeping remain in
+automated runtime coverage. The dated 24-case evidence below describes the
+preceding catalog, not the current case numbers.
+
 On 2026-10-03, all 24 case setups and step preparations were exercised locally
 with Yazi 26.9.1 and chezmoi 2.73.0 on macOS. `test/manual_runtime.py` verified
 the real guide and file rows, unanswered-verdict gating, fresh retries,
@@ -238,6 +246,31 @@ verified Yazi's own appearance detection, and checked rendered RGB colors in
 normal, select and unset status modes, plus preservation through Case 8.
 The complete `test/runtime.py` also passed on macOS with Yazi 26.9.1 and chezmoi
 2.73.1. These captures verify emitted colors, not physical display calibration.
+
+On 2026-10-18, the human walk was consolidated from 24 cases/49 steps to
+12 cases/34 steps. Add, Re-add, template/encrypted Add, Forget, Destroy, Diff,
+Apply and Edit retain their distinct command UI paths. Multiple-target review
+combines direct/menu selection with a target in another directory. Rejection
+messages share one fixture whose source is nested below the destination while
+retaining the baseline managed files. Template failures and partial summaries
+are introduced sequentially to keep each warning observation focused.
+
+The session format now records version 2 and ordered case keys. Opening an
+older or reordered catalog is rejected before modifying progress, launching
+Yazi or archiving; a regression verifies unchanged saved bytes and retained
+fixtures. Existing reports, status queries and explicit cleanup remain usable.
+New-catalog sessions still resume their saved steps. Both theme steps were
+reopened with a stale epoch from the previous process; the launcher captured
+the new baseline and `Y` then `P` advanced successfully.
+
+`test/check.py` passed 47 Python tests, 51 core and 73 action assertions.
+The complete `test/manual_runtime.py` and `test/runtime.py` passed on macOS
+with Yazi 26.9.1 and chezmoi 2.73.1. Guide checks exercised the consolidated
+command flows, native Forget/Destroy approval, file-check failure gating,
+cross-directory confirmation, repeated foreground Ctrl-C, archive/cleanup and
+resumed theme steps. Existing refresh, navigation and visual-unset scenarios
+remain automated. The guide's case numbers/titles were also compared with
+the manual table. These are automated execution checks, not a new human walk.
 
 These automated checks do not constitute human visual acceptance of every
 case, font, color, or terminal. The guided launcher with git.yazi, actual editor
