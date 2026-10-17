@@ -73,7 +73,10 @@ def prepare(t, operations, session):
                     write(t.dest / f"{prefix}-{char}", f"{prefix} {char}\n")
             write(t.dest / ".config/outside", "outside\n")
         elif name == "nested-source":
-            t.source = t.dest / ".local/share/chezmoi"
+            nested = t.dest / ".local/share/chezmoi"
+            nested.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(t.source), nested)
+            t.source = nested
             (t.source / "dot_local/bin").mkdir(parents=True)
             write(t.source / "dot_local/bin/tool", "tool\n")
             write(t.source / "dot_bashrc", "unrelated\n")
@@ -228,7 +231,8 @@ def initialize(root, git_plugin):
     git_plugin = str(Path(git_plugin).resolve(strict=True)) if git_plugin else None
     versions = {name: run([name, "--version"]).strip() for name in ["yazi", "chezmoi"]}
     diff = run(["git", "diff", "HEAD"], cwd=REPO)
-    state = dict(version=1, session=str(root), git_plugin=git_plugin, versions=versions,
+    state = dict(version=2, case_keys=[case["key"] for case in CASES],
+                 session=str(root), git_plugin=git_plugin, versions=versions,
                  head=run(["git", "rev-parse", "HEAD"], cwd=REPO).strip(), diff_sha256=hashlib.sha256(diff.encode()).hexdigest(),
                  source_hashes={str(p.relative_to(REPO)): hashlib.sha256(p.read_bytes()).hexdigest()
                                 for pattern in ["*.lua", "test/*.lua", "test/*.py", "test/manual-theme.toml"] for p in REPO.glob(pattern)},

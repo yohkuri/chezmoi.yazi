@@ -488,6 +488,12 @@ All four presented product choices are now confirmed and implemented.
 4. Integrate linemode rendering and run real Yazi checks in isolated config,
    cache, and state directories. Inspect that run's logs and display output.
 
+The guided human walk concentrates on rendering readability and command UI:
+effects, targets, menus, previews, approvals, cancellation, warnings and terminal
+return. Automatic checks verify file/state outcomes. Refresh/cache behavior,
+navigation state and selection bookkeeping remain automated runtime scenarios;
+terminal interaction alone does not make a scenario require a human verdict.
+
 Required acceptance cases include:
 
 - Clean, unmanaged, `" M"`, `MM`, `DA`, `" D"`, and pending `" R"` states.

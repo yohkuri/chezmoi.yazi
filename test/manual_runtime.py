@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 import time
-from action_cases import confirm, enter, finish
+from action_cases import confirm, enter, finish, native_confirm
 from manual import configure_guide, install_guide
 from manual_backend import current, load, remove_attempts, save, transition
 from manual_cases import CASES
@@ -74,9 +74,12 @@ def test(t):
         return after["attempts"][active]
 
     def jump(key):
+        before = state()["active"]
         number = next(i + 1 for i, case in enumerate(CASES) if case["key"] == key)
         choose_case(t, number)
-        root = Path(state()["attempts"][-1]["root"])
+        after = wait_state(lambda s: s["active"] != before, "fresh case after jump")
+        root = Path(current(after)["root"])
+        t.wait_screen(lambda s: f"{number}/{len(CASES)} " in s and "Preparing/checking..." not in s, "guide ready after jump")
         t.wait(lambda s: s["cwd"] == str(root / "dest") and not s["running"])
         return root
 
@@ -106,10 +109,10 @@ def test(t):
     assert state()["attempts"][0]["steps"][0]["status"] == "PASS"
     assert state()["attempts"][0]["steps"][1]["visual"] == "unanswered", "Repeated P answered the next step"
     t.tmux("resize-window", "-t", "test", "-x", "80", "-y", "30")
-    screen = t.wait_screen(lambda s: "Check that it is empty" in " ".join(s.split()) and "still shows *" in " ".join(s.split())
+    screen = t.wait_screen(lambda s: "Narrow and enlarge" in " ".join(s.split()) and "Use W/d" in " ".join(s.split())
                            and "P: PASS/check/next" in s, "wrapped ordered instructions")
     text = " ".join(screen.split())
-    assert text.index("Move to .exact") < text.index("Check that it is empty") < text.index("still shows *"), screen
+    assert text.index("hide the guide") < text.index("Narrow and enlarge") < text.index("restore the guide"), screen
     assert all(label not in screen for label in ["Do:", "Expect:", "Command:"]), screen
     t.tmux("resize-window", "-t", "test", "-x", "140", "-y", "40")
     original = Path(v["root"])
@@ -132,7 +135,7 @@ def test(t):
     time.sleep(0.8)
     t.key("S")
     last_pass = time.monotonic()
-    t.wait_screen(lambda s: "2/24 Names" in s and "Preparing/checking..." not in s, "single-key SKIP to next case")
+    t.wait_screen(lambda s: "2/12 Warnings" in s and "Preparing/checking..." not in s, "single-key SKIP to next case")
     assert state()["results"][0] == "SKIP"
     assert current(state())["steps"][0]["visual"] == "unanswered"
     print("PASS guide: single-key SKIP within/across cases, no checks/reason prompt, shared verdict-key guard")
@@ -144,6 +147,7 @@ def test(t):
     t.wait_screen(lambda s: "P: PASS | S: SKIP | W: controls" in s, "compact guide")
     t.tmux("resize-window", "-t", "test", "-x", "140", "-y", "40")
     t.wait_screen(lambda s: "W: controls" in s, "full guide after resize")
+    jump("names")
     accept()
     t.wait_screen(lambda s: "step 2/2" in s, "last names step")
     control(t, "s")
@@ -155,8 +159,8 @@ def test(t):
     t.key("q"); enter(t)
     t.wait_screen(lambda s: "Visual: SKIP" in s, "skip retained after diagnostics")
     control(t, "n")
-    t.wait_screen(lambda s: "3/24 Manual refresh" in s, "next case after skipped step")
-    assert state()["results"][1] == "SKIP", state()["results"]
+    t.wait_screen(lambda s: "2/12 Warnings" in s, "next case after skipped step")
+    assert state()["results"][0] == "SKIP", state()["results"]
     jump("git")
     control(t, "n")
     t.wait_screen(lambda s: "Walk complete" in s and "SKIP:" in s, "completed walk")
@@ -165,27 +169,24 @@ def test(t):
     assert state() == completed, "SKIP changed a completed walk"
     assert CASES[-1]["steps"][0]["instruction"].splitlines()[0] not in t.capture(), "Stale instructions after completion"
     control(t, "r")
-    t.wait_screen(lambda s: "24/24 git.yazi coexistence" in s and "Walk complete" not in s, "reopened last case")
+    t.wait_screen(lambda s: "12/12 git.yazi coexistence" in s and "Walk complete" not in s, "reopened last case")
     assert not state()["finished"]
     control(t, "n")
     t.wait_screen(lambda s: "Walk complete" in s, "completed restarted walk")
-    root = jump("refresh")
+    root = jump("errors")
     assert not state()["finished"]
-    print("PASS guide: SKIP survives diagnostics/case change; restart and jump restore case titles after completion")
+    t.refresh(lambda s: s["records"].get(str(root / "dest/bad"), {}).get("failed")
+              and s["records"].get(str(root / "dest/clean"), {}).get("xy") == "  ")
     accept()
-    assert read(root / "source/local") == "local edit\n"
-    time.sleep(1)
-    held = t.snapshot()["records"][str(root / "dest/local")]
-    assert held["xy"] == "MM", held
-    send_pass()
-    assert state()["attempts"][-1]["step"] == 1, "Failed refresh verification advanced"
-    assert state()["attempts"][-1]["steps"][1]["status"] == "FAIL"
-    t.refresh(lambda s: (s.get("records") or {}).get(str(root / "dest/local"), {}).get("xy") == "  ")
+    t.refresh(lambda s: s["records"].get(str(root / "dest/.config"), {}).get("partial"))
     accept()
-    t.refresh(lambda s: (s.get("records") or {}).get(str(root / "dest/local"), {}).get("xy") == "MM")
+    t.refresh(lambda s: s["records"].get(str(root / "dest/clean"), {}).get("membership") == "error")
     accept()
-    print("PASS guide: single-key progress, repeated-key guard, failed-check gate, held cache and real refresh")
-    root = jump("visual-unset")
+    t.refresh(lambda s: s["records"].get(str(root / "dest/bad"), {}).get("xy") == "  "
+              and not s["records"].get(str(root / "dest/.config"), {}).get("partial"))
+    accept()
+    print("PASS guide: consolidated template/membership warnings and recovery")
+    root = jump("visual")
     t.key("1"); t.key(" "); t.key("j"); t.key(" "); t.key("j"); t.key(" ")
     t.key("1"); t.key("V"); t.key("j")
     control(t, "h")  # Opening/closing controls must not escape visual mode.
@@ -202,30 +203,56 @@ def test(t):
     accept()
     t.key("Y"); accept()
     assert_mode_colors(t, "NOR", "137;180;250")
+    root = jump("add")
+    for key in ["a", "C", "t", "r", "z"]:
+        t.key("7"); t.key(key)
+        if key == "C":
+            t.wait_screen(lambda s: "Re-add" in s, "Re-add menu")
+            t.key("r")
+        finish(t)
+        accept()
+    history = [json.loads(line) for line in read(root / "state/instrument/actions.jsonl").splitlines()]
+    assert len(history) == 5 and all(item["exit_code"] == 0 for item in history), history
+    assert "--template" in history[2]["argv"] and "--encrypt" in history[4]["argv"], history
+    print("PASS guide: consolidated Add/Re-add/template/encryption with independent file checks")
+    jump("forget")
+    t.key("7"); t.key("f"); confirm(t, False); accept()
+    t.key("f"); confirm(t); native_confirm(t); finish(t); accept()
+    jump("destroy")
+    t.key("8"); t.key("x"); confirm(t); native_confirm(t); finish(t); accept()
+    print("PASS guide: Forget cancellation/native approval and Destroy native approval")
+    root = jump("apply")
+    t.key("9"); t.key("d"); finish(t); accept()
+    t.key("6"); t.key("p"); finish(t, next_confirm=True); confirm(t, False); accept()
+    t.key("9"); t.key("p"); finish(t, next_confirm=True); confirm(t); finish(t); accept()
+    print("PASS guide: standalone Diff, cancelled Apply, directory/script preview and approved Apply")
     root = jump("edit")
+    send_pass()
+    wait_state(lambda s: current(s)["steps"][0]["status"] == "FAIL", "file-check failure gate")
+    assert current(state())["step"] == 0, "Failed file verification advanced"
     t.key("6"); t.key("e")
     t.wait_screen(lambda s: "New source content" in s, "fixture editor")
     screen = t.capture()
     assert "Running (argv):" in screen and "--apply=false" in screen and "--watch=false" in screen, screen
     t.key("edited by fixture"); enter(t)
-    finish(t)
-    history = [json.loads(line) for line in read(root / "state/instrument/actions.jsonl").splitlines()]
-    assert len(history) == 1 and history[0]["exit_code"] == 0 and "edit" in history[0]["argv"], history
-    accept()
-    jump("encryption")
-    t.key("7"); t.key("z"); finish(t); accept()
-    jump("template-add")
-    t.key("7"); t.key("t"); finish(t); accept()
-    root = jump("edit-apply")
+    finish(t); accept()
     t.key("6"); t.key("E")
-    t.wait_screen(lambda s: "New source content" in s, "edit-and-apply editor")
-    t.key("edited by fixture"); enter(t)
-    finish(t, next_command=True); finish(t, next_confirm=True); confirm(t, False)
+    t.wait_screen(lambda s: "New source content" in s, "cancelled Edit and Apply")
+    t.key("cancelled edit"); enter(t)
+    finish(t, next_command=True); finish(t, next_confirm=True); confirm(t, False); accept()
+    t.key("E")
+    t.wait_screen(lambda s: "New source content" in s, "approved Edit and Apply")
+    t.key("accepted edit"); enter(t)
+    finish(t, next_command=True); finish(t, next_confirm=True); confirm(t); finish(t); accept()
+    t.key("E")
+    t.wait_screen(lambda s: "New source content" in s, "interrupted Edit and Apply")
+    t.tmux("send-keys", "-t", "test", "C-c")
+    finish(t, success=False); accept()
     history = [json.loads(line) for line in read(root / "state/instrument/actions.jsonl").splitlines()]
-    assert len(history) == 2 and "edit" in history[0]["argv"] and "diff" in history[1]["argv"], history
-    assert all(item["exit_code"] == 0 for item in history), history
-    accept()
-    jump("mixed")
+    assert [item["argv"][item["argv"].index("--cache") + 2] for item in history] == ["edit", "edit", "diff", "edit", "diff", "apply", "edit"], history
+    assert history[-1]["exit_code"] != 0, history
+    print("PASS guide: file-check gate, command argv/history, plain Edit, cancelled/approved Edit and Apply, Ctrl-C")
+    root = jump("rejections")
     t.key("8"); t.key(" "); t.key("7"); t.key(" "); t.key("e")
     t.wait_screen(lambda s: "Not managed" in s, "mixed Edit rejection")
     t.wait(lambda s: not s["action_busy"] and not s["running"])
@@ -236,18 +263,13 @@ def test(t):
     t.wait_screen(lambda s: "Select files inside" in s, "standard Escape cleared selection")
     t.wait(lambda s: not s["action_busy"] and not s["running"])
     accept()
-    jump("navigation")
-    t.key("G"); t.key("H")
-    root = jump("confirmation")
-    # Changing cases must dispose of old tabs, and select every exact target.
-    t.key("4", settle=0.8); t.key("x")
-    t.wait_screen(lambda s: "Continue?" in s and "Targets: 6" in s, "long target selection")
-    confirm(t, yes=False)
-    assert all((root / "dest" / name).exists() for name in json.loads(read(root / "long.json")))
-    print("PASS guide: theme epoch, command argv/history, cancelled apply, standard Escape, encryption and exact targets")
-    jump("source-protection")
+    t.key("0"); t.key("D")
+    t.wait_screen(lambda s: "Non-recursive destroy" in s, "shallow directory rejection")
+    t.wait(lambda s: not s["action_busy"] and not s["running"])
+    accept()
     t.key("5"); t.key("x")
     t.wait_screen(lambda s: "contains the source" in s, "source-ancestor rejection")
+    t.wait(lambda s: not s["action_busy"] and not s["running"])
     previous = state()
     theme = t.root / "baseline-theme.toml"
     original_theme = read(theme)
@@ -274,6 +296,23 @@ def test(t):
     assert "restart: case" in t.capture(), t.capture()
     t.key("q"); enter(t)
     t.wait_screen(lambda s: "W: controls" in s, "return from details")
+    jump("visual")
+    t.key("1"); t.key("v"); t.key("j"); t.key("j"); t.key("a")
+    t.wait_screen(lambda s: "Targets: 3" in s, "direct three-target confirmation")
+    confirm(t); finish(t); accept()
+    t.tmux("send-keys", "-t", "test", "Escape")
+    time.sleep(0.3)
+    t.key("3"); t.key(" "); t.key("h"); t.key("2"); t.key("v"); t.key("j"); t.key("j")
+    t.key("C"); t.wait_screen(lambda s: "Add options" in s, "cross-directory Add menu"); t.key("a")
+    t.wait_screen(lambda s: "Targets: 4" in s and "outside" in s, "menu cross-directory confirmation")
+    confirm(t); finish(t); accept()
+    t.key("G"); t.key("H")
+    root = jump("confirmation")
+    t.key("4", settle=0.8); t.key("x")
+    t.wait_screen(lambda s: "Continue?" in s and "Targets: 6" in s, "long target selection")
+    confirm(t, yes=False)
+    assert all((root / "dest" / name).exists() for name in json.loads(read(root / "long.json")))
+    print("PASS guide: direct/menu cross-directory confirmations, extra-tab disposal and exact long targets")
     t.key("q")
     t.wait_screen(lambda s: "Save, retain fixtures and exit" in s, "finish menu")
     t.key("k")
@@ -290,9 +329,13 @@ def foreground_launcher():
         t.started = True
         t.tmux("set-option", "-w", "remain-on-exit", "on")
         t.wait_screen(lambda s: "P: PASS/check/next" in s and "CMM" in s, "foreground launcher")
-        number = next(i + 1 for i, case in enumerate(CASES) if case["key"] == "interrupt")
+        number = next(i + 1 for i, case in enumerate(CASES) if case["key"] == "edit")
         choose_case(t, number, settle=0.1)
-        t.wait_screen(lambda s: f"{number}/{len(CASES)} Editor interruption" in s, "launcher interrupt case")
+        t.wait_screen(lambda s: f"{number}/{len(CASES)} Edit, Edit and Apply" in s, "launcher interrupt case")
+        for step in range(1, 4):
+            t.key("S")
+            t.wait_screen(lambda s: f"step {step + 1}/4" in s and "Preparing/checking..." not in s, "skip to interruption")
+            time.sleep(0.8)
         for _ in range(2):
             t.key("6", settle=0.5); t.key("E")
             t.wait_screen(lambda s: "New source content" in s, "launcher fixture editor")
@@ -300,7 +343,7 @@ def foreground_launcher():
             finish(t, success=False)
             t.wait_screen(lambda s: "W: controls" in s, "launcher survives editor Ctrl-C")
         t.key("P", settle=0.1)
-        t.wait_screen(lambda s: "18/24 Diff and pending script" in s, "single-key PASS after interruption")
+        t.wait_screen(lambda s: "9/12 Rejected actions" in s, "single-key PASS after interruption")
         t.key("q")
         t.wait_screen(lambda s: "Save and exit; clean fixtures" in s, "launcher finish menu")
         t.key("c")
@@ -308,58 +351,48 @@ def foreground_launcher():
     reports = set((REPO / ".dev/manual-runs").glob("*/results.json")) - before
     assert len(reports) == 1, reports
     report = json.loads(read(next(iter(reports))))
-    assert report["results"][number - 1] == "PASS", report["attempts"][-1]
+    assert report["results"][number - 1] == "SKIP", report["attempts"][-1]
+    assert report["attempts"][-2]["steps"][-1]["status"] == "PASS", report["attempts"]
     assert not Path(report["session"]).exists()
     assert all(not Path(a["root"]).exists() for a in report["attempts"])
     print("PASS foreground launcher: repeated editor Ctrl-C returns to usable Yazi; unchanged files, archive and cleanup")
 
 
-def resumed_refresh():
-    """Resume both epoch-gated refresh steps through the foreground launcher."""
+def resumed_theme():
+    """Resume both epoch-gated theme steps with the new process baseline."""
     for step in [1, 2]:
         with fixture() as t:
             write(t.root / "manual.json", json.dumps(dict(version=1, root=str(t.root), repo=str(REPO))))
             try:
                 value = configure_guide(t, None)
-                index = next(i for i, case in enumerate(CASES) if case["key"] == "refresh")
+                index = next(i for i, case in enumerate(CASES) if case["key"] == "theme")
                 value = transition(t.root, "jump", dict(token=value["token"], index=index))
                 for _ in range(step):
-                    value = transition(t.root, "skip", dict(token=value["token"]))
-                    value = transition(t.root, "next", dict(token=value["token"]))
+                    value = transition(t.root, "skip-next", dict(token=value["token"]))
                 saved = load(t.root)[1]
                 active = saved["active"]
-                current(saved)["epoch_before"] = 50  # The previous Yazi process had its own epoch.
+                current(saved)["epoch_before"] = 50  # The previous process had its own epoch.
                 save(t.root, saved)
                 root = Path(value["root"])
-                # A retained session may predate the single-key SKIP binding.
                 write(t.root / "config/keymap.toml", '[[mgr.prepend_keymap]]\non="P"\nrun="plugin manual -- accept"\n')
                 t.tmux("new-session", "-d", "-s", "test", "-x", "140", "-y", "40",
                        "-c", str(REPO), str(REPO / "test/manual.py"), "open", str(t.root))
                 t.started = True
                 t.tmux("set-option", "-w", "remain-on-exit", "on")
-                title = f"3/24 Manual refresh - step {step + 1}/3"
-                t.wait_screen(lambda s: title in s and "P: PASS/check/next" in s, "resumed refresh ready")
+                title = f"3/12 Theme, wide signs and colors - step {step + 1}/3"
+                t.wait_screen(lambda s: title in s and "P: PASS/check/next" in s, "resumed theme ready")
                 snapshot = t.wait(lambda s: s["cwd"] == str(root / "dest") and not s["running"])
-                t.key("P")
-                t.wait_screen(lambda s: "Checks failed; staying" in s and "P: PASS/check/next" in s,
-                              "resumed refresh requires R")
-                attempt = current(load(t.root)[1])
-                assert attempt["step"] == step and attempt["steps"][step]["status"] == "FAIL", attempt
-                t.refresh(lambda s: not s["running"])
-                time.sleep(0.8)  # Separate the two PASS attempts from the repeat-key guard.
-                t.key("P")
-                expected = "step 3/3" if step == 1 else "4/24 Membership discovery"
-                t.wait_screen(lambda s: expected in s and "P: PASS/check/next" in s, "resumed refresh advances after R")
+                assert current(load(t.root)[1])["epoch_before"] == snapshot["epoch"], snapshot
+                assert snapshot["epoch"] != 50
+                t.key("Y"); t.key("P")
+                expected = "step 3/3" if step == 1 else "4/12 Add, Re-add"
+                t.wait_screen(lambda s: expected in s and "P: PASS/check/next" in s, "resumed theme advances after Y")
                 attempt = load(t.root)[1]["attempts"][active]
                 assert attempt["steps"][step]["status"] == "PASS", attempt
-                assert attempt["steps"][step]["visual"] == "PASS", attempt
-                # Step 2 advances within the attempt and replaces its baseline for step 3.
-                if step == 2:
-                    assert attempt["epoch_before"] == snapshot["epoch"], attempt
                 if step == 1:
                     time.sleep(0.8)
                     t.key("S")
-                    t.wait_screen(lambda s: "4/24 Membership discovery" in s, "resumed session has SKIP binding")
+                    t.wait_screen(lambda s: "4/12 Add, Re-add" in s, "resumed session has SKIP binding")
                     assert load(t.root)[1]["attempts"][active]["steps"][2]["status"] == "SKIP"
                 t.key("q")
                 t.wait_screen(lambda s: "Save, retain fixtures and exit" in s, "resumed finish menu")
@@ -370,7 +403,7 @@ def resumed_refresh():
                     stop(t.root)
                     t.started = False
                     remove_attempts(load(t.root)[1])
-    print("PASS resumed refresh: steps 2 and 3 reject PASS before R and advance after R")
+    print("PASS resumed theme: steps 2 and 3 replace the old epoch and advance after Y")
 
 
 def backend_paths():
@@ -415,7 +448,7 @@ def main():
                 remove_attempts(load(t.root)[1])
 
     foreground_launcher()
-    resumed_refresh()
+    resumed_theme()
 
 
 if __name__ == "__main__":

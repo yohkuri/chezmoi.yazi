@@ -24,7 +24,8 @@ class ManualTests(unittest.TestCase):
         self.session.joinpath("state").mkdir()
         self.session.joinpath("config").mkdir()
         write(self.session / "baseline-theme.toml", "")
-        self.state = dict(git_plugin=None, results=["NOT RUN"] * len(CASES), active=0, versions={}, attempts=[dict(
+        self.state = dict(version=2, case_keys=[case["key"] for case in CASES],
+                          git_plugin=None, results=["NOT RUN"] * len(CASES), active=0, versions={}, attempts=[dict(
             case=2, step=0, root=str(self.fixture), opts={"destination": str(self.fixture / "dest")},
             call_offset=0, epoch_before=None, steps=[dict(status="NOT RUN", visual="unanswered") for _ in range(3)])])
         save(self.session, self.state)
@@ -142,7 +143,7 @@ class ManualTests(unittest.TestCase):
                 save(self.session, self.state)
                 target = 2 if operation == "restart" else 11 if operation == "jump" else 3
                 with self.fresh_cases(), patch("manual_backend.baseline", side_effect=RuntimeError("Baseline failed")):
-                    value = self.cli(operation, token="0:2", index=11, snapshot=dict(self.snapshot, epoch=3))
+                    value = self.cli(operation, token="0:2", index=11, snapshot=dict(self.snapshot, epoch=2, signs=dict(managed="C")))
                 report = load(self.session)[1]
                 self.assertEqual(len(report["attempts"]), 1)
                 self.assertEqual(report["active"], 0)
@@ -198,13 +199,12 @@ class ManualTests(unittest.TestCase):
         self.assertEqual(self.state["attempts"], previous)
         self.assertEqual(self.state["active"], 0)
 
-    def test_refresh_requires_a_new_acquisition_even_if_records_match(self):
+    def test_theme_reload_requires_the_same_acquisition_epoch(self):
         attempt = self.state["attempts"][0]
         attempt.update(step=1, epoch_before=3)
-        write(self.fixture / "source/local", "local edit\n")
-        snapshot = dict(epoch=3, records={str(self.fixture / "dest/local"): {"membership": "managed", "xy": "  "}})
+        snapshot = dict(epoch=4, signs=dict(managed="界", modified="m"))
         self.assertEqual(check(self.state, snapshot)["diagnostic"], "FAIL")
-        snapshot["epoch"] = 4
+        snapshot["epoch"] = 3
         self.assertEqual(check(self.state, snapshot)["diagnostic"], "PASS")
 
     def test_completed_details_show_results_instead_of_old_instructions(self):
@@ -247,7 +247,7 @@ class ManualTests(unittest.TestCase):
                 self.assertEqual(before, (self.session / "walk.json").read_bytes())
 
     def test_declining_apply_is_verified_from_files(self):
-        self.state["attempts"][0].update(case=10, step=0)
+        self.state["attempts"][0].update(case=6, step=1)
         write(self.fixture / "dest/source", "original\n")
         self.assertEqual(check(self.state, {})["files"], "PASS")
         write(self.fixture / "dest/source", "source edit\n")
@@ -306,25 +306,25 @@ class ManualTests(unittest.TestCase):
 
     def test_last_step_skip_survives_details_check_and_case_change(self):
         attempt = self.state["attempts"][0]
-        attempt.update(case=1, step=1, steps=[dict(status="PASS", visual="PASS"), dict(status="NOT RUN", visual="unanswered")])
+        attempt.update(case=0, step=1, steps=[dict(status="PASS", visual="PASS"), dict(status="NOT RUN", visual="unanswered")])
         save(self.session, self.state)
         for operation in ["skip", "check"]:
             transition(self.session, operation, {"token": "0:1"})
         with self.fresh_cases():
             transition(self.session, "next", {"token": "0:1"})
         report = load(self.session)[1]
-        self.assertEqual(report["results"][1], "SKIP")
-        self.assertEqual(report["attempts"][report["active"]]["case"], 2)
+        self.assertEqual(report["results"][0], "SKIP")
+        self.assertEqual(report["attempts"][report["active"]]["case"], 1)
 
     def test_case_change_preserves_unverified_and_error_results(self):
         for status in ["NOT RUN", "ERROR"]:
             with self.subTest(status=status):
                 attempt = self.state["attempts"][0]
-                attempt.update(case=1, step=1, steps=[dict(status="PASS", visual="PASS"), dict(status=status, visual="SKIP")])
+                attempt.update(case=0, step=1, steps=[dict(status="PASS", visual="PASS"), dict(status=status, visual="SKIP")])
                 save(self.session, self.state)
                 with self.fresh_cases():
                     transition(self.session, "next", {"token": "0:1"})
-                self.assertEqual(load(self.session)[1]["results"][1], status)
+                self.assertEqual(load(self.session)[1]["results"][0], status)
 
     def test_relative_git_plugin_survives_backend_cwd_change(self):
         plugin = self.session / "git.yazi"
@@ -377,6 +377,20 @@ class ManualTests(unittest.TestCase):
         with patch("manual.install_guide"), patch("manual.subprocess.Popen", return_value=child), patch("manual_backend.finalize", side_effect=archive):
             with self.assertRaises(KeyboardInterrupt):
                 open_fixture(self.session)
+
+    def test_launcher_rejects_an_old_or_reordered_catalog_without_changing_saved_progress(self):
+        from manual import open_fixture
+        for changes in [dict(version=1, case_keys=None), dict(case_keys=list(reversed(self.state["case_keys"])) )]:
+            with self.subTest(changes=changes):
+                save(self.session, dict(self.state, **changes))
+                before = (self.session / "walk.json").read_bytes()
+                with patch("manual.subprocess.Popen") as launch, patch("manual_backend.finalize") as archive:
+                    with self.assertRaisesRegex(ValueError, "older case list"):
+                        open_fixture(self.session)
+                launch.assert_not_called()
+                archive.assert_not_called()
+                self.assertEqual((self.session / "walk.json").read_bytes(), before)
+                self.assertTrue(self.fixture.exists())
 
     def test_harness_error_retains_fixtures_and_is_archived(self):
         self.state["exit"] = {"keep": False}

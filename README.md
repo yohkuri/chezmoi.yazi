@@ -350,6 +350,10 @@ the required tools on `PATH`; none invokes mise.
 
 Start an interactive fixture with `test/manual.py`. The command starts Yazi
 directly in your terminal with ordered English instructions in a bottom guide.
+Its 12 cases focus on readable rendering, command screens, confirmations,
+cancellation, warnings and return to Yazi. File/state correctness is checked
+automatically; refresh, navigation and selection bookkeeping stay in the
+automated suites.
 Press `P` once after each step to record visual PASS,
 check files/state and advance on success, or `S` to skip the current step and
 advance. `W` opens other verdicts, retries and
