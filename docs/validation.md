@@ -318,6 +318,16 @@ verified that the JSON argv remained visible and the edited content was applied.
 `test/check.py` passed 49 Python tests, 51 core and 73 action assertions.
 The complete `test/runtime.py` also passed with the updated headings.
 
+The manual instructions now double-quote file and directory names throughout
+the walk. Special filenames use JSON quoting so embedded quotes, backslashes,
+newlines and carriage returns remain unambiguous. The details legend, diagnostic
+path labels and fixture editor use the same convention. A comparison of all
+12 cases/34 steps preserved every non-instruction field, including preparation
+and file/state expectations. `test/check.py` passed 49 Python tests, 51 core and
+73 action assertions. The complete `test/manual_runtime.py` and `test/runtime.py`
+passed, including wrapped instructions, foreground details/editor, saved-session
+resume and cleanup. These are automated checks, not a new human acceptance walk.
+
 These automated checks do not constitute human visual acceptance of every
 case, font, color, or terminal. The guided launcher with git.yazi, actual editor
 integration, and Linux manual acceptance remain unverified. Earlier direct

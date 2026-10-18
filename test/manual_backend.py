@@ -22,7 +22,7 @@ class PreparationError(RuntimeError):
     def __init__(self, case, step, error, *, fixture=None):
         message = str(error)
         if fixture is not None:
-            message += f"; retained fixture: {fixture}"
+            message += f"; retained fixture: {json.dumps(str(fixture), ensure_ascii=False)}"
         super().__init__(message)
         self.case, self.step = case, step
 
@@ -255,10 +255,10 @@ def check(state, snapshot):
     for relative, expected in spec["files"].items():
         path = root / relative
         if not path.is_file() or read(path) != expected:
-            failures.append(f"{relative}: expected {expected!r}")
+            failures.append(f"{json.dumps(relative, ensure_ascii=False)}: expected {expected!r}")
     for relative in spec["absent"]:
         if (root / relative).exists() or (root / relative).is_symlink():
-            failures.append(f"{relative}: expected absent")
+            failures.append(f"{json.dumps(relative, ensure_ascii=False)}: expected absent")
     calls = root / "state/instrument/calls"
     if spec["no_action"] and calls.exists():
         with calls.open("rb") as log:
@@ -272,10 +272,10 @@ def check(state, snapshot):
         for key, value in expected.items():
             # Missing false flags and explicit false flags are equivalent.
             if actual.get(key, False if value is False else None) != value:
-                diagnostic.append(f"{name}.{key}: expected {value!r}, got {actual.get(key)!r}")
+                diagnostic.append(f"{json.dumps(name, ensure_ascii=False)}.{key}: expected {value!r}, got {actual.get(key)!r}")
     special = spec["special"]
     if special == "template-added" and not (root / "source/unmanaged.tmpl").is_file():
-        failures.append("source/unmanaged.tmpl: expected template")
+        failures.append('"source/unmanaged.tmpl": expected template')
     if special == "encrypted-added":
         encrypted = root / "source/encrypted_unmanaged.age"
         if not encrypted.is_file():
@@ -291,7 +291,7 @@ def check(state, snapshot):
             for directory in ["source", "dest"]:
                 path = root / directory / name
                 if not path.exists() or read(path) != "confirmation fixture\n":
-                    failures.append(f"Long target changed: {directory}/{name!r}")
+                    failures.append(f"Long target changed: {json.dumps(directory + '/' + name, ensure_ascii=False)}")
     for name, expected in spec["signs"].items():
         actual = (snapshot.get("signs") or {}).get(name)
         if actual != expected:
@@ -387,7 +387,7 @@ def details(root):
     lines = [f'{spec["title"]} - step {attempt["step"] + 1}/{len(spec["steps"])}', "",
              view(state)["instruction"], "",
              "Signs are MXYD (plus leading separator). C=managed; XY=chezmoi status; *=directory change; !=failure.",
-             "Spaces are significant: clean='C   ', local='CMM ', source='C M ', unmanaged='    '.", "",
+             "Spaces are significant: \"clean\"='C   ', \"local\"='CMM ', \"source\"='C M ', \"unmanaged\"='    '.", "",
              "CURRENT RESULT", json.dumps(attempt["steps"][attempt["step"]], indent=2), "",
              "CASES"]
     if state.get("finished"):
@@ -401,18 +401,18 @@ def details(root):
     lines += ["", "EXECUTED ACTIONS (argv and exit code; background queries excluded)"]
     actions = fixture / "state/instrument/actions.jsonl"
     lines += read(actions).splitlines() if actions.exists() else ["No interactive chezmoi command executed in this attempt."]
-    lines += ["", "VERSIONS", json.dumps(state["versions"], indent=2), "", f"Fixture: {fixture}"]
+    lines += ["", "VERSIONS", json.dumps(state["versions"], indent=2), "", f"Fixture: {json.dumps(str(fixture), ensure_ascii=False)}"]
     for relative in ["snapshot.json", "state/instrument/calls", "editor-targets.json"]:
         path = fixture / relative
         if path.is_file():
-            lines += ["", relative, read(path)[-24000:]]
+            lines += ["", json.dumps(relative, ensure_ascii=False), read(path)[-24000:]]
     lines += ["", "SOURCE / DEST CONTENTS (JSON escaped; at most 80 files per tree)"]
     for directory in [Path(attempt["opts"]["source"]), fixture / "dest"]:
         for path in heapq.nsmallest(80, directory.rglob("*")):
             if path.is_file() and not path.is_symlink() and path.stat().st_size <= 4096:
                 lines.append(json.dumps({str(path.relative_to(fixture)): read(path)}, ensure_ascii=True))
     for path in (root / "state").rglob("*.log"):
-        lines += ["", str(path.relative_to(root)), read(path)[-12000:]]
+        lines += ["", json.dumps(str(path.relative_to(root)), ensure_ascii=False), read(path)[-12000:]]
     text = "\n".join(lines).splitlines()
     import textwrap
     width = max(20, shutil.get_terminal_size().columns - 2)
