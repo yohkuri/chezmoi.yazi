@@ -91,7 +91,8 @@ is read without following the selected symlink. Other applicability decisions
 and recursive entry exclusions remain chezmoi's responsibility; a successful
 command does not claim every entry was changed. Failure can leave partial work.
 
-Each interactive stage displays its actual executable and argument vector as
+Each interactive stage starts with `chezmoi <subcommand>`, naming the command
+executed in that stage. It displays its actual executable and argument vector as
 JSON before execution, alongside the effect and targets. Argument boundaries,
 quotes and control characters stay visible without constructing a shell command.
 An edit/apply action displays edit, diff and approved apply separately; cancelled

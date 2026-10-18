@@ -150,7 +150,8 @@ function M.run(snapshot, action)
 	end
 	local function execute(name)
 		snapshot.executed = true
-		local ok = process.interactive(snapshot.opts, actions.args(plan, snapshot.opts, name), actions.summary(plan, name))
+		local ok =
+			process.interactive(snapshot.opts, name, actions.args(plan, snapshot.opts, name), actions.summary(plan, name))
 		if not ok then
 			M.notify("Command failed or was interrupted. Some changes may already have occurred; status will refresh.")
 		end
