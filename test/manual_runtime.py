@@ -50,20 +50,20 @@ def test(t):
             time.sleep(0.05)
         raise AssertionError(f"Timed out waiting for {description}: {latest}\n{t.capture()}")
 
-    last_pass = float("-inf")
+    last_verdict = float("-inf")
 
-    def send_pass():
-        nonlocal last_pass
-        remaining = 0.8 - (time.monotonic() - last_pass)
+    def send_verdict(key="P", settle=0.1):
+        nonlocal last_verdict
+        remaining = 0.8 - (time.monotonic() - last_verdict)
         if remaining > 0:
             time.sleep(remaining)
-        t.key("P")
-        last_pass = time.monotonic()
+        t.key(key, settle=settle)
+        last_verdict = time.monotonic()
 
     def accept():
         before = state()
         active, index = before["active"], current(before)["step"]
-        send_pass()
+        send_verdict()
         wait_state(lambda s: s["attempts"][active]["steps"][index]["status"] == "PASS", "single-key PASS")
         after = wait_state(lambda s: (s["active"], current(s)["step"]) != (active, index)
                            or s.get("finished"), "single-key advancement")
@@ -104,7 +104,7 @@ def test(t):
     control(t, "n")
     assert state()["attempts"][0]["step"] == 0, "Unanswered observation advanced"
     t.tmux("send-keys", "-t", "test", "P", "P", "P")
-    last_pass = time.monotonic()
+    last_verdict = time.monotonic()
     t.wait_screen(lambda s: "step 2/2" in s, "single-key next step")
     assert state()["attempts"][0]["steps"][0]["status"] == "PASS"
     assert state()["attempts"][0]["steps"][1]["visual"] == "unanswered", "Repeated P answered the next step"
@@ -120,21 +120,15 @@ def test(t):
     t.wait_screen(lambda s: "step 1/2" in s and "Preparing/checking..." not in s, "fresh restart")
     assert Path(state()["attempts"][-1]["root"]) != original and original.exists()
     active = state()["active"]
-    remaining = 0.8 - (time.monotonic() - last_pass)
-    if remaining > 0:
-        time.sleep(remaining)
-    t.key("S", settle=0)
-    last_pass = time.monotonic()
+    send_verdict("S", settle=0)
     skipped = wait_state(lambda s: current(s)["step"] == 1, "single-key SKIP within case")
     assert skipped["attempts"][active]["steps"][0]["status"] == "SKIP", skipped
     assert "files" not in skipped["attempts"][active]["steps"][0], "SKIP ran checks"
     t.tmux("send-keys", "-t", "test", "P", "S", "S")
-    last_pass = time.monotonic()
+    last_verdict = time.monotonic()
     t.wait_screen(lambda s: "step 2/2" in s and "Preparing/checking..." not in s, "guide ready after SKIP")
     assert current(state())["steps"][1]["visual"] == "unanswered", "Repeated or mixed verdict keys answered the next step"
-    time.sleep(0.8)
-    t.key("S")
-    last_pass = time.monotonic()
+    send_verdict("S")
     t.wait_screen(lambda s: "2/12 Warnings" in s and "Preparing/checking..." not in s, "single-key SKIP to next case")
     assert state()["results"][0] == "SKIP"
     assert current(state())["steps"][0]["visual"] == "unanswered"
@@ -227,7 +221,7 @@ def test(t):
     t.key("9"); t.key("p"); finish(t, next_confirm=True); confirm(t); finish(t); accept()
     print("PASS guide: standalone Diff, cancelled Apply, directory/script preview and approved Apply")
     root = jump("edit")
-    send_pass()
+    send_verdict()
     wait_state(lambda s: current(s)["steps"][0]["status"] == "FAIL", "file-check failure gate")
     assert current(state())["step"] == 0, "Failed file verification advanced"
     t.key("6"); t.key("e")

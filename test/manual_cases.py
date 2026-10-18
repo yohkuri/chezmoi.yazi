@@ -1,15 +1,16 @@
 """Human UI acceptance, with file and state checks kept independent."""
+from support import NAMES
 
 
-def step(*instructions, prep=(), files=None, absent=(), records=None, no_action=None, special=None, epoch=None):
+def step(*instructions, prep=(), files=None, absent=(), records=None, signs=None, no_action=None, special=None, epoch=None):
     closing = "If the UI is clear and readable, press P once; otherwise use W, then f."
     text = "\n".join(f"{i}. {line}" for i, line in enumerate([*instructions, closing], 1))
     return dict(instruction=text, prep=list(prep), files=files or {}, absent=list(absent),
-                records=records or {}, no_action=no_action, special=special, epoch=epoch)
+                records=records or {}, signs=signs or {}, no_action=no_action, special=special, epoch=epoch)
 
 
-def case(key, title, *steps, setup=(), optional=None, cache_ttl=0.2):
-    return dict(key=key, title=title, steps=list(steps), setup=list(setup), optional=optional, cache_ttl=cache_ttl)
+def case(key, title, *steps, setup=(), optional=None):
+    return dict(key=key, title=title, steps=list(steps), setup=list(setup), optional=optional)
 
 
 CLEAN = {"membership": "managed", "xy": "  "}
@@ -24,7 +25,7 @@ CASES = [
                        "unmanaged": {"membership": "unmanaged"}, "ignored": {"membership": "unmanaged"},
                        "remove-me": {"xy": " D"}, "link": CLEAN,
                        ".config": {"summary": "changed"}, ".exact": {"summary": "changed"},
-                       **{name: CLEAN for name in ['space name', '日本語', 'quote"name', 'back\\slash', '-dash', 'new\nline', 'carriage\rreturn']}},
+                       **{name: CLEAN for name in NAMES[4:]}},
          ),
          step(
               "Press W, then h to hide the guide. Narrow and enlarge the terminal; check that the status columns and status bar remain readable and the file list is not corrupted.",
@@ -66,12 +67,12 @@ CASES = [
          step(
               "The fixture has installed a test flavor and theme. Press Y to reload the theme without running a chezmoi command.",
               "Move the cursor away from local. Check that the managed sign is the wide 界, modified marks are lowercase m, and modified text is orange. Check that columns still line up and the status bar remains readable.",
-              prep=[("theme", "custom")], special="theme-custom", epoch="same",
+              prep=[("theme", "custom")], signs={"managed": "界", "modified": "m"}, epoch="same",
          ),
          step(
               "The fixture has restored the base theme. Press Y to reload it.",
               "Check that local has the default CMM signs again and that the restored colors and status bar remain readable.",
-              prep=[("theme", "base")], special="theme-base", epoch="same",
+              prep=[("theme", "base")], signs={"managed": "C"}, epoch="same",
          ),
     ),
     case("add", "Add, Re-add, template and encryption",
