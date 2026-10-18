@@ -1,5 +1,6 @@
 """Fixture preparation and durable progress behind the in-Yazi guide."""
 import argparse
+from contextlib import redirect_stdout
 from datetime import datetime, timezone
 import hashlib
 import heapq
@@ -18,8 +19,11 @@ class StaleRequest(ValueError):
 class PreparationError(RuntimeError):
     """Fixture preparation failed before the target step became active."""
 
-    def __init__(self, case, step, error):
-        super().__init__(str(error))
+    def __init__(self, case, step, error, *, fixture=None):
+        message = str(error)
+        if fixture is not None:
+            message += f"; retained fixture: {fixture}"
+        super().__init__(message)
         self.case, self.step = case, step
 
 
@@ -208,7 +212,7 @@ def start_case(root, state, index):
         if t is not None:
             t.close()
         if isinstance(error, Exception):
-            raise PreparationError(index, 0, error) from error
+            raise PreparationError(index, 0, error, fixture=t.root if t is not None and t.keep else None) from error
         raise
 
 
@@ -223,15 +227,20 @@ def prepare_step(root, attempt):
         raise PreparationError(attempt["case"], attempt["step"], error) from error
 
 
-def initialize(root, git_plugin):
-    git_plugin = str(Path(git_plugin).resolve(strict=True)) if git_plugin else None
+def execution_info():
+    """Identify the code and tools used by both new and resumed sessions."""
     versions = {name: run([name, "--version"]).strip() for name in ["yazi", "chezmoi"]}
     diff = run(["git", "diff", "HEAD"], cwd=REPO)
+    return dict(versions=versions,
+                head=run(["git", "rev-parse", "HEAD"], cwd=REPO).strip(), diff_sha256=hashlib.sha256(diff.encode()).hexdigest(),
+                source_hashes={str(p.relative_to(REPO)): hashlib.sha256(p.read_bytes()).hexdigest()
+                               for pattern in ["*.lua", "test/*.lua", "test/*.py", "test/manual-theme.toml"] for p in REPO.glob(pattern)})
+
+
+def initialize(root, git_plugin):
+    git_plugin = str(Path(git_plugin).resolve(strict=True)) if git_plugin else None
     state = dict(version=2, case_keys=[case["key"] for case in CASES],
-                 session=str(root), git_plugin=git_plugin, versions=versions,
-                 head=run(["git", "rev-parse", "HEAD"], cwd=REPO).strip(), diff_sha256=hashlib.sha256(diff.encode()).hexdigest(),
-                 source_hashes={str(p.relative_to(REPO)): hashlib.sha256(p.read_bytes()).hexdigest()
-                                for pattern in ["*.lua", "test/*.lua", "test/*.py", "test/manual-theme.toml"] for p in REPO.glob(pattern)},
+                 session=str(root), git_plugin=git_plugin, **execution_info(),
                  results=["NOT RUN"] * len(CASES), attempts=[], finished=False)
     start_case(root, state, 0)
     save(root, state)
@@ -463,7 +472,10 @@ def main():
     else:
         root = owned(args.root)
         try:
-            value = transition(root, args.operation, json.loads(args.payload))
+            # Helpers may print retained-fixture diagnostics, even if their
+            # constructor fails. The guide's stdout protocol is JSON only.
+            with redirect_stdout(sys.stderr):
+                value = transition(root, args.operation, json.loads(args.payload))
         except StaleRequest as error:
             _, state = load(root)
             value = view(state)

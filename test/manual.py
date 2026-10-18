@@ -45,7 +45,11 @@ def open_fixture(root):
     from manual_cases import CASES
     if state.get("version") != 2 or state.get("case_keys") != [case["key"] for case in CASES]:
         raise ValueError("This session uses an older case list. Start a new session with test/manual.py; saved results and fixtures are preserved.")
-    from manual_backend import save, view
+    from manual_backend import execution_info, save, view
+    changed = [name for name, value in execution_info().items() if state.get(name) != value]
+    if changed:
+        raise ValueError("Cannot resume this session: execution information differs ("
+                         + ", ".join(changed) + "). Start a new session with test/manual.py; saved results and fixtures are preserved.")
     state.pop("exit", None)
     current(state)["epoch_before"] = None
     save(root, state)
