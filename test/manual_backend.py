@@ -172,12 +172,10 @@ def view(state):
     return dict(title=spec["title"], case=attempt["case"] + 1, total=len(CASES),
                 step=attempt["step"] + 1, steps=len(spec["steps"]),
                 instruction="This case was skipped because no git.yazi path was supplied. Press W, then n to continue." if unavailable else instruction["instruction"],
-                # Retained sessions may still have a guide that reads these fields.
-                expect="", command="",
                 needs_baseline=bool(instruction["epoch"]),
                 result=attempt["steps"][attempt["step"]],
                 root=attempt["root"], opts=attempt["opts"], token=f'{state["active"]}:{attempt["step"]}',
-                cases=[dict(title=c["title"], optional=c["optional"], result=state["results"][i]) for i, c in enumerate(CASES)],
+                results=state["results"],
                 targets=json.loads(read(targets)) if targets.is_file() else [],
                 finished=state.get("finished", False))
 
@@ -195,7 +193,7 @@ def start_case(root, state, index):
         prepare(t, spec["setup"], root)
         opts = dict(command=str(t.root / "chezmoi-wrapper"), config=str(t.cfg), source=str(t.source),
                     destination=str(t.dest), persistent_state=str(t.root / "chezmoi.db"), cache=str(t.root / "cache/chezmoi"),
-                    timeout=1, cache_ttl=spec["cache_ttl"], error_backoff=0.5)
+                    timeout=1, cache_ttl=0.2, error_backoff=0.5)
         write(t.root / "attempt.json", json.dumps(dict(opts=opts)))
         attempt = dict(case=index, root=str(t.root), opts=opts, step=0,
                        steps=[dict(visual="unanswered", status="NOT RUN") for _ in spec["steps"]])
@@ -220,8 +218,6 @@ def prepare_step(root, attempt):
         spec = CASES[attempt["case"]]["steps"][attempt["step"]]
         if spec["prep"]:
             prepare(context(fixture), spec["prep"], root)
-        calls = fixture / "state/instrument/calls"
-        attempt["call_offset"] = calls.stat().st_size if calls.exists() else 0
         attempt["epoch_before"] = None
     except Exception as error:
         raise PreparationError(attempt["case"], attempt["step"], error) from error
@@ -255,15 +251,12 @@ def check(state, snapshot):
         if (root / relative).exists() or (root / relative).is_symlink():
             failures.append(f"{relative}: expected absent")
     calls = root / "state/instrument/calls"
-    if spec["no_action"]:
-        offset = attempt["call_offset"] if spec["special"] == "no-new-destroy" else 0
-        if calls.exists():
-            with calls.open("rb") as log:
-                log.seek(offset)
-                for line in log:
-                    args = json.loads(line)
-                    if "--no-tty" not in args and spec["no_action"] in args:
-                        failures.append(f'Interactive {spec["no_action"]} must not be invoked')
+    if spec["no_action"] and calls.exists():
+        with calls.open("rb") as log:
+            for line in log:
+                args = json.loads(line)
+                if "--no-tty" not in args and spec["no_action"] in args:
+                    failures.append(f'Interactive {spec["no_action"]} must not be invoked')
     diagnostic = []
     for name, expected in spec["records"].items():
         actual = (snapshot.get("records") or {}).get(str(root / "dest" / name), {})
@@ -290,18 +283,13 @@ def check(state, snapshot):
                 path = root / directory / name
                 if not path.exists() or read(path) != "confirmation fixture\n":
                     failures.append(f"Long target changed: {directory}/{name!r}")
-    if special in {"theme-custom", "theme-base"}:
-        signs = snapshot.get("signs") or {}
-        expected = "界" if special == "theme-custom" else "C"
-        if special == "theme-custom" and signs.get("modified") != "m":
-            diagnostic.append("Expected flavor modified sign m")
-        if signs.get("managed") != expected:
-            diagnostic.append(f"Expected managed sign {expected!r}, got {signs}")
+    for name, expected in spec["signs"].items():
+        actual = (snapshot.get("signs") or {}).get(name)
+        if actual != expected:
+            diagnostic.append(f"signs.{name}: expected {expected!r}, got {actual!r}")
     before = attempt.get("epoch_before")
     if spec["epoch"] == "same" and before is not None and snapshot.get("epoch") != before:
         diagnostic.append("Theme reload advanced status epoch")
-    if spec["epoch"] == "advance" and (before is None or snapshot.get("epoch", -1) <= before):
-        diagnostic.append("Press R to force a new status acquisition before recording PASS.")
     write(root / "snapshot.json", json.dumps(snapshot, indent=2))
     return dict(files="FAIL" if failures else "PASS", failures=failures,
                 diagnostic="FAIL" if diagnostic else "PASS", diagnostic_failures=diagnostic)

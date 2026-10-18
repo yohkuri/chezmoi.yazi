@@ -27,7 +27,7 @@ class ManualTests(unittest.TestCase):
         self.state = dict(version=2, case_keys=[case["key"] for case in CASES],
                           git_plugin=None, results=["NOT RUN"] * len(CASES), active=0, versions={}, attempts=[dict(
             case=2, step=0, root=str(self.fixture), opts={"destination": str(self.fixture / "dest")},
-            call_offset=0, epoch_before=None, steps=[dict(status="NOT RUN", visual="unanswered") for _ in range(3)])])
+            epoch_before=None, steps=[dict(status="NOT RUN", visual="unanswered") for _ in range(3)])])
         save(self.session, self.state)
         self.snapshot = dict(records={str(self.fixture / "dest/local"): {"xy": "MM"}})
 
@@ -236,14 +236,11 @@ class ManualTests(unittest.TestCase):
                     result.update(status=status, visual="PASS")
                 save(self.session, self.state)
                 before = (self.session / "walk.json").read_bytes()
-                output = StringIO()
-                with patch("sys.argv", ["manual_backend.py", str(self.session), "check", '{"token":"older-token"}']), patch("sys.stdout", output):
-                    main()
-                value = json.loads(output.getvalue())
+                value = self.cli("check", token="older-token")
                 self.assertEqual(value["token"], "0:0")
                 self.assertEqual(value["result"]["status"], status)
                 self.assertIn("Stale", value["result"]["message"])
-                self.assertEqual(value["cases"][2]["result"], status)
+                self.assertEqual(value["results"][2], status)
                 self.assertEqual(before, (self.session / "walk.json").read_bytes())
 
     def test_declining_apply_is_verified_from_files(self):
@@ -465,12 +462,10 @@ class ManualTests(unittest.TestCase):
         for result in self.state["attempts"][0]["steps"]:
             result.update(status="PASS", visual="PASS")
         save(self.session, self.state)
-        output = StringIO()
-        with patch("sys.argv", ["manual_backend.py", str(self.session), "check", '{"token":"0:0"}']), patch("sys.stdout", output), patch("manual_backend.check", side_effect=RuntimeError("Decryption failed")):
-            main()
-        value = json.loads(output.getvalue())
+        with patch("manual_backend.check", side_effect=RuntimeError("Decryption failed")):
+            value = self.cli("check", token="0:0")
         self.assertEqual(value["result"]["status"], "ERROR")
-        self.assertEqual(value["cases"][2]["result"], "ERROR")
+        self.assertEqual(value["results"][2], "ERROR")
         self.assertEqual(load(self.session)[1]["results"][2], "ERROR")
         with tempfile.TemporaryDirectory() as archive_repo, patch("manual_backend.REPO", Path(archive_repo)):
             report = json.loads(read(finalize(self.session) / "results.json"))

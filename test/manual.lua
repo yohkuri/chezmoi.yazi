@@ -21,8 +21,8 @@ local function guide_lines(v, width)
 	local lines
 	if v.finished then
 		local counts = {}
-		for _, case in ipairs(v.cases) do
-			counts[case.result] = (counts[case.result] or 0) + 1
+		for _, result in ipairs(v.results) do
+			counts[result] = (counts[result] or 0) + 1
 		end
 		local totals = {}
 		for _, result in ipairs { "PASS", "FAIL", "ERROR", "SKIP", "NOT RUN" } do
@@ -238,13 +238,15 @@ end
 local function request(v, operation, extra)
 	local payload = extra or {}
 	payload.token = v.token
-	if operation == "accept" or operation == "fail" or operation == "check" then
+	local checking = operation == "accept" or operation == "fail" or operation == "check"
+	local answered = v.result.visual == "PASS" or v.result.visual == "FAIL" or v.result.visual == "SKIP"
+	if checking then
 		local deadline = ya.time() + 8
 		while snapshot().running and ya.time() < deadline do
 			ya.sleep(0.05)
 		end
 	end
-	if operation == "accept" or operation == "fail" or operation == "check" or operation == "next" then
+	if checking or operation == "next" and not answered then
 		payload.snapshot = snapshot(true)
 	elseif operation == "baseline" then
 		payload.snapshot = { epoch = snapshot().epoch }
@@ -367,7 +369,15 @@ function M:entry(job)
 		if baseline then
 			return request(v, "baseline")
 		end
-		local result = verdict and (v.finished and v or request(v, job.args[1])) or controls(v, job.args[1] == "exit")
+		if verdict and v.finished then
+			return v
+		end
+		local result
+		if verdict then
+			result = request(v, job.args[1])
+		else
+			result = controls(v, job.args[1] == "exit")
+		end
 		if result.root ~= v.root then
 			switch(result)
 		end

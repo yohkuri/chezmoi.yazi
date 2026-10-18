@@ -272,6 +272,22 @@ resumed theme steps. Existing refresh, navigation and visual-unset scenarios
 remain automated. The guide's case numbers/titles were also compared with
 the manual table. These are automated execution checks, not a new human walk.
 
+Follow-up cleanup removed the unused Destroy log offset, refresh-only epoch
+branch, per-case cache TTL and old guide-response fields. Theme sign expectations
+now live beside their steps and use a common comparison. The frontend receives
+case results directly and omits full snapshots for Next after a recorded verdict.
+CLI tests share their existing invocation helper, P/S timing shares one sender,
+and filename expectations reuse the baseline fixture list.
+
+A comparison preserved all 12 cases/34 steps, including instructions,
+preparation and file/state/theme expectations. `test/check.py` passed 47 Python
+tests, 51 core and 73 action assertions. The complete `test/manual_runtime.py`
+and `test/runtime.py` passed on the same macOS/Yazi/chezmoi versions. A trial
+cache of wrapped `ui.lines()` objects caused `ui.Text` redraw errors and was
+discarded before the passing guide run; wrapping still runs on layout. These
+checks do not measure a startup or memory improvement or establish human
+visual acceptance.
+
 These automated checks do not constitute human visual acceptance of every
 case, font, color, or terminal. The guided launcher with git.yazi, actual editor
 integration, and Linux manual acceptance remain unverified. Earlier direct
