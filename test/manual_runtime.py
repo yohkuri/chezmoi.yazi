@@ -284,7 +284,7 @@ def test(t):
         write(theme, original_theme)
     control(t, "d")
     screen = t.wait_screen(lambda s: "Enter: next | b: back | q: return to Yazi" in s, "same-terminal details")
-    assert "Press 5 to move to .local" in " ".join(screen.split()), screen
+    assert 'Press 5 to move to ".local"' in " ".join(screen.split()), screen
     assert all(label not in screen for label in ["DO:", "EXPECT:", "COMMAND:"]), screen
     deadline = time.monotonic() + 5
     while "PREPARATION ERRORS" not in t.capture():

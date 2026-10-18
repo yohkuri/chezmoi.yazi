@@ -11,7 +11,7 @@ mode = read(root / "editor-mode")
 if mode == "manual":
     print("Disposable fixture editor. Personal editor/config is not used.")
     for target in targets:
-        print(f"{target.name}: {read(target)!r}")
+        print(f"{json.dumps(target.name, ensure_ascii=False)}: {read(target)!r}")
     print("Type one line and Enter to save to all selected source files; Ctrl-C cancels.", flush=True)
     value = input("New source content > ")
 elif mode == "wait":

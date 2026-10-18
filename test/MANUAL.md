@@ -58,7 +58,10 @@ The guide shows the case and step, followed by numbered English instructions
 in execution order. Each action is followed by what to check before the next
 action. Command names appear beside the keys that invoke them. Press `P` once
 after completing the whole current step; numbered instructions do not add
-separate verdicts. Text wraps to the terminal width. If it exceeds the guide height,
+separate verdicts. File and directory names in instructions are enclosed in
+double quotes. Quotes, backslashes and control characters inside names use JSON
+escapes, such as `"quote\"name"`, `"back\\slash"` and `"new\nline"`.
+Text wraps to the terminal width. If it exceeds the guide height,
 the guide directs you to `W`, then `d` for complete instructions and diagnostics
 in the same terminal. Enter advances that viewer, `b` then Enter goes back, and
 `q` then Enter returns to Yazi. The viewer also lists every case number, title
@@ -84,7 +87,7 @@ and current result under `CASES`; continue through its pages to reach that list.
    then `j` to enter a case number. Jumping starts the chosen case from its
    first step with a fresh fixture. Previous attempts remain available as evidence.
 
-In case 1, `.config` is intentionally empty even though its row has `*`:
+In case 1, `".config"` is intentionally empty even though its row has `*`:
 the source contains changes that have not been applied to the destination.
 You inspect the destination in Yazi. This explains the sign; opening the
 directory to verify its contents is not a separate human acceptance step.
@@ -146,10 +149,10 @@ file/state checks, but never supplies a visual verdict or advances the step.
 | `d`, `p`, `f`, `x` | Diff / Apply / Forget / Destroy |
 | `D` | Destroy with `--recursive=false` |
 | `t`, `z` | Add as template / encrypted Add |
-| `G`, `H` | New `.config` tab / tab zero |
-| `1`, `2`, `3` | Reveal `range-a` / `menu-a` / `.config/outside` |
+| `G`, `H` | New `".config"` tab / tab zero |
+| `1`, `2`, `3` | Reveal `"range-a"` / `"menu-a"` / `".config/outside"` |
 | `4` | Select all long/deep confirmation targets |
-| `5`, `6`, `7`, `8`, `9`, `0` | Reveal `.local` / `source` / `unmanaged` / `clean` / `.config` / `.exact` |
+| `5`, `6`, `7`, `8`, `9`, `0` | Reveal `".local"` / `"source"` / `"unmanaged"` / `"clean"` / `".config"` / `".exact"` |
 | `T` | Write the internal diagnostic probe |
 
 Move the cursor to a directory and press `l` to enter it; press `h` to return
