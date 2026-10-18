@@ -288,6 +288,29 @@ discarded before the passing guide run; wrapping still runs on layout. These
 checks do not measure a startup or memory improvement or establish human
 visual acceptance.
 
+Two follow-up regressions protect preparation errors and resumed evidence.
+The backend redirects helper diagnostics to stderr while keeping stdout JSON
+only, including cleanup after a constructor failure. With `KEEP_FIXTURE=1`,
+a failed case's retained fixture path is also recorded in its preparation-error
+message and history. Existing PASS verdicts remain unchanged.
+
+The launcher now compares the saved HEAD, working tree diff hash, source hashes
+and Yazi/chezmoi versions against the current execution before resuming. Missing
+or changed information rejects resume before modifying progress/configuration,
+launching Yazi or archiving; previous results remain intact. Session creation
+and resume share the same metadata collector.
+
+`test/check.py` passed 49 Python tests, 51 core and 73 action assertions.
+The complete `test/manual_runtime.py` passed on macOS with Yazi 26.9.1 and
+chezmoi 2.73.2. Real backend CLI checks injected preparation failures with and
+without fixture retention and verified parseable JSON, stderr diagnostics,
+retained paths and preserved PASS. Separate launcher processes rejected each
+stored metadata mismatch without changing saved bytes. Unit checks also cover
+constructor failure, each tool version and missing metadata. The real-terminal
+suite still resumed unchanged sessions, completed both theme steps, handled
+foreground interrupts, and archived/cleaned up successfully.
+The complete `test/runtime.py` also passed on the same macOS/Yazi/chezmoi versions.
+
 These automated checks do not constitute human visual acceptance of every
 case, font, color, or terminal. The guided launcher with git.yazi, actual editor
 integration, and Linux manual acceptance remain unverified. Earlier direct

@@ -2,12 +2,15 @@
 """Real-terminal checks for the guided manual session (private tmux only)."""
 import json
 from pathlib import Path
+import shutil
+import subprocess
+import sys
 import time
 from action_cases import confirm, enter, finish, native_confirm
 from manual import configure_guide, install_guide
 from manual_backend import current, load, remove_attempts, save, transition
 from manual_cases import CASES
-from support import REPO, fixture, read, write, stop
+from support import REPO, fixture, owned, read, write, stop
 
 
 def control(t, key, settle=0.3):
@@ -430,8 +433,73 @@ def backend_paths():
     print("PASS backend CLI: relative git plugin persists across cwd changes, restart and jump")
 
 
+def backend_diagnostics():
+    """Keep JSON parseable when real preparation fails and retains evidence."""
+    with fixture(probe=False, keep=False) as t:
+        retained = []
+        try:
+            write(t.root / "manual.json", json.dumps(dict(version=1, root=str(t.root), repo=str(REPO))))
+            configure_guide(t, None)
+            state = load(t.root)[1]
+            for result in current(state)["steps"]:
+                result.update(status="PASS", visual="PASS")
+            save(t.root, state)
+            shims = t.root / "bin"
+            shims.mkdir()
+            write(shims / "chezmoi", '#!/bin/sh\nprintf "injected preparation failure\\n" >&2\nexit 73\n')
+            (shims / "chezmoi").chmod(0o700)
+            for keep in [False, True]:
+                env = dict(t.env, PATH=str(shims) + ":" + t.env["PATH"])
+                env.pop("KEEP_FIXTURE", None)
+                if keep:
+                    env["KEEP_FIXTURE"] = "1"
+                process = subprocess.run([sys.executable, str(REPO / "test/manual_backend.py"), str(t.root), "restart", '{"token":"0:0"}'],
+                                         env=env, capture_output=True, text=True, timeout=20)
+                retained += [owned(line.removeprefix("Evidence: ")) for line in process.stderr.splitlines() if line.startswith("Evidence: ")]
+                assert process.returncode == 0, process.stderr
+                value = json.loads(process.stdout)
+                assert value["result"]["status"] == "PASS" and value["results"][0] == "PASS", value
+                assert load(t.root)[1]["attempts"] == state["attempts"]
+                if keep:
+                    assert len(retained) == 1 and retained[0].is_dir(), process.stderr
+                    assert str(retained[0]) in value["result"]["message"], value
+                    assert str(retained[0]) in load(t.root)[1]["preparation_errors"][-1]["error"]
+                else:
+                    assert not retained, process.stderr
+        finally:
+            if (t.root / "walk.json").exists():
+                remove_attempts(load(t.root)[1])
+            for root in retained:
+                shutil.rmtree(owned(root))
+    print("PASS backend CLI: preparation failures keep JSON stdout, stderr evidence and saved PASS with/without KEEP_FIXTURE")
+
+
+def resume_execution_guard():
+    """Compare actual code/tool metadata before touching a retained session."""
+    with fixture(probe=False) as t:
+        try:
+            write(t.root / "manual.json", json.dumps(dict(version=1, root=str(t.root), repo=str(REPO))))
+            configure_guide(t, None)
+            original = load(t.root)[1]
+            code = 'import sys; from pathlib import Path; from manual import open_fixture; open_fixture(Path(sys.argv[1]))'
+            for name in ["head", "diff_sha256", "source_hashes", "versions"]:
+                state = dict(original, **{name: "previous execution"})
+                save(t.root, state)
+                before = (t.root / "walk.json").read_bytes()
+                process = subprocess.run([sys.executable, "-c", code, str(t.root)], cwd=REPO / "test", env=t.env,
+                                         capture_output=True, text=True, timeout=20)
+                assert process.returncode != 0 and f"execution information differs ({name})" in process.stderr, process.stderr
+                assert (t.root / "walk.json").read_bytes() == before
+        finally:
+            if (t.root / "walk.json").exists():
+                remove_attempts(load(t.root)[1])
+    print("PASS resume guard: actual HEAD/diff/source/tool metadata mismatches preserve saved bytes before launch")
+
+
 def main():
     backend_paths()
+    backend_diagnostics()
+    resume_execution_guard()
     with fixture() as t:
         try:
             test(t)

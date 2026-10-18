@@ -244,6 +244,9 @@ position. The message identifies the intended case and step; `W/d` shows the
 preparation-error history. Retry the same operation after resolving the cause.
 These errors are archived separately from step verdicts and retain fixtures,
 even if a later retry succeeds and cleanup was requested.
+With `KEEP_FIXTURE=1`, a failed case's retained fixture path also appears in the
+preparation-error message and history. Backend diagnostics go to stderr so the
+guide can still read its JSON response without changing saved verdicts.
 
 Press `q` to open the exit menu:
 
@@ -283,9 +286,18 @@ for `PATH` below, not the report directory or an individual attempt directory.
 test/manual.py open PATH
 ```
 
-This resumes the saved case and step in Yazi with the current checkout's guide,
-key bindings and backend. Keep the checkout available. Theme steps capture a
-fresh status epoch when reopened; press `Y` as instructed.
+This resumes the saved case and step only when the recorded Git HEAD, working
+tree diff, source hashes, and Yazi/chezmoi versions match the current execution.
+Keep the checkout available and unchanged while completing a session. A new
+commit, a changed diff/source file, different tool versions, or missing execution
+information causes the launcher to refuse resume before changing progress,
+rewriting fixture configuration, opening Yazi, or archiving. Start a fresh
+`test/manual.py` session after changing code or tools; the old results and
+fixtures remain available for inspection, `status` and explicit cleanup.
+
+With matching execution information, the saved step opens with the guide and
+key bindings from that checkout. Theme steps capture a fresh status epoch when
+reopened; press `Y` as instructed.
 
 The earlier 24-case sessions use different case numbers and cannot be resumed
 with this 12-case guide. The launcher rejects that mismatch before changing

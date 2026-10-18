@@ -24,8 +24,10 @@ class ManualTests(unittest.TestCase):
         self.session.joinpath("state").mkdir()
         self.session.joinpath("config").mkdir()
         write(self.session / "baseline-theme.toml", "")
+        self.execution = dict(head="original-head", diff_sha256="original-diff", source_hashes={"main.lua": "original-source"},
+                              versions=dict(yazi="original-yazi", chezmoi="original-chezmoi"))
         self.state = dict(version=2, case_keys=[case["key"] for case in CASES],
-                          git_plugin=None, results=["NOT RUN"] * len(CASES), active=0, versions={}, attempts=[dict(
+                          git_plugin=None, results=["NOT RUN"] * len(CASES), active=0, **self.execution, attempts=[dict(
             case=2, step=0, root=str(self.fixture), opts={"destination": str(self.fixture / "dest")},
             epoch_before=None, steps=[dict(status="NOT RUN", visual="unanswered") for _ in range(3)])])
         save(self.session, self.state)
@@ -190,6 +192,32 @@ class ManualTests(unittest.TestCase):
         self.assertEqual(saved["preparation_errors"], report["preparation_errors"])
         self.assertTrue(self.fixture.exists())
         self.assertTrue(self.session.exists())
+
+    def test_retained_preparation_diagnostics_do_not_corrupt_json_or_saved_pass(self):
+        for phase in ["setup", "baseline"]:
+            with self.subTest(phase=phase):
+                for result in self.state["attempts"][0]["steps"]:
+                    result.update(status="PASS", visual="PASS")
+                save(self.session, self.state)
+                def fail_setup(t, *_):
+                    self.roots.append(t.root)
+                    raise RuntimeError("Setup failed")
+                failure = (patch("manual_backend.Runtime.setup", new=fail_setup) if phase == "setup"
+                           else patch("manual_backend.baseline", side_effect=RuntimeError("Baseline failed")))
+                diagnostics = StringIO()
+                with self.fresh_cases(), failure, patch.dict("os.environ", {"KEEP_FIXTURE": "1"}), patch("sys.stderr", diagnostics):
+                    value = self.cli("restart", token="0:0")
+                retained = self.roots[-1]
+                self.assertTrue(retained.is_dir())
+                self.assertIn(f"Evidence: {retained}", diagnostics.getvalue())
+                self.assertEqual(value["result"]["status"], "PASS")
+                report = load(self.session)[1]
+                self.assertEqual(report["attempts"], self.state["attempts"])
+                self.assertEqual(report["results"][2], "PASS")
+                self.assertEqual(len(report["preparation_errors"]), 1)
+                if phase == "baseline":
+                    self.assertIn(str(retained), value["result"]["message"])
+                    self.assertIn(str(retained), report["preparation_errors"][0]["error"])
 
     def test_case_preparation_failure_preserves_the_previous_attempt(self):
         previous = list(self.state["attempts"])
@@ -371,7 +399,7 @@ class ManualTests(unittest.TestCase):
             self.assertTrue(child.terminate.called)
             self.assertEqual(child.wait.call_count, 2)
             self.assertTrue(json.loads(read(root / "walk.json"))["exit"]["keep"])
-        with patch("manual.install_guide"), patch("manual.subprocess.Popen", return_value=child), patch("manual_backend.finalize", side_effect=archive):
+        with patch("manual_backend.execution_info", return_value=self.execution), patch("manual.install_guide"), patch("manual.subprocess.Popen", return_value=child), patch("manual_backend.finalize", side_effect=archive):
             with self.assertRaises(KeyboardInterrupt):
                 open_fixture(self.session)
 
@@ -387,6 +415,31 @@ class ManualTests(unittest.TestCase):
                 launch.assert_not_called()
                 archive.assert_not_called()
                 self.assertEqual((self.session / "walk.json").read_bytes(), before)
+                self.assertTrue(self.fixture.exists())
+
+    def test_launcher_rejects_changed_or_missing_execution_info_without_writes(self):
+        from manual import open_fixture
+        changes = [dict(head="changed-head"), dict(diff_sha256="changed-diff"),
+                   dict(source_hashes={"main.lua": "changed-source"}),
+                   dict(versions=dict(self.execution["versions"], yazi="changed-yazi")),
+                   dict(versions=dict(self.execution["versions"], chezmoi="changed-chezmoi"))]
+        for change in [*changes, *({name: None} for name in self.execution)]:
+            with self.subTest(change=change):
+                state = dict(self.state, exit=dict(keep=True), **change)
+                for name in change:
+                    if state[name] is None:
+                        del state[name]
+                save(self.session, state)
+                write(self.session / "config/keymap.toml", "saved keymap")
+                before = (self.session / "walk.json").read_bytes()
+                with patch("manual_backend.execution_info", return_value=self.execution), patch("manual.install_guide") as install, patch("manual.subprocess.Popen") as launch, patch("manual_backend.finalize") as archive:
+                    with self.assertRaisesRegex(ValueError, "execution information differs"):
+                        open_fixture(self.session)
+                install.assert_not_called()
+                launch.assert_not_called()
+                archive.assert_not_called()
+                self.assertEqual((self.session / "walk.json").read_bytes(), before)
+                self.assertEqual(read(self.session / "config/keymap.toml"), "saved keymap")
                 self.assertTrue(self.fixture.exists())
 
     def test_harness_error_retains_fixtures_and_is_archived(self):
