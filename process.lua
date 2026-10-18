@@ -81,7 +81,7 @@ end
 
 -- Interactive commands own the terminal until the user has read their output.
 -- The shell only implements the fixed Enter prompt; target paths never enter it.
-function M.interactive(opts, args, summary)
+function M.interactive(opts, name, args, summary)
 	local permit = ui.hide()
 	local ok, success = pcall(function()
 		local argv = { opts.command }
@@ -89,7 +89,9 @@ function M.interactive(opts, args, summary)
 			argv[#argv + 1] = arg
 		end
 		-- JSON quoting preserves argument boundaries and makes control paths readable.
-		io.write("\27[2J\27[Hchezmoi\n" .. summary .. "\n\nRunning (argv):\n" .. ya.json_encode(argv) .. "\n\n")
+		io.write(
+			"\27[2J\27[Hchezmoi " .. name .. "\n" .. summary .. "\n\nRunning (argv):\n" .. ya.json_encode(argv) .. "\n\n"
+		)
 		io.flush()
 		local status =
 			Command(opts.command):arg(args):stdin(Command.INHERIT):stdout(Command.INHERIT):stderr(Command.INHERIT):status()

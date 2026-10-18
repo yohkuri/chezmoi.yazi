@@ -180,10 +180,12 @@ the default signs and colors temporarily; its guide gives the expected values.
 
 Commands use real chezmoi and its native prompts, with no forced confirmation.
 The guide's command description omits shared fixture context and abbreviates
-target paths. Each actual execution screen shows the complete executable and
-argument vector as JSON, preserving quotes and control characters. `W`, then
-`d` lists executed interactive commands and exit codes separately from background
-status queries; this history is included in the saved report. A cancelled or
+target paths. Each execution screen starts with `chezmoi <subcommand>`, such as
+`chezmoi add` or `chezmoi diff`, for the stage actually running. It also shows the
+complete executable and argument vector as JSON, preserving quotes and control
+characters. `W`, then `d` lists executed interactive commands and exit codes
+separately from background status queries; this history is included in the saved
+report. A cancelled or
 rejected action may run validation queries, but does not execute the rejected
 interactive command. Edit and Apply runs edit, diff, then apply only after approval.
 Read output and press Enter when the command asks to return to Yazi. For Apply,

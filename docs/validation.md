@@ -311,6 +311,13 @@ suite still resumed unchanged sessions, completed both theme steps, handled
 foreground interrupts, and archived/cleaned up successfully.
 The complete `test/runtime.py` also passed on the same macOS/Yazi/chezmoi versions.
 
+Execution screens now start with `chezmoi <subcommand>` for the stage actually
+running. An isolated real-terminal probe observed `chezmoi add`, followed by
+`chezmoi edit`, `chezmoi diff` and `chezmoi apply` during Edit and Apply. It also
+verified that the JSON argv remained visible and the edited content was applied.
+`test/check.py` passed 49 Python tests, 51 core and 73 action assertions.
+The complete `test/runtime.py` also passed with the updated headings.
+
 These automated checks do not constitute human visual acceptance of every
 case, font, color, or terminal. The guided launcher with git.yazi, actual editor
 integration, and Linux manual acceptance remain unverified. Earlier direct
