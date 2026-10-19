@@ -12,3 +12,6 @@ __pycache__/
 /CLAUDE.local.md.bak
 /AGENTS.override.md.bak
 /.claude/settings.local.json.bak
+
+# Claude Code places agent worktrees here; each is a separate checkout.
+/.claude/worktrees/
