@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "ask": [
+      "Bash(gh pr merge *)",
+      "Bash(gh api *merge*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_response.filePath // .tool_input.file_path' | { read -r f; d=\"${CLAUDE_PROJECT_DIR:-/nonexistent}\"; case \"$f\" in \"$d\"/.dev/* | \"$d\"/node_modules/*) ;; \"$d\"/*.lua) stylua --config-path \"$d/.stylua.toml\" \"$f\" ;; esac; } || true",
+            "statusMessage": "Formatting Lua"
+          }
+        ]
+      }
+    ]
+  }
+}
