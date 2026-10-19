@@ -17,38 +17,45 @@ description: >-
 
 ## Which suites a change needs
 
-Every change runs `test/check.py`. The rest depends on what moved:
+Every change runs `test/check.py`. A change to the plugin's Lua, any
+root-level `*.lua`, also runs `test/runtime.py` and `test/e2e.py`, whichever
+module it touches:
 
-| Changed | Also run |
+- `core.lua` and `actions.lua` build the arguments given to chezmoi and parse
+  what it prints. Their unit suites compare that against hand-written output
+  and expected argv, so a flag the real chezmoi rejects passes them once the
+  expectation is edited to match.
+- `process.lua` runs every chezmoi call. `test/runtime.py` puts
+  `test/command.py` between the plugin and chezmoi, so only `test/e2e.py`
+  shows the plugin's own calls reaching chezmoi unchanged.
+
+For a change under `test/`, run every suite that loads the file:
+
+| Suite | Loads from `test/` |
 | --- | --- |
-| `core.lua`, `actions.lua` | Nothing more unless the change shows on screen |
-| `main.lua`, `render.lua`, `interaction.lua` | `test/runtime.py`, `test/e2e.py` |
-| `process.lua` | `test/runtime.py` (its child-process checks live only there) |
-| `test/support.py`, `test/action_cases.py` | `test/runtime.py`, `test/e2e.py` |
-| `test/screen.py` | `test/e2e.py` |
-| `test/manual.py`, `test/manual_*`, `test/manual.lua`, `test/manual-theme.toml` | `test/manual_runtime.py` |
-| Docs, CI, tooling only | Nothing more |
+| `test/check.py` | `core.lua`, `actions.lua`, `test_*.py` and what they import: `screen.py`, `support.py`, `manual_backend.py`, `manual_cases.py` |
+| `test/runtime.py` | `support.py`, `action_cases.py`, `screen.py`, `editor.py`, `command.py`, `probe.lua`, `runner.lua`, `child.py` |
+| `test/e2e.py` | `support.py`, `action_cases.py`, `screen.py`, `editor.py` |
+| `test/manual_runtime.py` | `support.py`, `action_cases.py`, `screen.py`, `editor.py`, `command.py`, `probe.lua`, `manual.py`, `manual_backend.py`, `manual_cases.py`, `manual.lua`, `manual-theme.toml` |
+| `test/benchmark.py` | `support.py` |
 
-`test/core.lua` and `test/actions.lua` load the pure modules with `dofile`,
-so those two suites are the only ones that reach `core.lua` and `actions.lua`
-without Yazi. Everything else in the plugin is exercised only inside a running
-Yazi.
+A suite's own file counts as loaded by it. `support.py`, `action_cases.py`
+and `screen.py` reach three suites each, and each suite reads a different kind
+of evidence, so one passing says nothing for the others. A change to docs, CI
+or tooling alone needs nothing beyond `test/check.py`.
 
-`test/action_cases.py` is shared: `test/runtime.py` drives it through the
-instrumented chezmoi wrapper and the probe, `test/e2e.py` through the real
-binary with neither. A change there has to pass both, because each suite reads
-a different kind of evidence.
-
-`test/manual_runtime.py` is the guide's own suite. README does not list it,
-but a change to the guide is not validated without it.
+`test/manual_runtime.py` is the guide's own suite. README does not list it; it
+runs like the others, from the repository root with no arguments.
 
 ## What each suite cannot establish
 
 - **`test/check.py`** never starts Yazi. It also does not run what CI adds:
-  `lua5.1` and `lua5.4` over both pure suites, and `luac -p` under 5.1, 5.4
-  and 5.5 over every `*.lua` in the root, `test/` and `scripts/`. Lua 5.5-only
-  syntax anywhere fails CI while passing locally, unless you install `lua5.1`
-  and `lua5.4` and run the same commands from `.github/workflows/check.yml`.
+  both pure suites under `lua5.1` and `lua5.4`, and `luac -p` under 5.1, 5.4
+  and 5.5 over the `*.lua` files in the root, `test/` and `scripts/` (not
+  `types/`). So Lua 5.5-only syntax in those files, and a pure-suite call such
+  as `table.unpack` that an older Lua lacks, fail in CI after passing locally,
+  unless you install `lua5.1` and `lua5.4` and run the same commands from
+  `.github/workflows/check.yml`.
 - **`test/runtime.py`** reads plugin state through `test/probe.lua` and runs
   chezmoi through `test/command.py`, which records every call and gives
   non-interactive ones a 10-second timeout. A pass shows the plugin's records
@@ -80,8 +87,9 @@ readability. Say so rather than letting a green run imply it.
 - Send Escape on its own and let it settle before the next key, as
   `test/manual_runtime.py` does. Followed at once by a digit, it decoded as
   Alt+digit.
-- Text wraps at the terminal width. Assert on a phrase that survives wrapping
-  at 80 columns, or on `screen.row` for file rows.
+- Text wraps at the terminal width, and the harness resizes to as narrow as
+  40 columns. Assert on a phrase that survives wrapping at the narrowest size
+  the check runs at, or on `screen.row` for file rows.
 - A fixture plugin under `test/` gets values as `local` lines prepended by
   `Runtime.plugin`. A new name needs an entry in `diagnostics.globals` of
   `test/.luarc.json`, and an `--- @sync entry` annotation must stay the file's
@@ -93,9 +101,12 @@ readability. Say so rather than letting a green run imply it.
   directory with its own config, source, destination, state, cache and tmux
   socket. Do not point a test at `~/.config/yazi`, the user's chezmoi source,
   or the default tmux server.
-- `support.owned` and `Runtime.close` refuse to delete anything that is not a
-  marked fixture. Keep those guards when changing cleanup; remove only what a
-  test created.
+- Two guards limit deletion. `Runtime.close` removes only the directory it
+  created, and only while that is a real directory named
+  `chezmoi-yazi-test-*`. `support.owned`, which the guide calls before it
+  opens, changes or removes a saved fixture, also requires the `manual.json`
+  marker naming this checkout. Keep both when changing cleanup; remove only
+  what a test created.
 - `KEEP_FIXTURE=1` (runtime) and `--keep` (E2E) leave the fixture behind and
   print its path. Report the path; do not delete retained fixtures from earlier
   runs that you did not start.
