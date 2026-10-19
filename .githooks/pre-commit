@@ -26,7 +26,7 @@ chezmoi.yazi: refusing a commit on `main`.
       git branch -f main origin/main
       git commit
 
-  A deliberate exception is spelled out rather than bypassed wholesale:
+  To commit on main deliberately:
 
       CHEZMOI_YAZI_COMMIT_ON_MAIN=1 git commit ...
 MSG
