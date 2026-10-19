@@ -308,6 +308,8 @@ test/check.py
 `npm run check` uses `.markdownlint-cli2.yaml`, `.luarc.json`, and
 `.stylua.toml`, then runs the pure Lua status and action suites, Python syntax checks,
 and harness unit tests. LuaLS checks the plugin and in-Yazi probes as Lua 5.5.
+`scripts/check-skills.sh`, which needs Bash, checks that every file under
+`.agents/skills/` has its relative symlink under `.claude/skills/`.
 
 `mise.toml` only pins tool versions for developers who use mise; it defines
 no tasks. If you use mise, `mise trust` and `mise install` install those tools.
