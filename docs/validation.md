@@ -582,6 +582,14 @@ StyLua 2.6.0, `stylua --check .` reported a root and a subdirectory file and
 skipped a hidden file, `.github/`, and a Git-ignored directory, the scope the
 hook formats. Loading the hook in a Claude Code session is not recorded here.
 
+On 2026-10-19, the CI step that ties `.claude/skills/` to `.agents/skills/`
+passed ShellCheck and was run locally against temporary Git repositories. It
+passed with one tracked symlink per skill file and failed, naming the file and
+the fix, for a missing link, a copied file, a link with the wrong relative
+target, a link whose skill file is not tracked, and a link to the skill
+directory instead of its files. Claude Code offering the skill through the
+link in a fresh session is not recorded here.
+
 The initial project commit range from `main` to the pull request head passed
 the local commit validator and the pull request's `checks` job. The isolated
 Git histories above remain the negative-case coverage for invalid messages.

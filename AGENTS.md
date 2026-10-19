@@ -72,6 +72,10 @@ Private conversation with the user may use their preferred language.
   argument when validating git.yazi coexistence.
 - Unit tests do not establish real rendering, fetcher, or shared-state behavior.
   State precisely which checks ran and which platforms remain unverified.
+- Before validating a change or reporting what was validated, read
+  `.agents/skills/verify-chezmoi-yazi/SKILL.md`. Skills live under
+  `.agents/skills/`; `.claude/skills/` holds one symlink per file for Claude
+  Code, and CI checks that every file has one.
 - Use isolated temporary source, destination, config, state, and cache paths,
   and a private tmux socket. Never modify the user's dotfiles or Yazi setup as
   a test side effect. Preview scoped chezmoi changes before scoped apply.
