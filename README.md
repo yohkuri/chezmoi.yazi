@@ -355,7 +355,7 @@ is reported back to the agent. The settings also ask before common merge
 commands and pushes that name `main`. Other agents and editors do not run this
 hook, so `test/check.py` remains the formatting check. Rules under
 `.claude/rules/` point Claude Code at the `verify-chezmoi-yazi` skill in
-`.agents/skills/` when it edits plugin Lua or the test harness.
+`.agents/skills/` when it works with plugin Lua or test harness files.
 
 Run `test/check.py` for development checks, `test/runtime.py` for integration
 tests with an internal probe, `test/e2e.py` for black-box terminal tests,

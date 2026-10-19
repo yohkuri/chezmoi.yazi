@@ -583,18 +583,21 @@ skipped a hidden file, `.github/`, and a Git-ignored directory, the scope the
 hook formats. Loading the hook in a Claude Code session is not recorded here.
 
 On 2026-10-20, `test/test_skills.py` was added to the harness unit tests, and
-`test/check.py` passed with 51 core and 73 action policy assertions and 52
-Python tests (49 before). Its fixture cases build temporary Git repositories
-with staged and untracked files: correct links, including file names with a
-space and with Japanese text, pass; it reports exactly a missing link, a copied
-file, a link with the wrong relative target, a link to a missing skill file, a
-link to a Git-ignored skill file, and a link to a skill directory or to the
-whole skills directory, each once and with its reason. Removing the real link
-in a temporary worktree made the repository case fail with the expected
-target. With `GIT_DIR`, `GIT_INDEX_FILE` and `GIT_WORK_TREE` pointing at a
-throwaway repository, the tests still passed and left that repository's files
-unchanged. Claude Code offered the skill through the link in the session that
-added it; the path rules taking effect on an edit is not recorded here.
+`test/check.py` passed on macOS with Git 2.54.0, with 51 core and 73 action
+policy assertions and 52 Python tests (49 before). Its fixture cases build
+temporary Git repositories with staged and untracked files: correct links,
+including file names with a space and with Japanese text, pass; it reports
+exactly a missing link, a copied file, a link with the wrong relative target, a
+link to a missing skill file, a link to a Git-ignored skill file, a correct link
+that Git ignores, and a link to a skill directory or to the whole skills
+directory, each once and with its reason. Removing the real link in a temporary
+worktree made the repository case fail with the expected target. With `GIT_DIR`,
+`GIT_INDEX_FILE` and `GIT_WORK_TREE` pointing at a throwaway repository, the
+tests still passed and left that repository's files unchanged, and with a global
+Git ignore of `.claude/` under a substituted `HOME`, the fixture cases still
+passed. Claude Code offered the skill through the link in the session that added
+it; the path rules taking effect is not recorded here. On Linux, only CI's run
+of the same unit tests covers it.
 
 The initial project commit range from `main` to the pull request head passed
 the local commit validator and the pull request's `checks` job. The isolated
