@@ -1,4 +1,4 @@
-"""The hooks in .githooks refuse a commit on main and a push to it, here only."""
+"""The hooks in .githooks refuse a commit on main, and a push to it here."""
 import subprocess
 import tempfile
 import unittest
@@ -13,6 +13,8 @@ THIS = [
     "git@github.com:yohkuri/chezmoi.yazi.git",
     "ssh://git@github.com/yohkuri/chezmoi.yazi.git",
     "ssh://git@ssh.github.com:443/yohkuri/chezmoi.yazi.git",
+    "ssh://git@github.com:22/yohkuri/chezmoi.yazi.git",
+    "github.com:yohkuri/chezmoi.yazi.git",
 ]
 OTHER = [
     "https://github.com/someone/chezmoi.yazi.git",
@@ -50,8 +52,8 @@ class PreCommitTests(unittest.TestCase):
             self.git("config", "remote.origin.url", origin)
         return hook("pre-commit", cwd=self.root, **env)
 
-    def test_refuses_main_of_this_repository(self):
-        for url in THIS:
+    def test_refuses_main_whatever_the_origin(self):
+        for url in [None, *THIS, *OTHER]:
             with self.subTest(url=url):
                 result = self.commit(url)
                 self.assertEqual(result.returncode, 1)
@@ -60,14 +62,6 @@ class PreCommitTests(unittest.TestCase):
     def test_refuses_main_beside_a_tag_named_main(self):
         self.git("tag", "main")
         self.assertEqual(self.commit(THIS[0]).returncode, 1)
-
-    def test_allows_no_origin(self):
-        self.assertEqual(self.commit().returncode, 0)
-
-    def test_allows_other_repositories(self):
-        for url in OTHER:
-            with self.subTest(url=url):
-                self.assertEqual(self.commit(url).returncode, 0)
 
     def test_allows_other_branches(self):
         self.assertEqual(self.commit(THIS[0], "fix/main").returncode, 0)
