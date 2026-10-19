@@ -359,7 +359,8 @@ hook, so `test/check.py` remains the formatting check. Rules under
 
 Run `test/check.py` for development checks, `test/runtime.py` for integration
 tests with an internal probe, `test/e2e.py` for black-box terminal tests,
-`test/manual.py` for an interactive fixture, or `test/benchmark.py` for
+`test/manual.py` for an interactive fixture, `test/manual_runtime.py` for
+automated terminal checks of that fixture's guide, or `test/benchmark.py` for
 acquisition measurements. Run these commands from the repository root with
 the required tools on `PATH`; none invokes mise.
 
