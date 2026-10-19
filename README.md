@@ -347,13 +347,12 @@ job runs the black-box E2E smoke scenario with pinned Yazi and chezmoi release
 binaries.
 
 No Git hooks are installed automatically. `.githooks/pre-commit` refuses a
-commit on `main`, in a fork too, where changes also go through a topic branch.
-`.githooks/pre-push` refuses a push to `main` only when the remote is this
-GitHub repository, so pushing a fork's `main` is left alone. Branch protection
-refuses such a push anyway; the hooks refuse it earlier and print how to move
-the commits to a topic branch. Install them once per clone; these
-lines also work from a linked worktree, and `ln` refuses to replace a hook
-that is already there:
+commit on `main`, in a fork too, and `.githooks/pre-push` a push to `main` of
+this GitHub repository; both print how to move the commits to a topic branch.
+Branch protection on GitHub refuses such a push anyway; the hooks only catch
+it earlier.
+Install them once per clone; these lines also work from a linked worktree, and
+`ln` refuses to replace a hook that is already there:
 
 ```sh
 common=$(git rev-parse --path-format=absolute --git-common-dir)

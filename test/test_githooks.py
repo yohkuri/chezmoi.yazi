@@ -42,39 +42,39 @@ class PreCommitTests(unittest.TestCase):
     def git(self, *args):
         return git(self.root, *args, env=ISOLATED)
 
-    def commit(self, origin=None, branch="main", **env):
+    def commit(self, branch="main", **env):
         """Run the hook on branch, or on a detached HEAD for None."""
         if branch:
             self.git("symbolic-ref", "HEAD", f"refs/heads/{branch}")
         else:
             self.git("switch", "--quiet", "--detach")
-        if origin is not None:
-            self.git("config", "remote.origin.url", origin)
         return hook("pre-commit", cwd=self.root, **env)
 
+    def test_refuses_main_without_origin(self):
+        result = self.commit()
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("refusing a commit on `main`", result.stderr)
+
     def test_refuses_main_whatever_the_origin(self):
-        for url in [None, *THIS, *OTHER]:
+        for url in [THIS[0], OTHER[0]]:
             with self.subTest(url=url):
-                result = self.commit(url)
-                self.assertEqual(result.returncode, 1)
-                self.assertIn("refusing a commit on `main`", result.stderr)
+                self.git("config", "remote.origin.url", url)
+                self.assertEqual(self.commit().returncode, 1)
 
     def test_refuses_main_beside_a_tag_named_main(self):
         self.git("tag", "main")
-        self.assertEqual(self.commit(THIS[0]).returncode, 1)
+        self.assertEqual(self.commit().returncode, 1)
 
     def test_allows_other_branches(self):
-        self.assertEqual(self.commit(THIS[0], "fix/main").returncode, 0)
+        self.assertEqual(self.commit("fix/main").returncode, 0)
 
     def test_allows_a_detached_head(self):
-        self.assertEqual(self.commit(THIS[0], None).returncode, 0)
+        self.assertEqual(self.commit(None).returncode, 0)
 
     def test_override(self):
-        self.commit(THIS[0])
         for value, code in [("1", 0), ("yes", 1), ("true", 1), ("0", 1), ("FALSE", 1), ("off", 1), ("", 1)]:
             with self.subTest(value=value):
-                result = hook("pre-commit", cwd=self.root, CHEZMOI_YAZI_COMMIT_ON_MAIN=value)
-                self.assertEqual(result.returncode, code)
+                self.assertEqual(self.commit(CHEZMOI_YAZI_COMMIT_ON_MAIN=value).returncode, code)
 
 
 class PrePushTests(unittest.TestCase):

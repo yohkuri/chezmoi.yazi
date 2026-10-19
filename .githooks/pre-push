@@ -7,11 +7,10 @@
 # GitHub accepts any case, a trailing slash and an optional `.git`, SSH with or
 # without a user, and SSH on port 22 or on 443 at ssh.github.com, so the URL is
 # folded before it is compared. The character before `github.com` keeps out a
-# host that merely ends in it.
+# host that merely ends in it; the leading `/` gives one to SSH without a user.
 remote_url=$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')
 remote_url=${remote_url%/}
-case "${remote_url%.git}" in
-github.com:yohkuri/chezmoi.yazi) ;;
+case "/${remote_url%.git}" in
 *[/@.]github.com[:/]yohkuri/chezmoi.yazi) ;;
 *[/@.]github.com:22/yohkuri/chezmoi.yazi | *[/@.]github.com:443/yohkuri/chezmoi.yazi) ;;
 *) exit 0 ;;
