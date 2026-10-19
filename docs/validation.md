@@ -393,11 +393,11 @@ configuration is installed, no real dotfiles are applied, and no user Git
 history is changed. The public age-manual key in the fixture protects only
 disposable test data.
 
-The CI workflow runs the same Markdown, skill link, LuaLS, StyLua, and pure
-test checks as `test/check.py`, including Python syntax and harness unit
-tests. It additionally runs the pure suite and syntax checks on Lua 5.1 and
-5.4, and validates commit messages with commitlint and the ASCII check. A
-separate Ubuntu 24.04 job downloads SHA-256-pinned Yazi 26.9.1 and chezmoi 2.72.2
+The CI workflow runs the same Markdown, LuaLS, StyLua, and pure test checks
+as `test/check.py`, including Python syntax and harness unit tests. It
+additionally runs the pure suite and syntax checks on Lua 5.1 and 5.4, and
+validates commit messages with commitlint and the ASCII check. A separate
+Ubuntu 24.04 job downloads SHA-256-pinned Yazi 26.9.1 and chezmoi 2.72.2
 binaries and runs `test/e2e.py --smoke`; failure captures and logs are uploaded
 as artifacts. It does not run the full runtime or E2E suites. On 2026-09-20,
 both required jobs completed successfully for pull request #1: `checks` and
@@ -582,17 +582,19 @@ StyLua 2.6.0, `stylua --check .` reported a root and a subdirectory file and
 skipped a hidden file, `.github/`, and a Git-ignored directory, the scope the
 hook formats. Loading the hook in a Claude Code session is not recorded here.
 
-On 2026-10-19, `scripts/check-skills.sh` passed ShellCheck and was run with
-macOS's Bash 3.2 against temporary Git repositories. It passed with one
-symlink per skill file, including file names with a space and with Japanese
-text. It failed, printing a command that fixes it, for a missing link, a
-missing link for a file with a space, a skill file not yet added to Git, a
-copied file, and a link with the wrong relative target. It failed for a link
-whose skill file does not exist, and for a link to the skill directory instead
-of its files, which it reports once with the directory to remove. Following
-the printed fixes for the directory link and for the file with a space made it
-pass. Claude Code offered the skill through the link in the session that added
-it; the path rules taking effect on an edit is not recorded here.
+On 2026-10-20, `test/test_skills.py` was added to the harness unit tests, and
+`test/check.py` passed with 51 core and 73 action policy assertions and 52
+Python tests (49 before). Its fixture cases build temporary Git repositories
+with staged and untracked files: correct links, including file names with a
+space and with Japanese text, pass; it reports exactly a missing link, a copied
+file, a link with the wrong relative target, a link to a missing skill file, a
+link to a Git-ignored skill file, and a link to a skill directory or to the
+whole skills directory, each once and with its reason. Removing the real link
+in a temporary worktree made the repository case fail with the expected
+target. With `GIT_DIR`, `GIT_INDEX_FILE` and `GIT_WORK_TREE` pointing at a
+throwaway repository, the tests still passed and left that repository's files
+unchanged. Claude Code offered the skill through the link in the session that
+added it; the path rules taking effect on an edit is not recorded here.
 
 The initial project commit range from `main` to the pull request head passed
 the local commit validator and the pull request's `checks` job. The isolated
