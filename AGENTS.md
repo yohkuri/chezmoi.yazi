@@ -22,8 +22,8 @@ Private conversation with the user may use their preferred language.
   open a pull request targeting `main`, validate and review it, then merge it.
 - Never commit directly to `main` or push changes directly to `main`.
 - Name topic branches `<type>/<short-subject>`, where `<type>` is a commit
-  type that `.commitlintrc.yml` accepts, unless the user specifies a
-  different name.
+  type that `@commitlint/config-conventional` accepts (`.commitlintrc.yml`
+  extends it), unless the user specifies a different name.
 - Every change must go through a pull request before it reaches `main`.
 - Merge pull requests exclusively with **rebase and merge**. Do not use merge
   commits or squash merges.
