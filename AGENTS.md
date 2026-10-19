@@ -19,8 +19,8 @@ Private conversation with the user may use their preferred language.
 - Use GitHub Flow: create a short-lived topic branch from `main`, make changes,
   open a pull request targeting `main`, validate and review it, then merge it.
 - Never commit directly to `main` or push changes directly to `main`.
-- Use the `codex/` prefix for agent-created topic branches unless the user
-  specifies a different branch name.
+- Name topic branches `<type>/<short-subject>`, where `<type>` is a
+  Conventional Commits type, unless the user specifies a different name.
 - Every change must go through a pull request before it reaches `main`.
 - Merge pull requests exclusively with **rebase and merge**. Do not use merge
   commits or squash merges.
