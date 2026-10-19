@@ -1,29 +1,19 @@
 #!/bin/sh
 # Refuse a push that would move `main` on GitHub; AGENTS.md says why, under
-# "GitHub Flow". Every way of making commits -- a commit, merge, cherry-pick,
-# revert, rebase or reset -- has to pass here to reach the remote.
-#
-# Branch protection refuses the same push on the server, for administrators
-# too. This refuses it before the round trip, and says how to move the commits
-# onto a branch. It has no override, since the server would refuse the push
-# anyway.
+# "GitHub Flow". There is no override: branch protection refuses the same push
+# on the server, for administrators too.
 
 # Only for this repository; `pre-commit` explains the matching.
 remote_url=$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')
 remote_url=${remote_url%/}
 case "${remote_url%.git}" in
-*[/@.]github.com[:/]yohkuri/chezmoi.yazi) ;;
-*[/@.]github.com:443/yohkuri/chezmoi.yazi) ;;
+*[/@.]github.com[:/]yohkuri/chezmoi.yazi | *[/@.]github.com:443/yohkuri/chezmoi.yazi) ;;
 *) exit 0 ;;
 esac
 
-refused=
-while read -r _local_ref _local_sha remote_ref _remote_sha; do
-	case "$remote_ref" in
-	refs/heads/main) refused=1 ;;
-	esac
-done
-[ -n "$refused" ] || exit 0
+# Each line is `<local ref> <sha> <remote ref> <sha>`, so the remote ref is the
+# only ref with a space on both sides.
+grep -q ' refs/heads/main ' || exit 0
 
 cat >&2 <<'MSG'
 chezmoi.yazi: refusing a push to `main`.

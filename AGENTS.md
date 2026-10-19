@@ -60,8 +60,8 @@ Private conversation with the user may use their preferred language.
 - Keep test entry points directly executable, such as `test/manual.py`. Their
   shebang invokes uv with the locked environment. Document short commands
   run from the repository root; do not require wrapper command chains.
-- Run `test/check.py` for Markdown, LuaLS, StyLua, pure Lua tests, and
-  Python syntax and harness unit tests.
+- Run `test/check.py` for Markdown, LuaLS, StyLua, ShellCheck, pure Lua
+  tests, and Python syntax and harness unit tests.
   Install development dependencies with `npm ci --ignore-scripts` and
   `npm run setup:types` first; see README for external tool versions.
 - Validate commit messages with `npm run lint:commits -- BASE HEAD`, or
