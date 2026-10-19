@@ -347,10 +347,11 @@ job runs the black-box E2E smoke scenario with pinned Yazi and chezmoi release
 binaries.
 
 No Git hooks are installed automatically. `.githooks/pre-commit` refuses a
-commit on `main` and `.githooks/pre-push` a push to it, both only when the
-remote is this GitHub repository, so a fork's `main` is left alone. Branch
-protection refuses such a push anyway; the hooks refuse it earlier and print
-how to move the commits to a topic branch. Install them once per clone; these
+commit on `main`, in a fork too, where changes also go through a topic branch.
+`.githooks/pre-push` refuses a push to `main` only when the remote is this
+GitHub repository, so pushing a fork's `main` is left alone. Branch protection
+refuses such a push anyway; the hooks refuse it earlier and print how to move
+the commits to a topic branch. Install them once per clone; these
 lines also work from a linked worktree, and `ln` refuses to replace a hook
 that is already there:
 
@@ -359,9 +360,13 @@ common=$(git rev-parse --path-format=absolute --git-common-dir)
 ln -s "${common%/.git}/.githooks"/* "$common/hooks/"
 ```
 
+The links follow whatever the main worktree has checked out, so the hooks stop
+running while it is at a commit without `.githooks/`.
+
 A `core.hooksPath` setting replaces `.git/hooks`, so with one set, these hooks
 run only if the hooks in that path pass control on to `.git/hooks`.
-`test/test_githooks.py` checks which remotes and refs they refuse.
+`test/test_githooks.py` checks which remotes and refs they refuse. CI runs
+the ShellCheck that its runner image provides.
 
 Claude Code also reads the tracked `.claude/settings.json`. After its `Write`
 or `Edit` tool touches a Lua file, the settings run `scripts/format-lua-hook.sh`.

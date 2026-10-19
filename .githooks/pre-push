@@ -3,11 +3,17 @@
 # "GitHub Flow". There is no override: branch protection refuses the same push
 # on the server, for administrators too.
 
-# Only for this repository; `pre-commit` explains the matching.
+# Only for this repository: pushing a fork's main is an ordinary thing to do.
+# GitHub accepts any case, a trailing slash and an optional `.git`, SSH with or
+# without a user, and SSH on port 22 or on 443 at ssh.github.com, so the URL is
+# folded before it is compared. The character before `github.com` keeps out a
+# host that merely ends in it.
 remote_url=$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')
 remote_url=${remote_url%/}
 case "${remote_url%.git}" in
-*[/@.]github.com[:/]yohkuri/chezmoi.yazi | *[/@.]github.com:443/yohkuri/chezmoi.yazi) ;;
+github.com:yohkuri/chezmoi.yazi) ;;
+*[/@.]github.com[:/]yohkuri/chezmoi.yazi) ;;
+*[/@.]github.com:22/yohkuri/chezmoi.yazi | *[/@.]github.com:443/yohkuri/chezmoi.yazi) ;;
 *) exit 0 ;;
 esac
 
@@ -21,10 +27,14 @@ chezmoi.yazi: refusing a push to `main`.
   main moves only when a pull request is merged; branch protection would
   refuse this push on GitHub as well.
 
-  Move main's commits to a topic branch, push it, and open a pull request:
+  Open a pull request from a topic branch instead. If the commits are on
+  your local main, move them to one first:
 
       git switch -c <type>/<short-subject> main
       git branch -f main origin/main
+
+  Then push the topic branch and open the pull request:
+
       git push -u origin HEAD
       gh pr create
 MSG

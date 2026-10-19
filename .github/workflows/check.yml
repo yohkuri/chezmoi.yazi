@@ -44,7 +44,7 @@ jobs:
           echo "$RUNNER_TEMP/stylua" >> "$GITHUB_PATH"
       - name: Install pinned Yazi type definitions
         run: npm run setup:types
-      - name: Check Markdown, Lua, formatting, and Python harness
+      - name: Check Markdown, Lua, formatting, shell, and Python harness
         run: test/check.py
       - name: Check Lua syntax and older-version compatibility
         run: |

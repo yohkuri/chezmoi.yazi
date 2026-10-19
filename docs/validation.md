@@ -601,25 +601,28 @@ of the same unit tests covers it.
 
 On 2026-10-20, `test/check.py` began running ShellCheck on `.githooks/*` and
 `scripts/*.sh`, which passed with ShellCheck 0.11.0, and `test/test_githooks.py`
-brought it to 63 Python tests (52 before) on macOS with Git 2.54.0. It refuses a
-commit on `main` and a push to `refs/heads/main` for six spellings of this
-repository's GitHub URL, including case, a trailing slash, SSH and
-`ssh.github.com:443`, and a commit on `main` beside a tag named `main`; it
-allows a fork, a lookalike host, a longer repository name, an unrelated local
-path, no `origin`, another branch or ref, pushing local `main` to another
-branch, and a detached HEAD. Only `CHEZMOI_YAZI_COMMIT_ON_MAIN=1` lets a commit
-through, and the tests pass with it exported. Each of 14 single edits to the
-first version of the hooks, such as dropping the host boundary or the case
-folding, and of the lines changed by review and simplification failed at least
-one test; the message text is checked by hand only. In a temporary clone with
-the hooks installed by the README lines from a linked worktree, a real `git
-commit` on `main` and `git push --dry-run` of `main`, by remote name and by URL,
-were refused through a global `core.hooksPath` that passes control on to
-`.git/hooks`; the override let the commit through, and the commands the message
-suggests moved it to a topic branch, also when run from another branch. The URL
-match is by suffix, so a local path ending in `github.com/yohkuri/chezmoi.yazi`
-is refused too, while an SSH host alias is not recognized. Without
-`core.hooksPath`, and on Linux beyond CI's unit tests, the hooks were not run.
+brought it to 61 Python tests (52 before) on macOS with Git 2.54.0. `pre-commit`
+refuses a commit on `main` with no `origin`, with any of eight spellings of this
+repository's GitHub URL, and with a fork or another remote, and also beside a
+tag named `main`; it allows another branch and a detached HEAD, and only
+`CHEZMOI_YAZI_COMMIT_ON_MAIN=1` lets a commit through, with the tests passing
+while it is exported. `pre-push` refuses a push to `refs/heads/main` for the
+eight spellings, including case, a trailing slash, SSH with and without a user,
+and ports 22 and 443; it allows a fork, a lookalike host, a longer repository
+name, an unrelated local path, another ref, and pushing local `main` to another
+branch. Single edits to the hooks, such as dropping the host boundary, the case
+folding, a URL spelling or the full ref comparison, each failed at least one
+test; the message text is checked by hand only. In temporary clones with the
+hooks installed by the README lines, a real `git commit` on `main` was refused,
+with a fork as `origin` too, and `git push --dry-run` of `main`, by remote name,
+by URL and as `HEAD:main` from a topic branch, was refused through a global
+`core.hooksPath` that passes control on to `.git/hooks`; a push to another
+branch name went through. The override let the commit through, and the commands
+the message suggests moved a commit on `main` to a topic branch, also when run
+from another branch. The URL match is by suffix, so a local path ending in
+`github.com/yohkuri/chezmoi.yazi` is refused too, while an SSH host alias is not
+recognized. Without `core.hooksPath`, and on Linux beyond CI's unit tests, the
+hooks were not run.
 
 The initial project commit range from `main` to the pull request head passed
 the local commit validator and the pull request's `checks` job. The isolated
