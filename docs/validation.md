@@ -601,19 +601,25 @@ of the same unit tests covers it.
 
 On 2026-10-20, `.githooks/pre-commit` and `.githooks/pre-push` passed ShellCheck
 0.11.0 with `scripts/*.sh`, and `test/test_githooks.py` brought `test/check.py`
-to 61 Python tests (52 before) on macOS with Git 2.54.0. It refuses a commit on
+to 62 Python tests (52 before) on macOS with Git 2.54.0. It refuses a commit on
 `main` and a push to `refs/heads/main` for six spellings of this repository's
 GitHub URL, including case, a trailing slash, SSH and `ssh.github.com:443`,
-and for a missing remote; it allows a fork, a lookalike host, a longer
-repository name, a local path, another branch or ref, and a detached HEAD.
-Each of 14 single edits to the hooks, such as dropping the host boundary or
-the case folding, failed at least one test. In a temporary clone with the
-hooks installed by the README lines from a linked worktree, a real
-`git commit` on `main` and `git push --dry-run` of `main`, by remote name and by
-URL, were refused through a global `core.hooksPath` that passes control on to
+and a commit on `main` beside a tag named `main`; it allows a fork, a lookalike
+host, a longer repository name, an unrelated local path, no `origin`, another
+branch or ref, and a detached HEAD. Only `CHEZMOI_YAZI_COMMIT_ON_MAIN=1` lets a
+commit through, and the tests pass with it exported. Each of 14 single edits
+to the first version of the hooks, such as dropping the host boundary or the
+case folding, and of 3 to the lines review changed failed at least one test;
+the message text is checked by hand only. In a temporary clone with the hooks
+installed by the README lines from a linked worktree, a real `git commit` on
+`main` and `git push --dry-run` of `main`, by remote name and by URL, were
+refused through a global `core.hooksPath` that passes control on to
 `.git/hooks`; the override let the commit through, and the commands the
-message suggests moved it to a topic branch. Without `core.hooksPath`, and on
-Linux beyond CI's unit tests, the hooks were not run.
+message suggests moved it to a topic branch, also when run from another
+branch. The URL match is by suffix, so a local path ending in
+`github.com/yohkuri/chezmoi.yazi` is refused too, while an SSH host alias is
+not recognized. Without `core.hooksPath`, and on Linux beyond CI's unit tests,
+the hooks were not run.
 
 The initial project commit range from `main` to the pull request head passed
 the local commit validator and the pull request's `checks` job. The isolated

@@ -23,7 +23,9 @@ OTHER = [
 
 
 def hook(name, *args, cwd, stdin="", **env):
-    return subprocess.run([HOOKS / name, *args], cwd=cwd, env=dict(ISOLATED, **env), input=stdin,
+    # An override exported in the developer's shell must not decide the result.
+    env = {**ISOLATED, "CHEZMOI_YAZI_COMMIT_ON_MAIN": "", **env}
+    return subprocess.run([HOOKS / name, *args], cwd=cwd, env=env, input=stdin,
                           capture_output=True, text=True, timeout=10)
 
 
@@ -47,8 +49,14 @@ class PreCommitTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 1)
                 self.assertIn("refusing a commit on `main`", result.stderr)
 
-    def test_refuses_main_without_origin(self):
-        self.assertEqual(self.commit().returncode, 1)
+    def test_refuses_main_beside_a_tag_named_main(self):
+        git(self.root, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "--quiet", "--allow-empty",
+            "--no-verify", "-m", "x", env=ISOLATED)
+        git(self.root, "tag", "main", env=ISOLATED)
+        self.assertEqual(self.commit(THIS[0]).returncode, 1)
+
+    def test_allows_no_origin(self):
+        self.assertEqual(self.commit().returncode, 0)
 
     def test_allows_other_repositories(self):
         for url in OTHER:
@@ -66,7 +74,7 @@ class PreCommitTests(unittest.TestCase):
         self.assertEqual(hook("pre-commit", cwd=self.root).returncode, 0)
 
     def test_override(self):
-        for value, code in [("1", 0), ("yes", 0), ("0", 1), ("false", 1), ("no", 1), ("", 1)]:
+        for value, code in [("1", 0), ("yes", 1), ("true", 1), ("0", 1), ("FALSE", 1), ("off", 1), ("", 1)]:
             with self.subTest(value=value):
                 self.assertEqual(self.commit(THIS[0], CHEZMOI_YAZI_COMMIT_ON_MAIN=value).returncode, code)
 
@@ -78,7 +86,7 @@ class PrePushTests(unittest.TestCase):
             return hook("pre-push", "origin", url, cwd=directory, stdin=lines)
 
     def test_refuses_main_on_this_repository(self):
-        for url in [*THIS, ""]:
+        for url in THIS:
             with self.subTest(url=url):
                 result = self.push(url, "refs/heads/fix/a", "refs/heads/main")
                 self.assertEqual(result.returncode, 1)

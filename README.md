@@ -350,11 +350,12 @@ commit on `main` and `.githooks/pre-push` a push to it, both only when the
 remote is this GitHub repository, so a fork's `main` is left alone. Branch
 protection refuses such a push anyway; the hooks refuse it earlier and print
 how to move the commits to a topic branch. Install them once per clone; these
-lines also work from a linked worktree:
+lines also work from a linked worktree, and `ln` refuses to replace a hook
+that is already there:
 
 ```sh
 common=$(git rev-parse --path-format=absolute --git-common-dir)
-ln -sf "${common%/.git}/.githooks"/* "$common/hooks/"
+ln -s "${common%/.git}/.githooks"/* "$common/hooks/"
 ```
 
 A `core.hooksPath` setting replaces `.git/hooks`, so with one set, these hooks
