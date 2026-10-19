@@ -22,6 +22,8 @@ Private conversation with the user may use their preferred language.
 - Use GitHub Flow: create a short-lived topic branch from `main`, make changes,
   open a pull request targeting `main`, validate and review it, then merge it.
 - Never commit directly to `main` or push changes directly to `main`.
+  `.githooks/pre-commit` and `.githooks/pre-push` refuse both for this
+  repository's GitHub remote; README says how to install them per clone.
 - Name topic branches `<type>/<short-subject>`, where `<type>` is a commit
   type that `@commitlint/config-conventional` accepts (`.commitlintrc.yml`
   extends it), unless the user specifies a different name.

@@ -343,7 +343,24 @@ and excludes emojis. Subject length above 50 is a warning; header length above
 including all commits on a newly created branch. It also runs `npm run check`
 and Lua 5.5.1 syntax and Lua 5.1/5.4 compatibility checks. A separate Ubuntu
 job runs the black-box E2E smoke scenario with pinned Yazi and chezmoi release
-binaries. No Git hooks are installed automatically.
+binaries.
+
+No Git hooks are installed automatically. `.githooks/pre-commit` refuses a
+commit on `main` and `.githooks/pre-push` a push to it, both only when the
+remote is this GitHub repository, so a fork's `main` is left alone. Branch
+protection refuses such a push anyway; the hooks refuse it earlier and print
+how to move the commits to a topic branch. Install them once per clone; these
+lines also work from a linked worktree:
+
+```sh
+common=$(git rev-parse --path-format=absolute --git-common-dir)
+ln -sf "${common%/.git}/.githooks"/* "$common/hooks/"
+```
+
+A `core.hooksPath` setting replaces `.git/hooks`, so with one set, these hooks
+run only if the hooks in that path pass control on to `.git/hooks`.
+`test/test_githooks.py` checks which remotes and refs they refuse, and CI runs
+ShellCheck on them and on `scripts/*.sh`.
 
 Claude Code also reads the tracked `.claude/settings.json`. After its `Write`
 or `Edit` tool touches a Lua file, the settings run `scripts/format-lua-hook.sh`.

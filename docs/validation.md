@@ -599,6 +599,22 @@ passed. Claude Code offered the skill through the link in the session that added
 it; the path rules taking effect is not recorded here. On Linux, only CI's run
 of the same unit tests covers it.
 
+On 2026-10-20, `.githooks/pre-commit` and `.githooks/pre-push` passed ShellCheck
+0.11.0 with `scripts/*.sh`, and `test/test_githooks.py` brought `test/check.py`
+to 61 Python tests (52 before) on macOS with Git 2.54.0. It refuses a commit on
+`main` and a push to `refs/heads/main` for six spellings of this repository's
+GitHub URL, including case, a trailing slash, SSH and `ssh.github.com:443`,
+and for a missing remote; it allows a fork, a lookalike host, a longer
+repository name, a local path, another branch or ref, and a detached HEAD.
+Each of 14 single edits to the hooks, such as dropping the host boundary or
+the case folding, failed at least one test. In a temporary clone with the
+hooks installed by the README lines from a linked worktree, a real
+`git commit` on `main` and `git push --dry-run` of `main`, by remote name and by
+URL, were refused through a global `core.hooksPath` that passes control on to
+`.git/hooks`; the override let the commit through, and the commands the
+message suggests moved it to a topic branch. Without `core.hooksPath`, and on
+Linux beyond CI's unit tests, the hooks were not run.
+
 The initial project commit range from `main` to the pull request head passed
 the local commit validator and the pull request's `checks` job. The isolated
 Git histories above remain the negative-case coverage for invalid messages.
