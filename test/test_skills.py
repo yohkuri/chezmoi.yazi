@@ -14,22 +14,26 @@ HOW = """Claude Code reads skills from .claude/skills. Give each file under
 # A hook or `git rebase -x` sets GIT_DIR or GIT_INDEX_FILE, which would point
 # these commands at the caller's repository instead of the one named by cwd.
 ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+# The fixture repositories must not see the developer's global ignores, which
+# could hide the very paths a case plants.
+ISOLATED = dict(ENV, GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM="1")
 
 
-def git(root, *args):
-    return run(["git", *args], cwd=root, env=ENV)
+def git(root, *args, env=ENV):
+    return run(["git", *args], cwd=root, env=env)
 
 
-def listed(root, path):
+def listed(root, path, env=ENV):
     # Untracked files count, so a new skill is checked before it is committed;
     # ignored ones do not, since a clone would not have them.
-    out = git(root, "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", path)
-    return [Path(name) for name in out.split("\0") if name]
+    out = git(root, "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", path, env=env)
+    return {Path(name) for name in out.split("\0") if name}
 
 
-def problems(root):
+def problems(root, env=ENV):
     root = Path(root)
-    sources = listed(root, ".agents/skills")
+    sources = listed(root, ".agents/skills", env)
+    links = listed(root, ".claude/skills", env)
     found, dirs = [], set()
 
     def under_dir_link(link):
@@ -43,7 +47,7 @@ def problems(root):
                 return True
         return False
 
-    for source in sources:
+    for source in sorted(sources):
         link = Path(".claude/skills", *source.parts[2:])
         target = os.path.relpath(source, link.parent)
         if under_dir_link(link):
@@ -51,7 +55,9 @@ def problems(root):
         actual = os.readlink(root / link) if (root / link).is_symlink() else None
         if actual != target:
             found.append(f"{link}: must be a symlink to {target}, not {actual or 'missing or a copy'}")
-    for link in listed(root, ".claude/skills"):
+        elif link not in links:
+            found.append(f"{link}: ignored by Git, so it would never be committed")
+    for link in sorted(links):
         source = Path(".agents/skills", *link.parts[2:])
         if not under_dir_link(link) and source not in sources:
             found.append(f"{link}: nothing listed at {source} for it to point at")
@@ -67,28 +73,30 @@ class SkillLinkTests(unittest.TestCase):
     def test_reports_each_mismatch(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            git(root, "-c", "init.templateDir=", "init", "--quiet")
+            git(root, "-c", "init.templateDir=", "init", "--quiet", env=ISOLATED)
             names = ["ok.md", "my notes.md", "日本語.md", "missing.md", "copy.md", "wrong.md"]
             for skill in "ab":
                 (root / ".agents/skills" / skill).mkdir(parents=True)
                 for name in names:
                     write(root / ".agents/skills" / skill / name, "x\n")
-            write(root / ".gitignore", "/.agents/skills/a/ignored.md\n")
+            write(root / ".gitignore", "/.agents/skills/a/ignored.md\n/.claude/skills/a/hidden.md\n")
+            write(root / ".agents/skills/a/hidden.md", "x\n")
             write(root / ".agents/skills/a/ignored.md", "x\n")
             (root / ".claude/skills/a").mkdir(parents=True)
-            for name in ["ok.md", "my notes.md", "日本語.md", "ignored.md", "gone.md"]:
+            for name in ["ok.md", "my notes.md", "日本語.md", "ignored.md", "gone.md", "hidden.md"]:
                 (root / ".claude/skills/a" / name).symlink_to(f"../../../.agents/skills/a/{name}")
             shutil.copy(root / ".agents/skills/a/copy.md", root / ".claude/skills/a/copy.md")
             (root / ".claude/skills/a/wrong.md").symlink_to("../../.agents/skills/a/wrong.md")
             (root / ".claude/skills/b").symlink_to("../../.agents/skills/b")
             # Staged and untracked files are both listed.
-            git(root, "add", ".agents/skills/a", ".claude/skills/a/ok.md")
-            sources, found = problems(root)
+            git(root, "add", ".agents/skills/a", ".claude/skills/a/ok.md", env=ISOLATED)
+            sources, found = problems(root, ISOLATED)
             self.assertIn(Path(".agents/skills/a/ok.md"), sources)
             self.assertEqual(sorted(found), [
                 ".claude/skills/a/copy.md: must be a symlink to ../../../.agents/skills/a/copy.md, "
                 "not missing or a copy",
                 ".claude/skills/a/gone.md: nothing listed at .agents/skills/a/gone.md for it to point at",
+                ".claude/skills/a/hidden.md: ignored by Git, so it would never be committed",
                 ".claude/skills/a/ignored.md: nothing listed at .agents/skills/a/ignored.md for it to point at",
                 ".claude/skills/a/missing.md: must be a symlink to ../../../.agents/skills/a/missing.md, "
                 "not missing or a copy",
@@ -100,12 +108,12 @@ class SkillLinkTests(unittest.TestCase):
     def test_reports_a_linked_skills_directory(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            git(root, "-c", "init.templateDir=", "init", "--quiet")
+            git(root, "-c", "init.templateDir=", "init", "--quiet", env=ISOLATED)
             (root / ".agents/skills/a").mkdir(parents=True)
             write(root / ".agents/skills/a/SKILL.md", "x\n")
             (root / ".claude").mkdir()
             (root / ".claude/skills").symlink_to("../.agents/skills")
-            self.assertEqual(problems(root)[1], [
+            self.assertEqual(problems(root, ISOLATED)[1], [
                 ".claude/skills: a symlink to a directory; remove it and link each file"])
 
 

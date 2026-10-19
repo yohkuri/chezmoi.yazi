@@ -28,7 +28,8 @@ Every change runs `test/check.py`. Then, by what changed:
   Most harness files are shared by two or three of these suites, and each
   reads a different kind of evidence, so one passing says nothing for the
   others.
-- **Docs, `test/MANUAL.md` included, CI or tooling alone**: nothing more.
+- **Docs (`test/MANUAL.md` included), CI or tooling (`test/check.py`
+  included) alone**: nothing more.
 
 ## What each suite cannot establish
 

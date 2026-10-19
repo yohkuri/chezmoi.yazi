@@ -3,10 +3,11 @@
 These are the canonical instructions for AI agents in this repository. Claude
 Code reads them through `CLAUDE.md`; other agents read this file directly. Keep
 rules here instead of copying them into agent-specific files. The tracked
-`.claude/settings.json` only assists Claude Code: it asks before the common
-merge commands and pushes that name `main`, which other spellings can bypass,
-and formats Lua files that `Write` or `Edit` touches. The rules in this file
-apply regardless.
+`.claude/` files only assist Claude Code: `settings.json` asks before the
+common merge commands and pushes that name `main`, which other spellings can
+bypass, and formats Lua files that `Write` or `Edit` touches; `rules/` and
+`skills/` point it at the skills under `.agents/skills/`. The rules in this
+file apply regardless.
 
 ## Language
 
@@ -72,9 +73,10 @@ Private conversation with the user may use their preferred language.
   argument when validating git.yazi coexistence.
 - Unit tests do not establish real rendering, fetcher, or shared-state behavior.
   State precisely which checks ran and which platforms remain unverified.
-- Before validating a change or reporting what was validated, read
-  `.agents/skills/verify-chezmoi-yazi/SKILL.md`. Skills live under
-  `.agents/skills/`; `test/test_skills.py` says how Claude Code reaches them.
+- Before changing the test harness, validating a change, or reporting what
+  was validated, read `.agents/skills/verify-chezmoi-yazi/SKILL.md`. Skills
+  live under `.agents/skills/`; `test/test_skills.py` says how Claude Code
+  reaches them.
 - Use isolated temporary source, destination, config, state, and cache paths,
   and a private tmux socket. Never modify the user's dotfiles or Yazi setup as
   a test side effect. Preview scoped chezmoi changes before scoped apply.
