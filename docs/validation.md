@@ -565,15 +565,22 @@ Locally verified on 2026-09-20:
   status regression rather than only successful process startup.
 
 On 2026-10-19, `scripts/format-lua-hook.sh` passed ShellCheck and was run
-outside Claude Code with sample hook payloads in a temporary Git repository.
-It formatted unformatted Lua at the root and in a subdirectory, including with
-a trailing slash on `CLAUDE_PROJECT_DIR`. It left alone Lua under ignored
-`.dev/` and `.claude/worktrees/`, a non-Lua file, and Lua outside the project,
-including a path that leaves it through `..`. It exited with status 2 and a
-message for a Lua syntax error and for a missing `stylua`. StyLua 2.6.0 was
-used locally; its `--check .` skipped hidden and gitignored directories, which
-matches the hook's scope. Loading the hook in a Claude Code session is not
-recorded here.
+outside Claude Code with sample hook payloads in temporary Git repositories,
+with `CLAUDE_PROJECT_DIR` set to the main checkout. It formatted unformatted
+Lua at the root, in a subdirectory, in a linked worktree under
+`.claude/worktrees/`, and through the `/tmp` alias of the macOS `/private/tmp`
+directory, for the file path and for `CLAUDE_PROJECT_DIR` alike, including with
+a trailing slash. It left alone Lua under `.github/`, `.git/` and ignored
+`.dev/`, a hidden Lua file, Lua in another repository or in no repository,
+including a path that leaves the checkout through `..`, and a non-Lua payload
+without `jq` on `PATH`. It exited with status 2 and a message, leaving the
+file unchanged, without `jq`, Git or `stylua`, when the installed StyLua
+differed from the `STYLUA_VERSION` in the workflow or the pin was missing, and
+for a Lua syntax error. Those runs used StyLua 2.6.0 against a temporary
+workflow that pinned 2.6.0 or 2.5.2; StyLua 2.5.2 itself was not run. With
+StyLua 2.6.0, `stylua --check .` reported a root and a subdirectory file and
+skipped a hidden file, `.github/`, and a Git-ignored directory, the scope the
+hook formats. Loading the hook in a Claude Code session is not recorded here.
 
 The initial project commit range from `main` to the pull request head passed
 the local commit validator and the pull request's `checks` job. The isolated
