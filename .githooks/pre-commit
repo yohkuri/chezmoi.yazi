@@ -1,0 +1,46 @@
+#!/bin/sh
+# Refuse a commit on `main`; AGENTS.md says why, under "GitHub Flow". This
+# catches the mistake before the commit exists. A merge, cherry-pick, revert or
+# rebase can move main without running this hook; `pre-push` refuses all of
+# them before they reach GitHub.
+
+case "$CHEZMOI_YAZI_COMMIT_ON_MAIN" in
+"" | 0 | false | no) ;;
+*) exit 0 ;;
+esac
+
+# Only for this repository: a fork's main belongs to its owner. GitHub accepts
+# any case, a trailing slash and an optional `.git`, and SSH on port 443 at
+# ssh.github.com, so the URL is folded before it is compared. The character
+# before `github.com` keeps out a host that merely ends in it. A missing remote
+# is refused rather than let through.
+origin_url=$(git remote get-url origin 2>/dev/null) || origin_url=
+origin_url=$(printf '%s' "$origin_url" | tr '[:upper:]' '[:lower:]')
+origin_url=${origin_url%/}
+case "${origin_url%.git}" in
+"" | *[/@.]github.com[:/]yohkuri/chezmoi.yazi) ;;
+*[/@.]github.com:443/yohkuri/chezmoi.yazi) ;;
+*) exit 0 ;;
+esac
+
+branch=$(git symbolic-ref --quiet --short HEAD) || exit 0
+[ "$branch" = main ] || exit 0
+
+cat >&2 <<'MSG'
+chezmoi.yazi: refusing a commit on `main`.
+
+  Changes reach main through a pull request, and branch protection refuses
+  any other push to it, so a commit made here cannot be published as it is.
+
+  Commit on a topic branch instead. This also carries over commits already
+  made on main, as long as they are not pushed:
+
+      git switch -c <type>/<short-subject>
+      git branch -f main origin/main
+      git commit
+
+  A deliberate exception is spelled out rather than bypassed wholesale:
+
+      CHEZMOI_YAZI_COMMIT_ON_MAIN=1 git commit ...
+MSG
+exit 1
