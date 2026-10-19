@@ -295,9 +295,9 @@ The leading `@since` annotation enforces the supported Yazi minimum.
 
 ## Development
 
-Install Lua 5.5.1, uv 0.11.19, Node.js 24+, LuaLS 3.19.1, and StyLua 2.5.2
-using your preferred installer; Claude Code users also need `jq`. mise is
-optional. From the repository root, run:
+Install Lua 5.5.1, uv 0.11.19, Node.js 24+, LuaLS 3.19.1, StyLua 2.5.2, and
+ShellCheck using your preferred installer; Claude Code users also need `jq`.
+mise is optional. From the repository root, run:
 
 ```sh
 npm ci --ignore-scripts
@@ -306,8 +306,9 @@ test/check.py
 ```
 
 `npm run check` uses `.markdownlint-cli2.yaml`, `.luarc.json`, and
-`.stylua.toml`, then runs the pure Lua status and action suites, Python syntax checks,
-and harness unit tests. LuaLS checks the plugin and in-Yazi probes as Lua 5.5.
+`.stylua.toml`, runs ShellCheck on `.githooks/*` and `scripts/*.sh`, then runs
+the pure Lua status and action suites, Python syntax checks, and harness unit
+tests. LuaLS checks the plugin and in-Yazi probes as Lua 5.5.
 `test/test_skills.py` checks that every file under `.agents/skills/` has its
 symlink under `.claude/skills/`.
 
@@ -360,8 +361,7 @@ ln -s "${common%/.git}/.githooks"/* "$common/hooks/"
 
 A `core.hooksPath` setting replaces `.git/hooks`, so with one set, these hooks
 run only if the hooks in that path pass control on to `.git/hooks`.
-`test/test_githooks.py` checks which remotes and refs they refuse, and CI runs
-ShellCheck on them and on `scripts/*.sh`.
+`test/test_githooks.py` checks which remotes and refs they refuse.
 
 Claude Code also reads the tracked `.claude/settings.json`. After its `Write`
 or `Edit` tool touches a Lua file, the settings run `scripts/format-lua-hook.sh`.

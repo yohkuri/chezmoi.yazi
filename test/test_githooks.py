@@ -34,12 +34,20 @@ class PreCommitTests(unittest.TestCase):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         self.root = directory.name
-        git(self.root, "-c", "init.templateDir=", "init", "--quiet", env=ISOLATED)
+        self.git("-c", "init.templateDir=", "init", "--quiet")
+        self.git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "--quiet", "--allow-empty", "-m", "x")
+
+    def git(self, *args):
+        return git(self.root, *args, env=ISOLATED)
 
     def commit(self, origin=None, branch="main", **env):
-        git(self.root, "symbolic-ref", "HEAD", f"refs/heads/{branch}", env=ISOLATED)
+        """Run the hook on branch, or on a detached HEAD for None."""
+        if branch:
+            self.git("symbolic-ref", "HEAD", f"refs/heads/{branch}")
+        else:
+            self.git("switch", "--quiet", "--detach")
         if origin is not None:
-            git(self.root, "config", "remote.origin.url", origin, env=ISOLATED)
+            self.git("config", "remote.origin.url", origin)
         return hook("pre-commit", cwd=self.root, **env)
 
     def test_refuses_main_of_this_repository(self):
@@ -50,9 +58,7 @@ class PreCommitTests(unittest.TestCase):
                 self.assertIn("refusing a commit on `main`", result.stderr)
 
     def test_refuses_main_beside_a_tag_named_main(self):
-        git(self.root, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "--quiet", "--allow-empty",
-            "--no-verify", "-m", "x", env=ISOLATED)
-        git(self.root, "tag", "main", env=ISOLATED)
+        self.git("tag", "main")
         self.assertEqual(self.commit(THIS[0]).returncode, 1)
 
     def test_allows_no_origin(self):
@@ -67,22 +73,20 @@ class PreCommitTests(unittest.TestCase):
         self.assertEqual(self.commit(THIS[0], "fix/main").returncode, 0)
 
     def test_allows_a_detached_head(self):
-        git(self.root, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "--quiet", "--allow-empty",
-            "--no-verify", "-m", "x", env=ISOLATED)
-        git(self.root, "switch", "--quiet", "--detach", env=ISOLATED)
-        git(self.root, "config", "remote.origin.url", THIS[0], env=ISOLATED)
-        self.assertEqual(hook("pre-commit", cwd=self.root).returncode, 0)
+        self.assertEqual(self.commit(THIS[0], None).returncode, 0)
 
     def test_override(self):
+        self.commit(THIS[0])
         for value, code in [("1", 0), ("yes", 1), ("true", 1), ("0", 1), ("FALSE", 1), ("off", 1), ("", 1)]:
             with self.subTest(value=value):
-                self.assertEqual(self.commit(THIS[0], CHEZMOI_YAZI_COMMIT_ON_MAIN=value).returncode, code)
+                result = hook("pre-commit", cwd=self.root, CHEZMOI_YAZI_COMMIT_ON_MAIN=value)
+                self.assertEqual(result.returncode, code)
 
 
 class PrePushTests(unittest.TestCase):
-    def push(self, url, *refs):
+    def push(self, url, *refs, local="refs/heads/x"):
         with tempfile.TemporaryDirectory() as directory:
-            lines = "".join(f"refs/heads/x {'1' * 40} {ref} {'0' * 40}\n" for ref in refs)
+            lines = "".join(f"{local} {'1' * 40} {ref} {'0' * 40}\n" for ref in refs)
             return hook("pre-push", "origin", url, cwd=directory, stdin=lines)
 
     def test_refuses_main_on_this_repository(self):
@@ -101,6 +105,9 @@ class PrePushTests(unittest.TestCase):
         for refs in [(), ("refs/heads/fix/main",), ("refs/tags/main",), ("refs/heads/main-notes",)]:
             with self.subTest(refs=refs):
                 self.assertEqual(self.push(THIS[0], *refs).returncode, 0)
+
+    def test_allows_pushing_local_main_elsewhere(self):
+        self.assertEqual(self.push(THIS[0], "refs/heads/fix/a", local="refs/heads/main").returncode, 0)
 
 
 if __name__ == "__main__":

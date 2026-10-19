@@ -58,8 +58,6 @@ jobs:
             luac5.1 -p "$file"
             luac5.4 -p "$file"
           done
-      - name: Check shell scripts
-        run: shellcheck .githooks/* scripts/*.sh
       - name: Check commit messages
         env:
           EVENT_NAME: ${{ github.event_name }}
