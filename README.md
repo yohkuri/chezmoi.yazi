@@ -296,7 +296,8 @@ The leading `@since` annotation enforces the supported Yazi minimum.
 ## Development
 
 Install Lua 5.5.1, uv 0.11.19, Node.js 24+, LuaLS 3.19.1, and StyLua 2.5.2
-using your preferred installer. mise is optional. From the repository root, run:
+using your preferred installer; Claude Code users also need `jq`. mise is
+optional. From the repository root, run:
 
 ```sh
 npm ci --ignore-scripts
@@ -343,11 +344,14 @@ job runs the black-box E2E smoke scenario with pinned Yazi and chezmoi release
 binaries. No Git hooks are installed automatically.
 
 Claude Code also reads the tracked `.claude/settings.json`. After its `Write`
-or `Edit` tool touches a Lua file that Git does not ignore, the settings run
-`scripts/format-lua-hook.sh`, which needs `jq` and StyLua and reports a
-formatting failure back to the agent. The settings also ask before common
-merge commands. Other agents and editors do not run this hook, so
-`test/check.py` remains the formatting check.
+or `Edit` tool touches a Lua file, the settings run `scripts/format-lua-hook.sh`.
+It formats the files that `test/check.py` checks, in this checkout or one of
+its worktrees, and skips hidden and Git-ignored paths. It needs `jq`, Git, and
+the StyLua version that `.github/workflows/check.yml` pins. A missing tool, a
+different StyLua version, or a formatting failure leaves the file unchanged and
+is reported back to the agent. The settings also ask before common merge
+commands and pushes that name `main`. Other agents and editors do not run this
+hook, so `test/check.py` remains the formatting check.
 
 Run `test/check.py` for development checks, `test/runtime.py` for integration
 tests with an internal probe, `test/e2e.py` for black-box terminal tests,
