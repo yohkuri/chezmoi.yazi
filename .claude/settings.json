@@ -3,7 +3,10 @@
     "ask": [
       "Bash(gh pr merge *)",
       "Bash(gh api *pulls/*/merge*)",
-      "Bash(gh api *mergePullRequest*)"
+      "Bash(gh api *mergePullRequest*)",
+      "Bash(gh api *merges*)",
+      "Bash(gh api *mergeBranch*)",
+      "Bash(git push *main*)"
     ]
   },
   "hooks": {
