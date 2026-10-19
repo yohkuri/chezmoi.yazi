@@ -1,51 +1,34 @@
 ---
 name: verify-chezmoi-yazi
 description: >-
-  Which of this plugin's test suites a change needs, what each one cannot
-  establish, and how to report a run. Read before validating a change to the
-  plugin's Lua or to anything under `test/`, and before writing a validation
-  claim into a pull request or `docs/validation.md`. Covers the module-to-suite
-  map, the Lua 5.1 and 5.4 checks that only CI runs, the runtime suite's
-  instrumentation versus the wrapper-free E2E suite, why an automated guide run
-  is not a human acceptance walk, writing terminal-driven checks that wait
-  rather than sleep, fixture isolation and cleanup, sandboxed tmux sockets,
-  and the form a dated validation entry takes. Not needed to run a single
-  command; README's Development section lists them.
+  Which test suites a change to this plugin's Lua or to `test/` needs, what
+  each suite cannot establish, and how to report a run in a pull request or
+  `docs/validation.md`. Read before validating such a change or writing a
+  validation claim; not needed just to run a command.
 ---
 
 # Validating a change
 
 ## Which suites a change needs
 
-Every change runs `test/check.py`. A change to the plugin's Lua, any
-root-level `*.lua`, also runs `test/runtime.py` and `test/e2e.py`, whichever
-module it touches:
+Every change runs `test/check.py`. Then, by what changed:
 
-- `core.lua` and `actions.lua` build the arguments given to chezmoi and parse
-  what it prints. Their unit suites compare that against hand-written output
-  and expected argv, so a flag the real chezmoi rejects passes them once the
-  expectation is edited to match.
-- `process.lua` runs every chezmoi call. `test/runtime.py` puts
-  `test/command.py` between the plugin and chezmoi, so only `test/e2e.py`
-  shows the plugin's own calls reaching chezmoi unchanged.
-
-For a change under `test/`, run every suite that loads the file:
-
-| Suite | Loads from `test/` |
-| --- | --- |
-| `test/check.py` | `core.lua`, `actions.lua`, `test_*.py` and what they import: `screen.py`, `support.py`, `manual_backend.py`, `manual_cases.py` |
-| `test/runtime.py` | `support.py`, `action_cases.py`, `screen.py`, `editor.py`, `command.py`, `probe.lua`, `runner.lua`, `child.py` |
-| `test/e2e.py` | `support.py`, `action_cases.py`, `screen.py`, `editor.py` |
-| `test/manual_runtime.py` | `support.py`, `action_cases.py`, `screen.py`, `editor.py`, `command.py`, `probe.lua`, `manual.py`, `manual_backend.py`, `manual_cases.py`, `manual.lua`, `manual-theme.toml` |
-| `test/benchmark.py` | `support.py` |
-
-A suite's own file counts as loaded by it. `support.py`, `action_cases.py`
-and `screen.py` reach three suites each, and each suite reads a different kind
-of evidence, so one passing says nothing for the others. A change to docs, CI
-or tooling alone needs nothing beyond `test/check.py`.
-
-`test/manual_runtime.py` is the guide's own suite. README does not list it; it
-runs like the others, from the repository root with no arguments.
+- **Plugin Lua** (root `*.lua`): `test/runtime.py`, `test/e2e.py` and
+  `test/manual_runtime.py`, whichever module it is; the guide drives the
+  plugin's own prompts too. `core.lua` and `actions.lua` build chezmoi's
+  arguments and parse its output, and their unit suites check that only
+  against hand-written expectations, never the real chezmoi.
+- **`test/core.lua`, `test/actions.lua`, `test/.luarc.json`, `test/test_*.py`**:
+  nothing more locally; CI also runs the two Lua suites under 5.1 and 5.4.
+- **`test/manual.py`, `test/manual_*`, `test/manual.lua`,
+  `test/manual-theme.toml`**: `test/manual_runtime.py`.
+- **`test/benchmark.py`**: `test/benchmark.py`.
+- **Any other file under `test/`**: `test/runtime.py`, `test/e2e.py` and
+  `test/manual_runtime.py`, plus `test/benchmark.py` for `test/support.py`.
+  Most harness files are shared by two or three of these suites, and each
+  reads a different kind of evidence, so one passing says nothing for the
+  others.
+- **Docs, `test/MANUAL.md` included, CI or tooling alone**: nothing more.
 
 ## What each suite cannot establish
 
@@ -97,19 +80,14 @@ readability. Say so rather than letting a green run imply it.
 
 ## Isolation and cleanup
 
-- Every fixture is a `chezmoi-yazi-test-*` directory under the system temp
-  directory with its own config, source, destination, state, cache and tmux
-  socket. Do not point a test at `~/.config/yazi`, the user's chezmoi source,
-  or the default tmux server.
 - Two guards limit deletion. `Runtime.close` removes only the directory it
   created, and only while that is a real directory named
   `chezmoi-yazi-test-*`. `support.owned`, which the guide calls before it
   opens, changes or removes a saved fixture, also requires the `manual.json`
   marker naming this checkout. Keep both when changing cleanup; remove only
   what a test created.
-- `KEEP_FIXTURE=1` (runtime) and `--keep` (E2E) leave the fixture behind and
-  print its path. Report the path; do not delete retained fixtures from earlier
-  runs that you did not start.
+- Report the path a kept fixture prints (`KEEP_FIXTURE=1`, `--keep`); do not
+  delete fixtures kept by runs you did not start.
 - Tests never pass `--force` to chezmoi. A prompt in a test is either expected
   and answered by the test, or a bug.
 - A restricted agent sandbox has lost the private tmux sockets before any key
