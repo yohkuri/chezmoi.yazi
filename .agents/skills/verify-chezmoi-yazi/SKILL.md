@@ -39,7 +39,8 @@ Every change runs `test/check.py`. Then, by what changed:
   `types/`). So Lua 5.5-only syntax in those files, and a pure-suite call such
   as `table.unpack` that an older Lua lacks, fail in CI after passing locally,
   unless you install `lua5.1` and `lua5.4` and run the same commands from
-  `.github/workflows/check.yml`.
+  `.github/workflows/check.yml`. CI also runs ShellCheck over `.githooks/*` and
+  `scripts/*.sh`; run it yourself after changing either.
 - **`test/runtime.py`** reads plugin state through `test/probe.lua` and runs
   chezmoi through `test/command.py`, which records every call and gives
   non-interactive ones a 10-second timeout. A pass shows the plugin's records

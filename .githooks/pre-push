@@ -9,10 +9,10 @@
 # anyway.
 
 # Only for this repository; `pre-commit` explains the matching.
-remote_url=$(printf '%s' "${2:-unknown}" | tr '[:upper:]' '[:lower:]')
+remote_url=$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')
 remote_url=${remote_url%/}
 case "${remote_url%.git}" in
-unknown | *[/@.]github.com[:/]yohkuri/chezmoi.yazi) ;;
+*[/@.]github.com[:/]yohkuri/chezmoi.yazi) ;;
 *[/@.]github.com:443/yohkuri/chezmoi.yazi) ;;
 *) exit 0 ;;
 esac
@@ -31,9 +31,9 @@ chezmoi.yazi: refusing a push to `main`.
   main moves only when a pull request is merged; branch protection would
   refuse this push on GitHub as well.
 
-  Move the commits to a topic branch, push it, and open a pull request:
+  Move main's commits to a topic branch, push it, and open a pull request:
 
-      git switch -c <type>/<short-subject>
+      git switch -c <type>/<short-subject> main
       git branch -f main origin/main
       git push -u origin HEAD
       gh pr create
