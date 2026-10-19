@@ -2,7 +2,8 @@
   "permissions": {
     "ask": [
       "Bash(gh pr merge *)",
-      "Bash(gh api *merge*)"
+      "Bash(gh api *pulls/*/merge*)",
+      "Bash(gh api *mergePullRequest*)"
     ]
   },
   "hooks": {
@@ -12,7 +13,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "jq -r '.tool_response.filePath // .tool_input.file_path' | { read -r f; d=\"${CLAUDE_PROJECT_DIR:-/nonexistent}\"; case \"$f\" in \"$d\"/.dev/* | \"$d\"/node_modules/*) ;; \"$d\"/*.lua) stylua --config-path \"$d/.stylua.toml\" \"$f\" ;; esac; } || true",
+            "command": "sh \"$CLAUDE_PROJECT_DIR/scripts/format-lua-hook.sh\"",
             "statusMessage": "Formatting Lua"
           }
         ]

@@ -12,7 +12,8 @@
     "test",
     "node_modules",
     ".git",
-    ".venv"
+    ".venv",
+    ".claude"
   ],
   "diagnostics.disable": [
     "redefined-local"

@@ -3,8 +3,9 @@
 These are the canonical instructions for AI agents in this repository. Claude
 Code reads them through `CLAUDE.md`; other agents read this file directly. Keep
 rules here instead of copying them into agent-specific files. The tracked
-`.claude/settings.json` backs two of them in Claude Code: it asks before a
-pull request is merged, and it runs StyLua on each Lua file an edit touches.
+`.claude/settings.json` only assists Claude Code: it asks before the common
+merge commands, which other spellings can bypass, and formats Lua files that
+`Write` or `Edit` touches. The rules in this file apply regardless.
 
 ## Language
 

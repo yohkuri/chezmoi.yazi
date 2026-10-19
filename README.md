@@ -342,6 +342,13 @@ and Lua 5.5.1 syntax and Lua 5.1/5.4 compatibility checks. A separate Ubuntu
 job runs the black-box E2E smoke scenario with pinned Yazi and chezmoi release
 binaries. No Git hooks are installed automatically.
 
+Claude Code also reads the tracked `.claude/settings.json`. After its `Write`
+or `Edit` tool touches a Lua file that Git does not ignore, the settings run
+`scripts/format-lua-hook.sh`, which needs `jq` and StyLua and reports a
+formatting failure back to the agent. The settings also ask before common
+merge commands. Other agents and editors do not run this hook, so
+`test/check.py` remains the formatting check.
+
 Run `test/check.py` for development checks, `test/runtime.py` for integration
 tests with an internal probe, `test/e2e.py` for black-box terminal tests,
 `test/manual.py` for an interactive fixture, or `test/benchmark.py` for

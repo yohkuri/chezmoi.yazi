@@ -564,6 +564,17 @@ Locally verified on 2026-09-20:
   fail on the initial status assertion, confirming that it detects a rendered
   status regression rather than only successful process startup.
 
+On 2026-10-19, `scripts/format-lua-hook.sh` passed ShellCheck and was run
+outside Claude Code with sample hook payloads in a temporary Git repository.
+It formatted unformatted Lua at the root and in a subdirectory, including with
+a trailing slash on `CLAUDE_PROJECT_DIR`. It left alone Lua under ignored
+`.dev/` and `.claude/worktrees/`, a non-Lua file, and Lua outside the project,
+including a path that leaves it through `..`. It exited with status 2 and a
+message for a Lua syntax error and for a missing `stylua`. StyLua 2.6.0 was
+used locally; its `--check .` skipped hidden and gitignored directories, which
+matches the hook's scope. Loading the hook in a Claude Code session is not
+recorded here.
+
 The initial project commit range from `main` to the pull request head passed
 the local commit validator and the pull request's `checks` job. The isolated
 Git histories above remain the negative-case coverage for invalid messages.
