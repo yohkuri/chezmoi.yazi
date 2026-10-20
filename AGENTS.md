@@ -54,7 +54,8 @@ Private conversation with the user may use their preferred language.
   standard-library code for runtime orchestration and fixture management.
 - Manage Python through uv, never pip. Keep `uv.lock` current and use
   `uv run --locked`. Neovim is not a development or test dependency.
-- Use `mise.toml` only to pin Lua and uv versions; do not define tasks or
+- Use `mise.toml` only to pin Lua, uv, and the LuaLS, StyLua, and ShellCheck
+  that `test/check.py` runs; CI installs them from it. Do not define tasks or
   require mise to develop or test. Lua must match the tested Yazi embedded
   version, currently Lua 5.5.1 for Yazi 26.9.1.
 - Keep test entry points directly executable, such as `test/manual.py`. Their
@@ -63,7 +64,7 @@ Private conversation with the user may use their preferred language.
 - Run `test/check.py` for Markdown, LuaLS, StyLua, ShellCheck, pure Lua
   tests, and Python syntax and harness unit tests.
   Install development dependencies with `npm ci --ignore-scripts` and
-  `npm run setup:types` first; see README for external tool versions.
+  `npm run setup:types` first. README lists the other tools, such as Node.js.
 - Validate commit messages with `npm run lint:commits -- BASE HEAD`, or
   `npm run lint:commits -- --file PATH` before a commit exists.
   Commit messages must use ASCII English; this makes character lengths

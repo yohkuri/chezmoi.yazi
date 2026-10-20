@@ -1,8 +1,9 @@
 #!/bin/sh
 # Claude Code PostToolUse hook from .claude/settings.json: format the Lua file
-# that a Write or Edit touched with the StyLua version CI pins. Exit status 2
-# hands stderr back to the agent, so a missing tool, a version mismatch or a
-# StyLua error is fixed in the same session instead of surfacing later in CI.
+# that a Write or Edit touched with the StyLua version mise.toml pins, which CI
+# installs too. Exit status 2 hands stderr back to the agent, so a missing tool,
+# a version mismatch or a StyLua error is fixed in the same session instead of
+# surfacing later in CI.
 #
 # The file is formatted only inside a checkout of this repository, which may be
 # a worktree, and only where `stylua --check .` in test/check.py would look:
@@ -55,17 +56,22 @@ case $? in
 *) fail "git check-ignore failed for $file" ;;
 esac
 
-workflow=$top/.github/workflows/check.yml
-want=$(sed -n 's/^[[:space:]]*STYLUA_VERSION:[[:space:]]*//p' "$workflow")
-[ -n "$want" ] || fail "could not read STYLUA_VERSION from $workflow"
+pins=$top/mise.toml
+want=$(sed -n 's/^stylua[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$pins")
+[ -n "$want" ] || fail "could not read the stylua version from $pins"
+# mise's shims pick a version by the working directory, so run StyLua where
+# the file's own mise.toml applies. A PATH set by `mise activate` does not
+# follow it; the version check below catches what that leaves.
+cd "$top" || fail "could not enter $top"
 command -v stylua >/dev/null 2>&1 ||
   fail "StyLua is not installed; CI uses StyLua $want"
 have=$(stylua --version) || fail 'stylua --version failed'
 have=${have#stylua }
 [ "$have" = "$want" ] ||
   fail "$file was not formatted: StyLua $have is installed, but CI uses $want.
-Install StyLua $want, then run it on the file."
+Install StyLua $want, with \`mise install\` if you use mise, then run it on the
+file."
 
-out=$(stylua --config-path "$top/.stylua.toml" -- "$file" 2>&1) ||
+out=$(stylua --config-path .stylua.toml -- "$rel" 2>&1) ||
   fail "StyLua could not format $file:
 $out"

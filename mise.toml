@@ -2,3 +2,8 @@
 # Yazi v26.9.1: mlua lua55 + lua-src 551.0.1 bundles Lua 5.5.1.
 lua = "5.5.1"
 uv = "0.11.19"
+# scripts/format-lua-hook.sh reads the stylua line: keep it on one line with a
+# full version.
+lua-language-server = "3.19.2"
+shellcheck = "0.11.0"
+stylua = "2.6.0"
