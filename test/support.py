@@ -59,11 +59,48 @@ def environment(root):
     return env
 
 
+# process.client puts these before every query; they keep its output exact.
+QUERY_FLAGS = ["--no-tty", "--no-pager", "--color=false", "--progress=false", "--skip-secrets=false"]
+# Queries override the user's filters. The preflight narrows its source-entry
+# and source-directory queries on purpose (interaction.lua); any managed query
+# may pass those pairs, since a call does not say which query it is.
+FILTERS = {"status": {("all", "none")},
+           "managed": {("all", "none"), ("files,symlinks,dirs", "externals"), ("dirs", "externals")}}
+CONTEXT_FLAGS = {"--config", "--source", "--destination", "--persistent-state", "--cache"}
+ACTIONS = {"add", "re-add", "edit", "diff", "apply", "forget", "destroy"}
+
+
 def chezmoi_args(root):
     return ["--config", str(root / "config/chezmoi.toml"), "--source", str(root / "source"),
             "--destination", str(root / "dest"), "--persistent-state", str(root / "chezmoi.db"),
-            "--cache", str(root / "cache/chezmoi"), "--no-tty", "--no-pager",
-            "--color=false", "--progress=false", "--skip-secrets=false"]
+            "--cache", str(root / "cache/chezmoi"), *QUERY_FLAGS]
+
+
+def check_call(args):
+    """Return whether one recorded plugin call is a query, after checking it."""
+    assert not any(arg.startswith("--force") for arg in args), args
+    index = 0
+    while index < len(args) and args[index].startswith("-"):
+        index += 2 if args[index] in CONTEXT_FLAGS else 1
+    assert index < len(args), ("No subcommand", args)
+    command = args[index]
+    if command not in ("execute-template", *FILTERS) and "--no-tty" not in args:
+        assert command in ACTIONS, ("Unknown action", args)
+        return False
+    assert command in ("execute-template", *FILTERS), ("Unknown query", args)
+    options = args[:args.index("--")] if "--" in args else args
+    for flag in QUERY_FLAGS:
+        name = flag.split("=")[0]
+        given = [arg for arg in options if arg == name or arg.startswith(name + "=")]
+        assert given == [flag] and options.index(flag) < index, (args, flag)
+    filters = [arg for arg in options if arg.startswith(("--include", "--exclude", "-i", "-x"))]
+    if command not in FILTERS:
+        assert not filters, args
+        return True
+    values = dict(arg.split("=", 1) for arg in filters if arg.startswith(("--include=", "--exclude=")))
+    assert len(filters) == len(values) == 2 and options.index(filters[0]) > index, args
+    assert (values.get("--include"), values.get("--exclude")) in FILTERS[command], args
+    return True
 
 
 def owned(root):
@@ -277,6 +314,13 @@ class Runtime:
             return
         raise AssertionError(f"Child survived {mode}")
 
+    def check_calls(self):
+        """Check every chezmoi call the plugin made; an uninstrumented run recorded none."""
+        if not self.calls.exists():
+            return
+        queries = [check_call(json.loads(line)) for line in read(self.calls).splitlines()]
+        assert any(queries), "No query was recorded"
+
     def close(self):
         assert self.root == self.owned_root and not self.root.is_symlink()
         assert re.fullmatch(r"chezmoi-yazi-test-[\w-]+", self.root.name)
@@ -302,6 +346,11 @@ def fixture(git_plugin=None, **kwargs):
     instance = Runtime(git_plugin, **kwargs)
     try:
         yield instance
+        # Stop Yazi first so that no call starts after the check reads them.
+        if instance.started:
+            stop(instance.root)
+            instance.started = False
+        instance.check_calls()
     finally:
         instance.close()
 

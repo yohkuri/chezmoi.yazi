@@ -39,26 +39,35 @@ local opts = { directory_summary = true, argument_bytes = 8192, max_retries = 8 
 local managed = { "/d/clean", "/d/dir", "/d/dir/new", "/d/dir/other", "/d/local" }
 local statuses = { ["/d/dir/new"] = " A", ["/d/dir/other"] = " D", ["/d/local"] = "MM" }
 local broken, calls, empty_queries, recursive_queries, max_argument_bytes = {}, 0, 0, 0, 0
+local unfiltered = 0
 local function run(args)
 	if args[1] == "execute-template" then
 		return "/d"
+	end
+	local targets, recursive, include, exclude, filters, after = {}, false, false, false, 0, false
+	for _, arg in ipairs(args) do
+		if after then
+			targets[#targets + 1] = arg
+		elseif arg == "--" then
+			after = true
+		else
+			recursive = recursive or arg == "--recursive=true"
+			include = include or arg == "--include=all"
+			exclude = exclude or arg == "--exclude=none"
+			if arg:find("^%-%-include") or arg:find("^%-%-exclude") or arg:find("^%-[ix]") then
+				filters = filters + 1
+			end
+		end
+	end
+	if not (include and exclude and filters == 2) then
+		unfiltered = unfiltered + 1
 	end
 	if args[1] == "managed" then
 		return table.concat(managed, "\0") .. "\0"
 	end
 	calls = calls + 1
-	local targets, recursive, after = {}, false, false
-	for _, arg in ipairs(args) do
-		if after then
-			targets[#targets + 1] = arg
-		end
-		if arg == "--" then
-			after = true
-		end
-		if arg == "--recursive=true" then
-			recursive = true
-			recursive_queries = recursive_queries + 1
-		end
+	if recursive then
+		recursive_queries = recursive_queries + 1
 	end
 	if #targets == 0 then
 		empty_queries = empty_queries + 1
@@ -154,4 +163,5 @@ before = calls
 core.collect(files, opts, run)
 equal(max_argument_bytes <= 256, true, "recovery respects argument byte budget")
 equal(calls - before <= 3, true, "expanded recovery still respects total retry budget")
+equal(unfiltered, 0, "queries override the user's filters")
 print("PASS " .. n .. " core assertions")

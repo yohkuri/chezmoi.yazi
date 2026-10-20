@@ -132,11 +132,13 @@ def test(t, git_plugin):
     flavor.mkdir(parents=True)
     write(flavor / "tmtheme.xml", '<?xml version="1.0"?><plist version="1.0"><dict><key>name</key><string>test</string><key>settings</key><array/></dict></plist>')
     write(flavor / "flavor.toml", '[chezmoi]\nmanaged_sign="F"\nmodified_sign="m"\nmodified={fg="#112233"}\n')
-    write(t.root / "config/theme.toml", '[flavor]\ndark="fixture"\nlight="fixture"\n[chezmoi]\nmanaged_sign="界"\n')
+    write(t.root / "config/theme.toml",
+          '[flavor]\ndark="fixture"\nlight="fixture"\n[chezmoi]\nmanaged_sign="界"\ndeleted_sign="\\u001b"\n')
     before = t.snapshot()["epoch"]
     t.key("Y")
     result = t.wait(lambda s: s["signs"]["managed"] == "界")
     assert result["signs"]["modified"] == "m", result["signs"]
+    assert result["signs"]["deleted"] == "D", "A sign with a control character must fall back"
     assert result["epoch"] == before, "Theme reload must not invalidate status"
     assert "界 m" in t.capture(), t.capture()
     assert "38;2;17;34;51" in t.tmux("capture-pane", "-e", "-p", "-t", "test")

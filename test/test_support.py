@@ -8,7 +8,7 @@ import sys
 import tempfile
 import unittest
 from unittest import mock
-from support import REPO, Runtime, lua, owned, read, run, stop, write
+from support import QUERY_FLAGS, REPO, Runtime, check_call, lua, owned, read, run, stop, write
 
 
 class SupportTests(unittest.TestCase):
@@ -43,6 +43,27 @@ class SupportTests(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 stop(root)
             self.assertTrue(marker.exists())
+
+    def test_check_call(self):
+        context = ["--config", "/c", "--cache", "/k"]
+        status = [*QUERY_FLAGS, *context, "status", "--include=all", "--exclude=none", "--", "/d/a"]
+        narrow = [*QUERY_FLAGS, *context, "managed", "--include=dirs", "--exclude=externals"]
+        action = [*context, "apply", "--include=all", "--exclude=none", "--recursive=true", "--", "/d/a"]
+        self.assertTrue(check_call(status) and check_call(narrow))
+        self.assertFalse(check_call(action))
+        for args in [status[1:], [*QUERY_FLAGS[:-1], *context, "status", QUERY_FLAGS[-1], *status[-4:]],
+                     [*status[:-3], "--exclude=encrypted", *status[-2:]],
+                     [*status[:-4], "--", "--include=all", "--exclude=none", "/d/a"],
+                     [*status[:-2], "--include=all", *status[-2:]],
+                     [*narrow[:-1], "--exclude=none"], [*action, "--force=true"],
+                     [*status[:-2], "-x", "encrypted", *status[-2:]],
+                     [*status[:-2], "--exclude", "encrypted", *status[-2:]],
+                     [*QUERY_FLAGS, *context, "--include=all", "--exclude=none", "status", "--", "/d/a"],
+                     [*status[:-2], "--color=true", *status[-2:]],
+                     [*QUERY_FLAGS, *context, "source-path", "--", "/d/a"],
+                     [*QUERY_FLAGS, *context], [*context, "remove", "--", "/d/a"]]:
+            with self.subTest(args=args), self.assertRaises(AssertionError):
+                check_call(args)
 
     def test_process_timeout(self):
         with self.assertRaises(subprocess.TimeoutExpired):
