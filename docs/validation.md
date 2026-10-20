@@ -651,9 +651,11 @@ directory, the directory prefix of the path, the relative config path, the
 trailing comment or the line anchor each failed a test. Run by hand from
 another directory on a sample payload, the hook formatted a real file with
 StyLua 2.6.0 through mise's shim; from inside a repository that pinned a
-version not yet installed, the shim installed that version and used it. Not
-yet seen: CI installing the three tools through mise on Linux, and the hook
-loaded in a Claude Code session.
+version not yet installed, the shim installed that version and used it. On
+the pull request, GitHub-hosted Ubuntu runs installed ShellCheck 0.11.0, LuaLS
+3.19.2 and StyLua 2.6.0 through mise, put them ahead of the image's tools on
+`PATH`, and passed `test/check.py` with 65 Python tests and the E2E smoke job.
+The hook has not been seen loaded in a Claude Code session.
 
 The initial project commit range from `main` to the pull request head passed
 the local commit validator and the pull request's `checks` job. The isolated
