@@ -580,7 +580,8 @@ for a Lua syntax error. Those runs used StyLua 2.6.0 against a temporary
 workflow that pinned 2.6.0 or 2.5.2; StyLua 2.5.2 itself was not run. With
 StyLua 2.6.0, `stylua --check .` reported a root and a subdirectory file and
 skipped a hidden file, `.github/`, and a Git-ignored directory, the scope the
-hook formats. Loading the hook in a Claude Code session is not recorded here.
+hook formats. The entry on fresh sessions below records a Claude Code session
+loading the later version of the hook, which reads `mise.toml`.
 
 On 2026-10-20, `test/test_skills.py` was added to the harness unit tests, and
 `test/check.py` passed on macOS with Git 2.54.0, with 51 core and 73 action
@@ -596,8 +597,9 @@ worktree made the repository case fail with the expected target. With `GIT_DIR`,
 tests still passed and left that repository's files unchanged, and with a global
 Git ignore of `.claude/` under a substituted `HOME`, the fixture cases still
 passed. Claude Code offered the skill through the link in the session that added
-it; the path rules taking effect is not recorded here. On Linux, only CI's run
-of the same unit tests covers it.
+it; the entry on fresh sessions below records the path rules taking effect,
+`lua.md` on more than root Lua. On Linux, only CI's run of the same unit tests
+covers it.
 
 On 2026-10-20, `test/check.py` began running ShellCheck on `.githooks/*` and
 `scripts/*.sh`, which passed with ShellCheck 0.11.0, and `test/test_githooks.py`
@@ -655,7 +657,34 @@ version not yet installed, the shim installed that version and used it. On
 the pull request, GitHub-hosted Ubuntu runs installed ShellCheck 0.11.0, LuaLS
 3.19.2 and StyLua 2.6.0 through mise, put them ahead of the image's tools on
 `PATH`, and passed `test/check.py` with 65 Python tests and the E2E smoke job.
-The hook has not been seen loaded in a Claude Code session.
+
+On 2026-10-20, fresh Claude Code 2.1.304 sessions on macOS checked the path
+rules and the Lua hook against a throwaway worktree of `main` at `73c8862`,
+with StyLua 2.6.0 found through mise's shim, Git 2.54.0 and jq 1.8.2. Each
+session got one prompt from `claude -p` with `claude-sonnet-5-5`,
+`--setting-sources project`, which loads neither user nor local settings,
+`--permission-mode acceptEdits`, `--tools Read Edit`, which left only those
+two tools, and `--output-format stream-json --verbose --include-hook-events`.
+The 29 checks read the transcripts, the hook events, the tool calls and the
+files, never the model's replies, and 28 passed. Path rules, one session per
+file with exactly one `Read`: `README.md` attached no rule, `core.lua`
+attached `.claude/rules/lua.md` alone, and `test/core.lua` attached
+`.claude/rules/test.md` and, against the intent, `lua.md` as well, whose
+`*.lua` pattern matches Lua below the root too; that failed the remaining
+check. The Lua hook, on the root `core.lua` only: after exactly one `Edit`
+that inserted an unformatted line as given, the `PostToolUse` hook exited 0
+and the file's first line was formatted. That held in a session working in
+the worktree, and in one working in the main checkout, whose settings, hook
+script, `mise.toml` and `.stylua.toml` matched `73c8862`, on a worktree file
+outside it reached through `--add-dir`. With the `stylua` line removed from
+the worktree's `mise.toml`, the hook exited with status 2, the file kept the
+unformatted line, and the transcript recorded the hook's message as a
+blocking error the session received. Two earlier runs with looser checks read
+`core.lua` and `test/core.lua` in one session, passed all their checks, and
+so missed the extra `lua.md`. Not run: the hook after `Write`, a Lua file
+below the root, a worktree that Claude Code creates under `.claude/worktrees/`,
+the interactive status message, sessions that also load user or local
+settings, and other platforms.
 
 The initial project commit range from `main` to the pull request head passed
 the local commit validator and the pull request's `checks` job. The isolated
