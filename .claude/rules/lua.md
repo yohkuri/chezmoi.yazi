@@ -1,7 +1,10 @@
 ---
+# Root-level Lua only: `*.lua` also matched the harness under test/. The
+# leading slash was measured with Claude Code 2.1.304 (docs/validation.md).
 paths:
-  - "*.lua"
+  - "/*.lua"
 ---
 
-This is plugin Lua. Before reporting a change to it as validated, read
-`.agents/skills/verify-chezmoi-yazi/SKILL.md` for the suites it needs.
+This is the plugin's own Lua. Before changing it other than a comment, read
+`.agents/skills/implement-chezmoi-yazi/SKILL.md`. Before reporting a change
+here as validated, read `.agents/skills/verify-chezmoi-yazi/SKILL.md`.

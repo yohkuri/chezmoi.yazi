@@ -598,8 +598,8 @@ tests still passed and left that repository's files unchanged, and with a global
 Git ignore of `.claude/` under a substituted `HOME`, the fixture cases still
 passed. Claude Code offered the skill through the link in the session that added
 it; the entry on fresh sessions below records the path rules taking effect,
-`lua.md` on more than root Lua. On Linux, only CI's run of the same unit tests
-covers it.
+at `73c8862` with `lua.md` on more than root Lua. On Linux, only CI's run of
+the same unit tests covers it.
 
 On 2026-10-20, `test/check.py` began running ShellCheck on `.githooks/*` and
 `scripts/*.sh`, which passed with ShellCheck 0.11.0, and `test/test_githooks.py`
@@ -685,6 +685,23 @@ so missed the extra `lua.md`. Not run: the hook after `Write`, a Lua file
 below the root, a worktree that Claude Code creates under `.claude/worktrees/`,
 the interactive status message, sessions that also load user or local
 settings, and other platforms.
+
+On 2026-10-20, the path rules were split so that each discloses the skill its
+files need: `.claude/rules/lua.md` now matches `/*.lua` and points at the new
+`implement-chezmoi-yazi` skill, and `.claude/rules/test.md` at
+`verify-chezmoi-yazi`. With a stand-in `lua.md`, fresh sessions as above
+attached it on reading `core.lua` and not `test/core.lua` for `/*.lua`, and on
+neither for `./*.lua`; that reading of the leading slash is Claude Code
+2.1.304's, and no check here would notice a release that changed it. On
+2026-10-21, with a worktree under `.claude/worktrees/`, a session in the main
+checkout attached the main checkout's `lua.md` on reading the worktree's
+`core.lua` and its `test.md` on `test/core.lua`, and a session inside the
+worktree attached the worktree's own rules. Not run with `/*.lua`: a file
+written with `Write`, an interactive session, other platforms; `scripts/` and
+`types/` Lua now get no rule. Five reviews found earlier drafts of the skill
+wrong wherever they restated `docs/design.md`, the README or the code, or
+mapped which suite checks what; it now points at those and says to search
+`test/` before changing a string or an argument.
 
 The initial project commit range from `main` to the pull request head passed
 the local commit validator and the pull request's `checks` job. The isolated

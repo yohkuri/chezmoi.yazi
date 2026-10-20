@@ -380,8 +380,10 @@ and the version check then refuses. `test/test_format_hook.py` checks that it
 reads the version from `mise.toml` and how it calls StyLua. The settings also
 ask before common merge commands and pushes that name `main`. Other agents and
 editors do not run this hook, so `test/check.py` remains the formatting check.
-Rules under `.claude/rules/` point Claude Code at the `verify-chezmoi-yazi`
-skill in `.agents/skills/` when it works with plugin Lua or test harness files.
+Rules under `.claude/rules/` attach when Claude Code reads a matching file
+and point it at the skills in `.agents/skills/`: for the plugin's root Lua,
+`implement-chezmoi-yazi` and, before reporting a change as validated,
+`verify-chezmoi-yazi`; for files under `test/`, `verify-chezmoi-yazi`.
 
 Run `test/check.py` for development checks, `test/runtime.py` for integration
 tests with an internal probe, `test/e2e.py` for black-box terminal tests,
