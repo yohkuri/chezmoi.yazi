@@ -76,6 +76,8 @@ Private conversation with the user may use their preferred language.
   argument when validating git.yazi coexistence.
 - Unit tests do not establish real rendering, fetcher, or shared-state behavior.
   State precisely which checks ran and which platforms remain unverified.
+- Before changing the plugin's root Lua other than a comment, read
+  `.agents/skills/implement-chezmoi-yazi/SKILL.md`.
 - Before changing the test harness, validating a change, or reporting what
   was validated, read `.agents/skills/verify-chezmoi-yazi/SKILL.md`. Skills
   live under `.agents/skills/`; `test/test_skills.py` says how Claude Code

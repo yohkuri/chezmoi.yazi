@@ -3,8 +3,10 @@ name: verify-chezmoi-yazi
 description: >-
   Which test suites a change to this plugin's Lua or to `test/` needs, what
   each suite cannot establish, and how to report a run in a pull request or
-  `docs/validation.md`. Read before validating such a change or writing a
-  validation claim; not needed just to run a command.
+  `docs/validation.md`, and how to write a terminal-driven check and its
+  cleanup. Read before changing the harness, validating a change or writing a
+  validation claim; not needed just to run a command, and not for what the
+  plugin's Lua must keep true, which `implement-chezmoi-yazi` covers.
 ---
 
 # Validating a change
