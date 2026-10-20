@@ -626,6 +626,35 @@ branch. The URL match is by suffix, so a local path ending in
 recognized. Without `core.hooksPath`, and on Linux beyond CI's unit tests, the
 hooks were not run.
 
+On 2026-10-20, `mise.toml` began pinning LuaLS 3.19.2, ShellCheck 0.11.0 and
+StyLua 2.6.0, which CI now installs from it instead of downloading LuaLS 3.19.1
+and StyLua 2.5.2 and using the runner image's ShellCheck. Before this, local
+Homebrew had LuaLS 3.19.2 against CI's 3.19.1, a difference nothing reported.
+StyLua 2.6.0 changed nothing here: its release notes touch Luau, range
+formatting, ignore ranges, CRLF comments and a new `Input` value for
+`collapse_simple_statement`, while this repository writes Lua 5.4 syntax, has
+no ignore comments or CRLF files, formats whole files and sets `FunctionOnly`;
+`stylua --check .` passed with 2.6.0 before the pin moved. After `mise install`
+on macOS, the three tools resolved to the pinned versions through mise's shims
+ahead of Homebrew, and `test/check.py` passed with them: Markdown, LuaLS and
+ShellCheck clean, 51 core and 73 action policy assertions and 65 Python tests
+(62 before). `scripts/format-lua-hook.sh` now reads the StyLua version from
+`mise.toml` and runs StyLua from the edited file's checkout, where mise's shims
+pick the version that checkout pins; a `PATH` set by `mise activate` does not
+follow the change of directory, and that case was not run.
+`test/test_format_hook.py` runs the hook with a stand-in StyLua from another
+directory: it reads this repository's pin, calls StyLua from the file's
+checkout with the checkout's `.stylua.toml` and the file's relative path when
+the pin matches, with or without spaces and a trailing comment, and refuses
+with exit status 2 when no `stylua` line is set. Dropping the change of
+directory, the directory prefix of the path, the relative config path, the
+trailing comment or the line anchor each failed a test. Run by hand from
+another directory on a sample payload, the hook formatted a real file with
+StyLua 2.6.0 through mise's shim; from inside a repository that pinned a
+version not yet installed, the shim installed that version and used it. Not
+yet seen: CI installing the three tools through mise on Linux, and the hook
+loaded in a Claude Code session.
+
 The initial project commit range from `main` to the pull request head passed
 the local commit validator and the pull request's `checks` job. The isolated
 Git histories above remain the negative-case coverage for invalid messages.

@@ -295,9 +295,10 @@ The leading `@since` annotation enforces the supported Yazi minimum.
 
 ## Development
 
-Install Lua 5.5.1, uv 0.11.19, Node.js 24+, LuaLS 3.19.1, StyLua 2.5.2, and
-ShellCheck using your preferred installer; Claude Code users also need `jq`.
-mise is optional. From the repository root, run:
+Install Node.js 24+ and the versions of Lua, uv, LuaLS, StyLua and ShellCheck
+that `mise.toml` pins; Claude Code users also need `jq`. mise is optional: with
+it, `mise trust` and `mise install` install the pinned tools, and without it,
+use your preferred installer. From the repository root, run:
 
 ```sh
 npm ci --ignore-scripts
@@ -312,14 +313,15 @@ tests. LuaLS checks the plugin and in-Yazi probes as Lua 5.5.
 `test/test_skills.py` checks that every file under `.agents/skills/` has its
 symlink under `.claude/skills/`.
 
-`mise.toml` only pins tool versions for developers who use mise; it defines
-no tasks. If you use mise, `mise trust` and `mise install` install those tools.
-The executable Python scripts use uv directly to prepare the locked environment
-and run Python, so no separate Python setup command is required.
+`mise.toml` defines no tasks. CI installs the same pinned tools from it, so
+with mise a local check runs the analyzers CI runs; `test/check.py` does not
+compare their versions. The executable Python scripts use uv directly to
+prepare the locked environment and run Python, so no separate Python setup
+command is required.
 
-Lua 5.5.1 and uv 0.11.19 are the pinned versions. Lua matches the Yazi 26.9.1 build:
-its `lua55` feature and locked `lua-src` 551.0.1 embed Lua 5.5.1. The independent
-Lua executable is for unit tests; it does not replace Yazi's embedded runtime.
+The pinned Lua matches the Yazi 26.9.1 build: its `lua55` feature and locked
+`lua-src` 551.0.1 embed Lua 5.5.1. The independent Lua executable is for unit
+tests; it does not replace Yazi's embedded runtime.
 uv selects Python 3.14 via `.python-version` and maintains `.venv` and `uv.lock`.
 The Python harness uses only the standard library; no pip installation is used.
 
@@ -364,20 +366,22 @@ running while it is at a commit without `.githooks/`.
 
 A `core.hooksPath` setting replaces `.git/hooks`, so with one set, these hooks
 run only if the hooks in that path pass control on to `.git/hooks`.
-`test/test_githooks.py` checks which remotes and refs they refuse. CI runs
-the ShellCheck that its runner image provides.
+`test/test_githooks.py` checks which remotes and refs they refuse.
 
 Claude Code also reads the tracked `.claude/settings.json`. After its `Write`
 or `Edit` tool touches a Lua file, the settings run `scripts/format-lua-hook.sh`.
 It formats the files that `test/check.py` checks, in this checkout or one of
 its worktrees, and skips hidden and Git-ignored paths. It needs `jq`, Git, and
-the StyLua version that `.github/workflows/check.yml` pins. A missing tool, a
-different StyLua version, or a formatting failure leaves the file unchanged and
-is reported back to the agent. The settings also ask before common merge
-commands and pushes that name `main`. Other agents and editors do not run this
-hook, so `test/check.py` remains the formatting check. Rules under
-`.claude/rules/` point Claude Code at the `verify-chezmoi-yazi` skill in
-`.agents/skills/` when it works with plugin Lua or test harness files.
+the StyLua version that `mise.toml` pins. A missing tool, a different StyLua
+version, or a formatting failure leaves the file unchanged and is reported back
+to the agent. It runs StyLua from the file's checkout, so mise's shims pick the
+version that checkout pins; a `PATH` set by `mise activate` does not follow it,
+and the version check then refuses. `test/test_format_hook.py` checks that it
+reads the version from `mise.toml` and how it calls StyLua. The settings also
+ask before common merge commands and pushes that name `main`. Other agents and
+editors do not run this hook, so `test/check.py` remains the formatting check.
+Rules under `.claude/rules/` point Claude Code at the `verify-chezmoi-yazi`
+skill in `.agents/skills/` when it works with plugin Lua or test harness files.
 
 Run `test/check.py` for development checks, `test/runtime.py` for integration
 tests with an internal probe, `test/e2e.py` for black-box terminal tests,

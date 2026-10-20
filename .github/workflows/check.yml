@@ -23,25 +23,10 @@ jobs:
           cache: npm
       - name: Install locked JavaScript tools
         run: npm ci --ignore-scripts
-      - name: Install Lua and pinned analyzers
-        env:
-          LUALS_VERSION: 3.19.1
-          STYLUA_VERSION: 2.5.2
+      - name: Install Lua 5.1 and 5.4
         run: |
           sudo apt-get update
           sudo apt-get install -y lua5.1 lua5.4
-          mkdir -p "$RUNNER_TEMP/luals" "$RUNNER_TEMP/stylua"
-          curl --fail --location --retry 3 \
-            "https://github.com/LuaLS/lua-language-server/releases/download/$LUALS_VERSION/lua-language-server-$LUALS_VERSION-linux-x64.tar.gz" \
-            -o "$RUNNER_TEMP/luals.tar.gz"
-          tar -xzf "$RUNNER_TEMP/luals.tar.gz" -C "$RUNNER_TEMP/luals"
-          curl --fail --location --retry 3 \
-            "https://github.com/JohnnyMorganz/StyLua/releases/download/v$STYLUA_VERSION/stylua-linux-x86_64.zip" \
-            -o "$RUNNER_TEMP/stylua.zip"
-          unzip -q "$RUNNER_TEMP/stylua.zip" -d "$RUNNER_TEMP/stylua"
-          chmod +x "$RUNNER_TEMP/stylua/stylua"
-          echo "$RUNNER_TEMP/luals/bin" >> "$GITHUB_PATH"
-          echo "$RUNNER_TEMP/stylua" >> "$GITHUB_PATH"
       - name: Install pinned Yazi type definitions
         run: npm run setup:types
       - name: Check Markdown, Lua, formatting, shell, and Python harness
