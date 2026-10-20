@@ -688,20 +688,86 @@ settings, and other platforms.
 
 On 2026-10-20, the path rules were split so that each discloses the skill its
 files need: `.claude/rules/lua.md` now matches `/*.lua` and points at the new
-`implement-chezmoi-yazi` skill, and `.claude/rules/test.md` at
-`verify-chezmoi-yazi`. With a stand-in `lua.md`, fresh sessions as above
+`implement-chezmoi-yazi` skill and, before a change is reported as validated,
+at `verify-chezmoi-yazi`; `.claude/rules/test.md` points at
+`verify-chezmoi-yazi` alone. With a stand-in `lua.md`, fresh sessions as above
 attached it on reading `core.lua` and not `test/core.lua` for `/*.lua`, and on
 neither for `./*.lua`; that reading of the leading slash is Claude Code
 2.1.304's, and no check here would notice a release that changed it. On
 2026-10-21, with a worktree under `.claude/worktrees/`, a session in the main
-checkout attached the main checkout's `lua.md` on reading the worktree's
-`core.lua` and its `test.md` on `test/core.lua`, and a session inside the
-worktree attached the worktree's own rules. Not run with `/*.lua`: a file
-written with `Write`, an interactive session, other platforms; `scripts/` and
-`types/` Lua now get no rule. Five reviews found earlier drafts of the skill
-wrong wherever they restated `docs/design.md`, the README or the code, or
-mapped which suite checks what; it now points at those and says to search
-`test/` before changing a string or an argument.
+checkout attached the main checkout's `lua.md` alone on reading the
+worktree's `core.lua` and its `test.md` alone on `test/core.lua`, and a session
+inside the worktree attached the worktree's own rules in the same way. Not run
+with `/*.lua`: a file written with `Write`, an interactive session, other
+platforms; `scripts/` and `types/` Lua now get no rule. Five reviews found
+earlier drafts of the skill wrong wherever they restated `docs/design.md`, the
+README or the code, or mapped which suite checks what; it now points at those
+and says to search `test/` before changing a string or an argument. A sixth
+found that it also said to change the matches with the code, which would
+rewrite a check that the old value must stay; it now says to decide which a
+match is from the design and the README.
+
+On 2026-10-21, in throwaway worktrees on macOS 26.6.2 with Yazi 26.9.1 and
+chezmoi 2.73.2, removing `--no-pager`, `--color=false`, `--progress=false`,
+`--skip-secrets=false` and the status display's and the preflight's
+`--include=all --exclude=none` all at once, and separately `render.theme`'s
+control-character check on signs, left the pure suites, `test/runtime.py`,
+`test/e2e.py` and `test/manual_runtime.py` passing, and no test looked for
+`--force`. A first set of checks failed on those breaks and on `--force` added
+to every action or to `forget` alone. The fresh-session checks then all passed
+against the split and those checks, with the `.claude/`, `mise.toml` and
+`.stylua.toml` this entry was committed with, `test/core.lua` attaching
+`test.md` alone, with the same tools and versions. A sixth review got breaks
+past those checks: they matched `--force` exactly on single-file plans,
+accepted any `--include` and `--exclude` value, and found queries by
+`--no-tty`. A seventh got an added `-x encrypted`, a later `--color=true` and an
+unknown query past their first replacement, which was then tightened into the
+one below.
+
+They were replaced the same day. `test/core.lua` checks that the status
+display's `managed` and `status` queries pass `--include=all --exclude=none`
+and no other filter before `--`, and `test/actions.lua` that no argument
+starting with `--force` reaches any stage of fourteen plans that cover each
+action's options and directory targets, naming the first plan and stage that
+does. When a fixture that recorded the plugin's chezmoi calls ends without an
+error, it stops Yazi and `support.check_call` checks each call: none has an
+argument starting with `--force`; each is a known query or action; each
+`execute-template`, `managed` and `status` query, and any call with
+`--no-tty`, puts the five query flags before its subcommand and gives none of
+them another value before any `--`; and there, a `status` or `managed` query
+has one `--include=` and one `--exclude=` after its subcommand and no other
+filter. `status` must pass `all` and `none`. A `managed` query may also pass
+either of the preflight's two narrower pairs, since a call does not say which
+query it is, so narrowing the preflight's first `managed` query to one of those
+pairs would pass. Counted in one run, that covered 505 calls in the 7 fixtures
+of `test/runtime.py` and none elsewhere: the guide's cases record calls in fixtures
+of their own, which the check does not read, `test/benchmark.py` runs chezmoi
+directly, and `test/e2e.py` records nothing. `test/test_support.py` feeds the
+check altered calls, and `test/runtime.py` still checks that a theme sign
+holding a control character falls back to its default. Each new check failed on
+a break aimed at it: `--force=true` on a non-recursive `apply`, `--force` on a
+broad `add` and on a non-recursive `re-add` in `test/actions.lua`;
+`--exclude=encrypted`, and separately an added `-x encrypted`, in the `status`
+query in `test/core.lua`; and in `test/runtime.py`, at the fixture's end,
+`--exclude=encrypted` and separately an added `-x encrypted` in the preflight's
+first `managed` query, and `--force` before the context of an interactive
+`diff`, the last two after every other assertion of their scenario passed.
+`test/test_support.py` covers the other ways past it that the seventh review
+named. Three other breaks failed earlier assertions first: the
+`status` filters moved after `--` failed `test/core.lua`'s argument byte budget;
+in `test/runtime.py`, dropping `--no-tty` sent the slow status down the
+wrapper's action path, and the query flags moved to the end became paths.
+`test/check.py` passed with 52 core and 74 action policy assertions and 66
+Python tests, and `test/runtime.py` (16 passes), `test/e2e.py` (14),
+`test/manual_runtime.py` (15) and `test/benchmark.py` passed. `test/runtime.py`
+passed in three plain runs; run three times under a wrapper that only counted
+the calls each check read, it failed twice in a row in `confirmation_pages`,
+which had not reviewed one target's path on the destroy confirmation's pages,
+before any call was checked, and then passed. That is a timing-sensitive
+failure in the screen reading, recorded rather than fixed here. Not run: the
+Yazi-driven suites, and so `support.check_call` on real calls, on Linux, where
+CI runs the pure suites, the Python tests and an uninstrumented smoke run; and
+`test/runtime.py --git-plugin`.
 
 The initial project commit range from `main` to the pull request head passed
 the local commit validator and the pull request's `checks` job. The isolated

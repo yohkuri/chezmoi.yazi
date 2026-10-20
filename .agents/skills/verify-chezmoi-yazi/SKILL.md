@@ -6,7 +6,7 @@ description: >-
   `docs/validation.md`, and how to write a terminal-driven check and its
   cleanup. Read before changing the harness, validating a change or writing a
   validation claim; not needed just to run a command, and not for what the
-  plugin's Lua must keep true, which `implement-chezmoi-yazi` covers.
+  plugin's Lua must keep true, which `implement-chezmoi-yazi` points to.
 ---
 
 # Validating a change
@@ -44,8 +44,10 @@ Every change runs `test/check.py`. Then, by what changed:
   `.github/workflows/check.yml`.
 - **`test/runtime.py`** reads plugin state through `test/probe.lua` and runs
   chezmoi through `test/command.py`, which records every call and gives
-  non-interactive ones a 10-second timeout. A pass shows the plugin's records
-  and rendering agree; it does not show the same behavior without the wrapper.
+  non-interactive ones a 10-second timeout; when a fixture ends without an
+  error, `support.check_call` checks each recorded call. A pass shows the
+  plugin's records and rendering agree; it does not show the same behavior
+  without the wrapper.
 - **`test/e2e.py`** sees only the screen, process exit and fixture files. It
   cannot say why a row is wrong, and it has no view of process counts,
   generations or the action lock; those are runtime-only assertions.

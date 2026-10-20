@@ -13,7 +13,7 @@ description: >-
 
 The invariants and their reasons are in `docs/design.md`, including the
 decisions D3 and D4; in the README, both its Plugin conventions and the
-sections that promise behaviour to users, such as Commands and Evaluation and
+sections that promise behavior to users, such as Commands and Evaluation and
 limits; and in comments in the code. Read the parts that cover what you
 change. This skill does not restate them: every earlier draft that did got
 them wrong somewhere.
@@ -23,8 +23,10 @@ them wrong somewhere.
 The suites match some of the plugin's messages, arguments and flags
 literally: the pure suites, the Python harness, and the guide text under
 `test/`. Before changing a string, an argument or a flag, search `test/` for
-it and change its matches with it. Strings that no test matches are not
-covered, so check them against the design instead.
+it. A match may be a copy that changes with it, or a check that the old value
+must stay, such as the query flags that `support.check_call` requires; decide
+which from the design and the README before changing the test. Strings that no
+test matches are not covered, so check them against the design instead.
 
 Many of these matches run only in the Yazi-driven suites, so a green
 `test/check.py` does not show that a change kept them;

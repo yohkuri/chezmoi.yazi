@@ -149,6 +149,34 @@ local diff, apply = actions.args(p, {}, "diff"), actions.args(p, {}, "apply")
 diff[1] = "apply"
 check(table.concat(diff, "\0") == table.concat(apply, "\0"), "preview and apply use identical scope/options")
 check(not table.concat(apply):find("no%-tty"), "no query flags in interactive action")
+local forced = false
+local both = { file("/d/a"), file("/d/dir", true) }
+for _, case in ipairs {
+	{ { "add" }, both },
+	{ { "add", template = true, encrypt = true }, both },
+	{ { "add", recursive = false }, both },
+	{ { "re-add" }, both },
+	{ { "re-add", recursive = false }, both },
+	{ { "diff" }, both },
+	{ { "diff", recursive = false }, both },
+	{ { "apply" }, both },
+	{ { "apply", recursive = false }, both },
+	{ { "forget" }, both },
+	{ { "destroy" }, both },
+	{ { "destroy", recursive = false }, { file("/d/a") } },
+	{ { "edit" }, { file("/d/a") } },
+	{ { "edit", apply = true }, { file("/d/a") } },
+} do
+	local planned = assert(plan(case[1], case[2]))
+	for _, stage in ipairs { planned.action.name, "edit", "diff", "apply" } do
+		for _, arg in ipairs(actions.args(planned, {}, stage)) do
+			if not forced and arg:find("^%-%-force") then
+				forced = planned.action.name .. " plan, " .. stage .. " stage: " .. arg
+			end
+		end
+	end
+end
+check(not forced, "no action passes --force: " .. tostring(forced))
 check(not actions.display("a\n\27b"):find("[%c]"), "escape display controls")
 check(actions.summary(p, "apply"):find("Source %-> destination"), "describe direction")
 print("PASS " .. n .. " action policy assertions")
