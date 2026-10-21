@@ -136,9 +136,11 @@ def stop(root, grace=10):
         f"no server running on {socket}", f"error connecting to {socket} (Connection refused)")
     assert result.returncode == 0 or (result.returncode == 1 and stopped), result.stderr
     assert panes is not None, "tmux list-panes timed out, so no leftover process was checked"
-    # Yazi waiting on a plugin's confirmation ignores the hangup and SIGTERM,
-    # also as a grandchild of the pane, as under the guide's launcher. The
-    # guide's own Yazi takes about five seconds to quit, so wait ten.
+    # Yazi whose terminal closes while a plugin waits in ya.confirm can keep
+    # running, and SIGTERM does not end it (docs/validation.md has the cause).
+    # It can be a grandchild of the pane, as under the guide's launcher, so
+    # look at whole process groups. The guide's own Yazi takes about five
+    # seconds to quit, so wait ten.
     killed = []
     for pid in settle(groups, grace):
         try:

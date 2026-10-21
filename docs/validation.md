@@ -588,6 +588,46 @@ more than before. On the same machine `test/runtime.py` passed in three runs
 `test/benchmark.py` passed, none of them killing a process. Not run: these on
 Linux, and `test/runtime.py --git-plugin`.
 
+### Yazi outliving its terminal
+
+On 2026-10-21, on macOS 26.6.2 with chezmoi 2.73.3, the leftover Yazi above
+was traced to Yazi, not this plugin, with scripts that are not kept; the
+entry's "ignored the hangup" was wrong, as the second bullet shows. Unless a
+bullet says otherwise, each opened Yazi in a private tmux, ran a plugin whose
+entry made one call, closed the terminal with `tmux kill-server` while the
+call ran and then looked for Yazi:
+
+- **Through the harness, Yazi 26.9.1, one run each unless counted.** An entry
+  waiting in `ya.confirm` left Yazi running in 3 of 3 runs, checked at 12 or
+  25 s; one of them had this plugin's setup removed. With no plugin call, or
+  an entry in `ya.sleep(15)` or `ya.input`, Yazi exited within 0.1 s. An
+  entry in a 12-second busy loop kept it until the loop ended, 10.6 s after
+  the terminal closed.
+- **SIGHUP alone, with the terminal still open, through the harness.** Yazi
+  exited after 5.1 to 5.2 s with no prompt open, at Yazi's own remove
+  confirmation and at this plugin's destroy confirmation, one run each.
+- **Without the harness or this plugin, in a directory holding a few files,
+  checked at 10 s.** `ya.confirm` left Yazi running in 9 of 9 runs, six with
+  26.9.1 and three with the nightly build 7c45837 (2026-10-20). `ya.input`
+  and Yazi's own remove confirmation each exited in 4 of 4, half on each
+  version, and `ya.which` in 2 of 2, one on each. Opened in an empty
+  directory, Yazi exited at `ya.confirm` in 3 of 3 runs with 26.9.1; why the
+  files matter was not traced.
+
+Read off the 26.9.1 source, not traced in a debugger: when the terminal is
+gone, a draw fails and Yazi's main loop returns before the quit that the
+hangup requested exits the process. Dropping the tokio runtime then waits for
+every `spawn_blocking` task, and a plugin's entry runs in one. The
+`CompletionToken` that `ya.confirm` awaits is completed only by an answer, so
+the entry does not return. Yazi's own remove confirmation awaits the same
+token in a `tokio::spawn` task, which the runtime drops instead, and
+`ya.input`'s channel closes with the prompt. Why `ya.sleep` returns was not
+traced. The nightly runs the entry under a cancellation scope; since Yazi
+still kept running, nothing on this path cancels it; which code should
+was not traced. Yazi stops reading signals after a hangup, quit or terminate signal,
+and SIGTERM did not end the leftover. Not tried: closing a real terminal
+window at the prompt, and Linux.
+
 ## Development tooling checks
 
 Locally verified on 2026-09-20:
@@ -872,10 +912,11 @@ coexistence remain unverified on Linux. Windows, older versions, interactive
 secret providers, and arbitrary external hooks are not validated. Windows is
 explicitly rejected by setup. Source-state browsing is outside this release.
 The direct-child deadline does not promise grandchild termination or cleanup
-when Yazi itself exits. Yazi waiting on the plugin's confirmation outlived its
-tmux server's hangup and SIGTERM; a terminal closed at that prompt outside tmux
-is untested. The output cap applies after line reads, so one long
-line can allocate more than the cap temporarily.
+when Yazi itself exits. In tmux, Yazi opened in a directory holding files kept
+running when its terminal closed while a plugin waited in `ya.confirm`, a
+Yazi bug traced under "Yazi outliving its terminal"; a real terminal window
+closed at that prompt is untested. The output cap applies after line reads,
+so one long line can allocate more than the cap temporarily.
 
 The pure tests are not substitutes for the Yazi suite. Scrolling through very
 large interactive lists, unusual grapheme/font combinations, and every

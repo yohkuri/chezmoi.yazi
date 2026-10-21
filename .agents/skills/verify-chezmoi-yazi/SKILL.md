@@ -97,11 +97,13 @@ readability. Say so rather than letting a green run imply it.
   marker naming this checkout. Keep both when changing cleanup; remove only
   what a test created.
 - `support.stop` kills what still runs in a pane's process group and names a
-  fixture ten seconds after the tmux server stops: Yazi waiting on the
-  plugin's confirmation ignores the hangup and SIGTERM. Under
-  `support.fixture`, a test that ended without an error then fails, since it
-  left a prompt open; `test/e2e.py` and the guide's own calls only print the
-  message, so read stderr there.
+  fixture ten seconds after the tmux server stops: Yazi whose terminal closes
+  while a plugin waits in `ya.confirm` can keep running, a Yazi bug that
+  `docs/validation.md` traces, and SIGTERM does not end it. Under
+  `support.fixture`, a test that ended without an error then fails, since
+  something was left waiting. A prompt left open in `ya.input` or `ya.which`,
+  such as the plugin's menu, lets Yazi exit and goes unnoticed. `test/e2e.py`
+  and the guide's own calls only print the message, so read stderr there.
 - Report the path a kept fixture prints (`KEEP_FIXTURE=1`, `--keep`); do not
   delete fixtures kept by runs you did not start.
 - Tests never pass `--force` to chezmoi. A prompt in a test is either expected
