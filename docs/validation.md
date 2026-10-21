@@ -535,6 +535,59 @@ input. Runtime and focused E2E checks therefore ran outside that sandbox with
 isolated config, source, destination, state, cache, and tmux paths. No new Linux
 validation was run.
 
+### Confirmation review flakes and cleanup
+
+On 2026-10-21, `confirmation_pages` ran alone in a loop on macOS 26.6.2 with
+Yazi 26.9.1 and chezmoi 2.73.3, through scripts that wrap the harness and are
+not kept:
+
+- **The resize restart.** 11 of 40 runs timed out waiting for it, 5 of 20 on an
+  idle machine and 6 of 20 beside ten `yes` processes. A trace of 24 runs saw,
+  within 0.01 s of `y`, the smaller pane's first page and the notice. At 80x18
+  the notice covers the box's `Continue?` row until it expires; the wait
+  required both at once, which held only while the notice slid away at about
+  7.3 s. That explains the resize-notification timeouts recorded above. The
+  wait now takes the notice and the smaller pane's page count, and the larger
+  pane's first page must show its own count. Each resize now waits for Yazi's
+  status bar, ending in its right-aligned position, on the new bottom row
+  instead of sleeping 0.2 s, since the plugin pages by the layout Yazi last
+  drew; a shrink can leave the old bar there, cut short.
+- **A row from outside the box.** The two failures recorded under the
+  tests entry of 2026-10-21 below did not recur in 64 runs. The one log kept
+  showed, between two rows of a path, the status bar's columns under the box:
+  the reading had gone past where the bottom border should be. `screen.box_rows`
+  now reads a box only once every row has both side borders and the bottom
+  border is drawn, counting a combining mark with the cell before it, and a
+  page is read only once two captures in a row agree, since a page change can
+  leave the borders whole over the old page's rows. `test/test_screen.py`
+  checks a covered row, a missing bottom and a combining mark at the right
+  edge. That this would have stopped those two failures is not shown.
+- **Yazi left running.** Each of the 21 failed runs left its Yazi running after
+  `tmux kill-server`. With the plugin's destroy confirmation open, Yazi ignored
+  the hangup and SIGTERM and exited only on SIGKILL. It exited with the
+  confirmation answered and with only a notice shown. In two runs with Yazi's
+  own remove confirmation open it exited, and in two alternating runs with the
+  plugin's it stayed. Ten seconds after the server stops, `support.stop` now
+  kills what still runs in a pane's process group and names a fixture, which
+  also reaches Yazi under the guide's launcher, and a test under
+  `support.fixture` that ended without an error then fails; `test/e2e.py` and
+  the guide's own calls only print it. `test/test_support.py` checks a pane
+  that exits, one that ignores both signals and one that leaves such a child;
+  counting only the panes' own processes failed the last. A first grace of two
+  seconds killed the guided walk's Yazi in `test/manual_runtime.py` three runs
+  in three. It runs in another fixture than its tmux server, so the old check
+  never watched it; at the end it showed Yazi's own "unfinished tasks, quit
+  anyway?" prompt for the `manual` plugin, and given 60 seconds it quit after
+  4.7. Whether closing a real terminal at the plugin's confirmation leaves
+  Yazi running was not checked.
+
+After the pull request's two reviews, the loop passed 30 of 30 runs. `test/check.py`
+passed with 52 core and 74 action policy assertions and 68 Python tests, two
+more than before. On the same machine `test/runtime.py` passed in three runs
+(16 passes each), and `test/e2e.py` (14), `test/manual_runtime.py` (15) and
+`test/benchmark.py` passed, none of them killing a process. Not run: these on
+Linux, and `test/runtime.py --git-plugin`.
+
 ## Development tooling checks
 
 Locally verified on 2026-09-20:
@@ -819,7 +872,9 @@ coexistence remain unverified on Linux. Windows, older versions, interactive
 secret providers, and arbitrary external hooks are not validated. Windows is
 explicitly rejected by setup. Source-state browsing is outside this release.
 The direct-child deadline does not promise grandchild termination or cleanup
-when Yazi itself exits. The output cap applies after line reads, so one long
+when Yazi itself exits. Yazi waiting on the plugin's confirmation outlived its
+tmux server's hangup and SIGTERM; a terminal closed at that prompt outside tmux
+is untested. The output cap applies after line reads, so one long
 line can allocate more than the cap temporarily.
 
 The pure tests are not substitutes for the Yazi suite. Scrolling through very

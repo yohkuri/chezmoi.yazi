@@ -1,14 +1,20 @@
 """Fast checks for the harness's byte handling and cleanup boundaries."""
 import errno
 import json
+import os
 from pathlib import Path
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
+from contextlib import redirect_stderr
+import io
 from unittest import mock
-from support import QUERY_FLAGS, REPO, Runtime, check_call, lua, owned, read, run, stop, write
+from support import (QUERY_FLAGS, REPO, Runtime, check_call, environment, leftover, lua, owned, processes,
+                     read, run, stop, write)
 
 
 class SupportTests(unittest.TestCase):
@@ -64,6 +70,47 @@ class SupportTests(unittest.TestCase):
                      [*QUERY_FLAGS, *context], [*context, "remove", "--", "/d/a"]]:
             with self.subTest(args=args), self.assertRaises(AssertionError):
                 check_call(args)
+
+    @unittest.skipUnless(shutil.which("tmux"), "tmux is not installed")
+    def test_stop_kills_only_what_outlives_the_server(self):
+        # Each pane writes its ready file once its signals are set. "child"
+        # leaves a grandchild in the pane's group, as the guide's launcher does.
+        script = ("import signal, subprocess, sys, time\n"
+                  "if sys.argv[2] != 'plain':\n"
+                  "    if sys.argv[2] == 'child':\n"
+                  "        subprocess.Popen([sys.executable, sys.argv[0], sys.argv[1], 'ignore'])\n"
+                  "        sys.argv[1] += '.parent'\n"
+                  "    else:\n"
+                  "        for number in (signal.SIGHUP, signal.SIGTERM): signal.signal(number, signal.SIG_IGN)\n"
+                  "open(sys.argv[1], 'w').close()\ntime.sleep(30)")
+        for mode, killed in [("plain", False), ("ignore", True), ("child", True)]:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory(prefix="chezmoi-yazi-test-") as directory:
+                root = Path(directory).resolve()
+                ready = root / "ready"
+                tmux = ["tmux", "-S", str(root / "tmux.sock"), "-f", "/dev/null"]
+                groups = set()
+                write(root / "pane.py", script)
+                try:
+                    subprocess.run([*tmux, "new-session", "-d", sys.executable, str(root / "pane.py"), str(ready), mode],
+                                   check=True, timeout=5, env=environment(root))
+                    pane = int(subprocess.run([*tmux, "list-panes", "-F", "#{pane_pid}"], check=True,
+                                              timeout=5, capture_output=True, env=environment(root)).stdout)
+                    for _ in range(100):
+                        if ready.exists():
+                            break
+                        time.sleep(0.05)
+                    self.assertTrue(ready.exists())
+                    groups = {group for pid, group, _ in processes() if pid == pane}
+                    errors = io.StringIO()
+                    with redirect_stderr(errors):
+                        self.assertEqual(stop(root, grace=1), killed)
+                    self.assertEqual("outlived the tmux server" in errors.getvalue(), killed)
+                finally:
+                    for pid in leftover(groups):
+                        try:
+                            os.kill(pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
 
     def test_process_timeout(self):
         with self.assertRaises(subprocess.TimeoutExpired):

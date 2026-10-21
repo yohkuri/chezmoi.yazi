@@ -36,6 +36,19 @@ class ScreenTests(unittest.TestCase):
     def test_cell_width_handles_wide_and_combining_text(self):
         self.assertEqual(screen.cell_width("界m e\N{COMBINING ACUTE ACCENT}"), 5)
 
+    def test_box_rows_require_whole_borders(self):
+        box = ["top ╭ chezmoi destroy (1/2) ╮",
+               "    │界ab                   │",
+               "    │ Continue?             │",
+               "    ╰───────────────────────╯ end"]
+        self.assertEqual(screen.box_rows("\n".join(box), "chezmoi destroy"), ["界ab", "Continue?"])
+        marked = [box[0], "    │界ab                  e\u0301│", *box[2:]]
+        self.assertEqual(screen.box_rows("\x1b[31m" + "\n".join(marked), "chezmoi destroy")[0],
+                         "界ab                  e\u0301")
+        covered = [*box[:2], "    │ Cont╭ notice ──────────", box[3]]
+        unfinished = [*box[:3], " NOR  status bar under the box"]
+        for capture in [covered, unfinished, box[1:]]:
+            self.assertIsNone(screen.box_rows("\n".join(capture), "chezmoi destroy"))
 
 if __name__ == "__main__":
     unittest.main()

@@ -373,31 +373,26 @@ def confirmation_pages(t):
         t.key(keys[name]); t.key("s")
 
     def body(capture):
-        lines = capture.splitlines()
-        top = next(i for i, line in enumerate(lines) if "╭" in line and "chezmoi destroy" in line)
-        left = screen.cell_width(lines[top].split("╭")[0])
-        width = screen.cell_width(lines[top].split("╭")[1].split("╮")[0])
-        result = []
-        for line in lines[top + 1:]:
-            if "╰" in line:
-                break
-            column, text = 0, ""
-            for char in line:
-                if left < column <= left + width:
-                    text += char
-                column += screen.cell_width(char)
-            if "[Y]es" not in text and "Continue?" not in text:
-                result.append(text.strip())
-        return "".join(result)
+        rows = screen.box_rows(capture, "chezmoi destroy")
+        return None if rows is None else "".join(
+            row for row in rows if "[Y]es" not in row and "Continue?" not in row)
 
-    for cols, rows in [(140, 40), (80, 18)]:
+    def resize(cols, rows):
+        # The plugin sizes its pages from the layout Yazi last drew, so wait
+        # until Yazi has drawn its status bar on the new bottom row. A shrink
+        # can leave the old bar there, cut before its right-aligned position.
         t.tmux("resize-window", "-t", "test", "-x", cols, "-y", rows)
-        time.sleep(0.2)
+        t.wait_screen(lambda s: len(lines := s.split("\n")) >= rows
+                      and re.search(r"NOR.*\d+/\d+\W*$", lines[rows - 1]), f"Yazi redrawn at {cols}x{rows}")
+
+    pages = {}
+    for cols, rows in [(140, 40), (80, 18)]:
+        resize(cols, rows)
         t.key("x")
         reviewed, page = "", 1
         while True:
-            capture = t.wait_screen(lambda s: f"chezmoi destroy ({page}/" in s and "Continue?" in s,
-                                    "complete confirmation page")
+            capture = t.wait_screen(lambda s: f"chezmoi destroy ({page}/" in s and "Continue?" in s
+                                    and body(s) is not None, "complete confirmation page", stable=True)
             reviewed += body(capture)
             total = int(re.search(r"chezmoi destroy \(\d+/(\d+)\)", capture)[1])
             if page == total:
@@ -406,25 +401,26 @@ def confirmation_pages(t):
             t.key("y")
             page += 1
         assert total > 1
+        pages[cols, rows] = total
         for name in names:
             escaped = str(t.dest / name).replace("\\", "\\\\").replace("\n", "\\x0a")
             assert escaped in reviewed, (escaped, reviewed)
             assert (t.source / name).exists() and (t.dest / name).exists(), "Cancellation mutated a target"
 
     # Accepting a page after a resize must restart review, never skip clipped text.
-    t.tmux("resize-window", "-t", "test", "-x", 140, "-y", 40)
-    time.sleep(0.2)
+    small = pages[80, 18]
+    resize(140, 40)
     t.key("x")
-    t.wait_screen(lambda s: "chezmoi destroy (1/" in s, "initial review page")
-    t.tmux("resize-window", "-t", "test", "-x", 80, "-y", 18)
-    time.sleep(0.2)
+    t.wait_screen(lambda s: f"chezmoi destroy (1/{pages[140, 40]})" in s, "initial review page")
+    resize(80, 18)
     t.key("y")
-    t.wait_screen(lambda s: "chezmoi destroy (1/" in s and "Continue?" in s and "Pane resized" in s,
+    # At this size the notice covers "Continue?" until it expires, so the
+    # restart shows as the smaller pane's page count.
+    t.wait_screen(lambda s: f"chezmoi destroy (1/{small})" in s and "Pane resized" in s,
                   "review restarts after resize")
     t.key("n")
     assert all((t.source / name).exists() and (t.dest / name).exists() for name in names)
-    t.tmux("resize-window", "-t", "test", "-x", 40, "-y", 12)
-    time.sleep(0.2)
+    resize(40, 12)
     t.key("x")
     t.wait_screen(lambda s: "Enlarge the current pane" in s, "too-small pane rejected")
     assert all((t.source / name).exists() and (t.dest / name).exists() for name in names)

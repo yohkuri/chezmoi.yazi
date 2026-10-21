@@ -75,6 +75,11 @@ readability. Say so rather than letting a green run imply it.
 - Send Escape on its own and let it settle before the next key, as
   `test/manual_runtime.py` does. Followed at once by a digit, it decoded as
   Alt+digit.
+- A notification can cover part of a box at small sizes, and a capture can
+  catch a redraw half done. Wait on what stays visible, and read a box only
+  once its borders are whole and two captures in a row agree
+  (`wait_screen(..., stable=True)`), as `confirmation_pages` does. After a
+  resize, wait for Yazi to redraw before a key that reads the layout.
 - Text wraps at the terminal width, and the harness resizes to as narrow as
   40 columns. Assert on a phrase that survives wrapping at the narrowest size
   the check runs at, or on `screen.row` for file rows.
@@ -91,6 +96,12 @@ readability. Say so rather than letting a green run imply it.
   opens, changes or removes a saved fixture, also requires the `manual.json`
   marker naming this checkout. Keep both when changing cleanup; remove only
   what a test created.
+- `support.stop` kills what still runs in a pane's process group and names a
+  fixture ten seconds after the tmux server stops: Yazi waiting on the
+  plugin's confirmation ignores the hangup and SIGTERM. Under
+  `support.fixture`, a test that ended without an error then fails, since it
+  left a prompt open; `test/e2e.py` and the guide's own calls only print the
+  message, so read stderr there.
 - Report the path a kept fixture prints (`KEEP_FIXTURE=1`, `--keep`); do not
   delete fixtures kept by runs you did not start.
 - Tests never pass `--force` to chezmoi. A prompt in a test is either expected
@@ -106,9 +117,9 @@ readability. Say so rather than letting a green run imply it.
 - Quote the counts `test/check.py` prints: core assertions, action policy
   assertions and Python tests. A count that changed is part of the change.
 - Disclose reruns. A failure that passed unchanged on rerun is reported as a
-  timing-sensitive failure, not dropped. The confirmation-pagination resize
-  notification has timed out this way before; a new flaky assertion is a
-  finding, not noise.
+  timing-sensitive failure, not dropped. A new flaky assertion is a finding,
+  not noise: the confirmation-pagination resize check failed this way for
+  weeks, until a trace showed its notice covering the line it waited for.
 - Distinguish an automated guide run from a human walk, and an injected
   failure from one that happened. Never record a guided-session verdict on the
   user's behalf.
