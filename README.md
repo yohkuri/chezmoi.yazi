@@ -281,6 +281,12 @@ individual nonrecursive queries because status has no NUL output format.
 Membership and status are separate snapshots; concurrent filesystem changes
 can produce a failure until the next refresh.
 
+Closing the terminal while one of the plugin's confirmations is open can leave
+Yazi running until it is killed with SIGKILL. This is a Yazi bug, seen in
+tmux on macOS with Yazi opened in a directory holding files while a plugin
+waited in `ya.confirm`; closing a real terminal window was not tried
+([validation](docs/validation.md#yazi-outliving-its-terminal)).
+
 ## Plugin conventions
 
 The layout follows [Yazi's plugin overview][plugin-overview]: `main.lua` is the
