@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import shlex
 import shutil
+import signal
 import stat
 import subprocess
 import sys
@@ -114,18 +115,68 @@ def owned(root):
     return root
 
 
-def stop(root):
+def stop(root, grace=10):
+    """Stop the fixture's tmux server; return whether a process had to be killed."""
     socket = root / "tmux.sock"
     try:
         mode = socket.lstat().st_mode
     except FileNotFoundError:
-        return
+        return False
     assert stat.S_ISSOCK(mode), "Unexpected socket path"
-    result = subprocess.run(["tmux", "-S", str(socket), "kill-server"],
-                            capture_output=True, timeout=5, env=environment(root))
+    tmux = ["tmux", "-S", str(socket)]
+    try:
+        panes = subprocess.run([*tmux, "list-panes", "-a", "-F", "#{pane_pid}"],
+                               capture_output=True, text=True, timeout=5, env=environment(root)).stdout
+    except subprocess.TimeoutExpired:
+        panes = None
+    pids = {int(pid) for pid in (panes or "").split()}
+    groups = {group for pid, group, _ in processes() if pid in pids}
+    result = subprocess.run([*tmux, "kill-server"], capture_output=True, timeout=5, env=environment(root))
     stopped = result.stderr.decode().strip() in (
         f"no server running on {socket}", f"error connecting to {socket} (Connection refused)")
     assert result.returncode == 0 or (result.returncode == 1 and stopped), result.stderr
+    assert panes is not None, "tmux list-panes timed out, so no leftover process was checked"
+    # Yazi waiting on a plugin's confirmation ignores the hangup and SIGTERM,
+    # also as a grandchild of the pane, as under the guide's launcher. The
+    # guide's own Yazi takes about five seconds to quit, so wait ten.
+    killed = []
+    for pid in settle(groups, grace):
+        try:
+            os.kill(pid, signal.SIGKILL)
+            killed.append(pid)
+        except ProcessLookupError:
+            pass
+    if killed:
+        print(f"Killed {sorted(killed)}, which outlived the tmux server", file=sys.stderr)
+    left = settle(groups, 2)
+    assert not left, f"Processes {sorted(left)} survived SIGKILL"
+    return bool(killed)
+
+
+def processes():
+    """Yield (pid, process group, command) for every process."""
+    # -ww keeps the command whole whatever COLUMNS says; any process's argv
+    # may hold bytes that are not UTF-8.
+    result = subprocess.run(["ps", "-A", "-ww", "-o", "pid=,pgid=,command="],
+                            capture_output=True, text=True, errors="replace", timeout=5)
+    assert result.returncode == 0, result.stderr
+    for line in result.stdout.splitlines():
+        pid, group, *command = line.split(None, 2)
+        yield int(pid), int(group), "".join(command)
+
+
+def leftover(groups):
+    """Return the processes of groups whose command still names a fixture."""
+    return {pid for pid, group, command in processes()
+            if group in groups and "chezmoi-yazi-test-" in command}
+
+
+def settle(groups, timeout):
+    """Wait up to timeout for the processes leftover finds to end; return those left."""
+    deadline = time.monotonic() + timeout
+    while (left := leftover(groups)) and time.monotonic() < deadline:
+        time.sleep(0.05)
+    return left
 
 
 class Runtime:
@@ -230,13 +281,16 @@ class Runtime:
             self.last_capture = capture
         return capture
 
-    def wait_screen(self, predicate, description, timeout=10):
+    def wait_screen(self, predicate, description, timeout=10, stable=False):
+        """Return a capture that satisfies predicate; with stable, only once two
+        captures in a row are the same, so that no redraw is half done."""
         deadline = time.monotonic() + timeout
-        capture = ""
+        capture = previous = ""
         while time.monotonic() < deadline:
             capture = self.capture()
-            if predicate(capture):
+            if predicate(capture) and (not stable or capture == previous):
                 return capture
+            previous = capture
             time.sleep(0.05)
         raise AssertionError(f"Timed out waiting for {description}\n{capture}\n{self.logs()}")
 
@@ -347,10 +401,10 @@ def fixture(git_plugin=None, **kwargs):
     try:
         yield instance
         # Stop Yazi first so that no call starts after the check reads them.
-        if instance.started:
-            stop(instance.root)
-            instance.started = False
+        killed = instance.started and stop(instance.root)
+        instance.started = False
         instance.check_calls()
+        assert not killed, "The test ended with a process waiting, such as on a prompt"
     finally:
         instance.close()
 
