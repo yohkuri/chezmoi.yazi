@@ -628,6 +628,14 @@ was not traced. Yazi stops reading signals after a hangup, quit or terminate sig
 and SIGTERM did not end the leftover. Not tried: closing a real terminal
 window at the prompt, and Linux.
 
+On 2026-10-22, on macOS 26.6.2 with Yazi 26.9.1, a plain `q` with no prompt
+open took 5.04 s to end Yazi in the harness's tmux in 3 of 3 runs, with
+scripts that are not kept. Read off the source: `app:quit` waits up to 5 s
+(`yazi-emulator/src/probe.rs`) for the reply to a terminal query that Yazi
+re-sends through tmux passthrough, and the detached tmux has no terminal to
+answer. The same wait would explain the 5.1 to 5.2 s after SIGHUP above;
+that path was not traced.
+
 ## Development tooling checks
 
 Locally verified on 2026-09-20:
