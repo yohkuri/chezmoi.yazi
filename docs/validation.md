@@ -898,6 +898,30 @@ multiple acquisition passes. The default 2-second reuse, 8 extra recovery
 queries, and 10-second subprocess timeout are configurable operating limits,
 not measured optimal settings.
 
+### Cancelled acquisition passes
+
+Read off the source before this change: once a refresh, navigation or action
+invalidated a running status pass, `process.run` killed the query in flight,
+but `core.collect` only skipped subdividing it and went on to spawn every
+remaining chunk, each killed at its first check. A query still waiting for
+output when its pass was cancelled ended as a timeout instead. An action
+waits for that worker before preflight. Now `process.run` checks for
+cancellation before it spawns, so a cancelled pass starts no further
+commands, and `core.collect` stops at the first cancelled query instead of
+walking its remaining chunks. A new case in `test/core.lua`, two one-path
+chunks, sees two queries when the first times out and one when it is
+cancelled; against the old `core.lua` the latter saw two. No pure suite runs
+`process.run`.
+
+On 2026-10-22, on macOS 26.6.2 with Yazi 26.9.1 and chezmoi 2.73.3,
+`test/check.py` passed with 55 core and 74 action policy assertions and 68
+Python tests, three core assertions more than before. `test/runtime.py` (16
+passes), `test/e2e.py` (14) and `test/manual_runtime.py` (15) passed in one
+run each, and `support.stop` killed no leftover process. No Yazi-driven check
+counts the commands started after a cancellation, so that rests on the code
+and the pure case; how much sooner an action starts in a large tree was not
+measured. Not run: these on Linux, and `test/runtime.py --git-plugin`.
+
 ## Force-push commit validation
 
 On 2026-10-03, PR #3 was rebased onto the dependency-update commit from PR #4.

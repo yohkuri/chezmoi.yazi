@@ -4,6 +4,9 @@ local M = {}
 -- stderr is deliberately discarded: besides containing secrets, read_line_with
 -- can lose partial stdout when a concurrent stderr read wins (Yazi 26.9.1).
 function M.run(command, args, timeout, limit, cancelled)
+	if cancelled and cancelled() then
+		return nil, "cancelled"
+	end
 	local child = Command(command):arg(args):stdin(Command.NULL):stdout(Command.PIPED):stderr(Command.NULL):spawn()
 	if not child then
 		return nil, "spawn"
