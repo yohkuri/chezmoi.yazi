@@ -153,6 +153,26 @@ equal(calls - before <= 4, true, "bounded failure subdivision")
 r = core.collect(files, opts, function() return nil, "spawn" end)
 equal(r.records["/d/clean"].membership, "error")
 equal(r.error, "spawn")
+local function failing(why)
+	local count = { queries = 0 }
+	return function(args)
+		if args[1] ~= "status" then
+			return run(args)
+		end
+		count.queries = count.queries + 1
+		return nil, why
+	end,
+		count
+end
+local two = { { path = "/d/clean" }, { path = "/d/local" } }
+local one_per_chunk = { directory_summary = false, argument_bytes = 9, max_retries = 8 }
+local timeout, timeouts = failing("timeout")
+core.collect(two, one_per_chunk, timeout)
+equal(timeouts.queries, 2, "a timed-out chunk does not stop the next")
+local cancelled, cancellations = failing("cancelled")
+r = core.collect(two, one_per_chunk, cancelled)
+equal(cancellations.queries, 1, "no query after cancellation")
+equal(r.error, "cancelled")
 table.remove(managed) -- Remove the exceptional path to force a recursive batch.
 for i = 1, 100 do
 	local path = "/d/dir/long-name-" .. i

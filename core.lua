@@ -156,7 +156,8 @@ function M.collect(files, opts, run)
 
 	local values, retries, last_error = {}, opts.max_retries, nil
 	local function query(paths, recursive, recovery)
-		if #paths == 0 then
+		-- A cancelled pass is never published; walking its remaining chunks only delays the next one.
+		if #paths == 0 or last_error == "cancelled" then
 			return
 		end
 		local coverage = {}

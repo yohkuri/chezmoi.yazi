@@ -273,7 +273,8 @@ does not guarantee termination of arbitrary grandchildren. The output limit
 is checked after each line read; it is not a strict peak-memory limit for one
 very large unterminated line. Cancellation takes effect between reads, at
 latest after the current command's timeout. A pass may contain multiple
-commands, each with its own deadline.
+commands, each with its own deadline; a cancelled pass starts no further
+commands.
 
 NUL-separated managed paths and validated status coverage prevent failed or
 ambiguous output from becoming a false clean result. CR/LF filenames require
