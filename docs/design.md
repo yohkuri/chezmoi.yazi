@@ -70,12 +70,14 @@ The selected interaction defaults are:
   alongside the seven basic actions. Reject unsupported flags and explain the
   distinction between forget and destroy when `remove` is requested.
 
-`actions.lua` contains argument validation, target reduction, command vectors,
-and confirmation policy. `interaction.lua` owns fresh metadata acquisition and
-the asynchronous UI. `main.lua` owns the operation lock, immutable selection
+`actions.lua` contains argument validation, the fresh chezmoi queries each
+action needs, target reduction, command vectors, and confirmation policy.
+`core.lua` builds the discovery and `managed` queries that status acquisition
+and actions share. `interaction.lua` reads local file metadata and owns the
+asynchronous UI. `main.lua` owns the operation lock, immutable selection
 snapshot, and status-worker coordination. The shared context argument builder
-passes the same executable/config/source/destination/state/cache to queries and
-actions without sharing query-specific flags.
+in `core.lua` passes the same executable/config/source/destination/state/cache
+to queries and actions without sharing query-specific flags.
 
 Confirmation pages are built from Yazi's prewrapped Unicode-aware lines, with
 room reserved for the dialog borders, buttons, and continuation prompt. Page
@@ -84,9 +86,11 @@ truncation. A resize detected after accepting a page restarts the entire review.
 Panes below 32 columns or 8 rows reject confirmation until enlarged. No command
 runs unless all pages are accepted at a consistent pane size.
 
-The preflight queries all managed entries, and a files/symlinks/directories
-subset excluding externals for edit/forget/destroy. Removal and script entries
-may have status markers without being editable source files. Filesystem metadata
+The preflight queries all managed entries, a files/symlinks/directories subset
+excluding externals for edit/forget/destroy, and the directories excluding
+externals for a nonrecursive destroy, whose destination metadata can differ
+from the source tree it removes. Removal and script entries may have status
+markers without being editable source files. Filesystem metadata
 is read without following the selected symlink. Other applicability decisions
 and recursive entry exclusions remain chezmoi's responsibility; a successful
 command does not claim every entry was changed. Failure can leave partial work.

@@ -1,4 +1,4 @@
--- Command policy and argument construction, independent of Yazi's UI.
+-- Command policy, preflight queries, and argument construction, independent of Yazi's UI.
 local core = require(".core")
 local M = {}
 -- recursive: takes --recursive. options: other accepted options; argv is built
@@ -66,7 +66,39 @@ function M.display(path)
 	return (path:gsub("\\", "\\\\"):gsub("[%z\1-\31\127]", function(c) return string.format("\\x%02x", c:byte()) end))
 end
 
-function M.prepare(action, files, destination, source, managed, editable)
+-- Without --recursive, chezmoi destroy still deletes a source directory's descendants.
+local function shallow_destroy(action) return action.name == "destroy" and action.recursive == false end
+
+-- Fresh chezmoi state for one action; a linemode marker is never evidence.
+function M.facts(action, run)
+	local facts = core.dirs(run)
+	if not facts then
+		return nil, "Cannot resolve chezmoi context. No action was run."
+	end
+	facts.managed = core.list_managed(run, facts.destination, "all", "none")
+	if not facts.managed then
+		return nil, "Cannot acquire managed targets. No action was run."
+	end
+	-- An index that was not queried stays absent, so prepare errors rather than trusts it.
+	if commands[action.name].editable then
+		facts.editable = core.list_managed(run, facts.destination, "files,symlinks,dirs", "externals")
+		if not facts.editable then
+			return nil, "Cannot acquire source entries. No action was run."
+		end
+	end
+	if shallow_destroy(action) then
+		-- Destination metadata can differ from the source tree destroy removes.
+		facts.source_dirs = core.list_managed(run, facts.destination, "dirs", "externals")
+		if not facts.source_dirs then
+			return nil, "Cannot acquire source directories. No action was run."
+		end
+	end
+	return facts
+end
+
+-- files carry fresh local metadata: local_path, exists, dir and special.
+function M.prepare(action, files, facts)
+	local command, destination, source, managed = commands[action.name], facts.destination, facts.source, facts.managed
 	if #files == 0 then
 		return nil, "No target. Select a file or hover over one."
 	end
@@ -87,16 +119,16 @@ function M.prepare(action, files, destination, source, managed, editable)
 			why = "Unsupported file type"
 		elseif action.name == "edit" and file.dir then
 			why = "Select files inside the directory to edit"
-		elseif action.name == "destroy" and action.recursive == false and (file.dir or file.source_dir) then
+		elseif shallow_destroy(action) and (file.dir or facts.source_dirs[path]) then
 			why = "Non-recursive destroy cannot target a directory; chezmoi would still delete its descendants"
 		elseif action.name ~= "add" and not managed[path] then
 			-- The destination root itself is not listed by managed.
-			local root = path == destination and commands[action.name].root and action.recursive and next(managed)
+			local root = path == destination and command.root and action.recursive and next(managed)
 			if not root then
 				why = "Not managed by chezmoi"
 			end
 		end
-		if not why and commands[action.name].editable and not editable[path] then
+		if not why and command.editable and not facts.editable[path] then
 			why = "No editable source entry (external, removal, or script)"
 		end
 		if why then

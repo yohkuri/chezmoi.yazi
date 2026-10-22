@@ -1,6 +1,5 @@
--- Async UI and fresh preflight for explicit user actions.
+-- Async UI, local file metadata, and staged execution for explicit user actions.
 local actions = require(".actions")
-local core = require(".core")
 local process = require(".process")
 local M = {}
 
@@ -85,42 +84,19 @@ local function preflight(snapshot, action)
 	if #snapshot.files == 0 then
 		return nil, "No target. Select a file or hover over one."
 	end
-	local run = process.client(snapshot.opts)
-	local dirs = core.dirs(run)
-	if not dirs then
-		return nil, "Cannot resolve chezmoi context. No action was run."
-	end
-	local destination, source = dirs.destination, dirs.source
-	local managed = core.list_managed(run, destination, "all", "none")
-	if not managed then
-		return nil, "Cannot acquire managed targets. No action was run."
-	end
-	local editable
-	editable = {}
-	if action.name == "edit" or action.name == "forget" or action.name == "destroy" then
-		editable = core.list_managed(run, destination, "files,symlinks,dirs", "externals")
-		if not editable then
-			return nil, "Cannot acquire source entries. No action was run."
-		end
-	end
-	local source_dirs
-	if action.name == "destroy" and action.recursive == false then
-		-- Destination metadata can differ from the source tree destroy removes.
-		source_dirs = core.list_managed(run, destination, "dirs", "externals")
-		if not source_dirs then
-			return nil, "Cannot acquire source directories. No action was run."
-		end
+	local facts, err = actions.facts(action, process.client(snapshot.opts))
+	if not facts then
+		return nil, err
 	end
 	for _, file in ipairs(snapshot.files) do
 		if file.local_path then
 			local cha = fs.cha(Url(file.path), false)
 			file.exists = cha ~= nil
 			file.dir = cha and cha.is_dir and not cha.is_link or false
-			file.source_dir = source_dirs and source_dirs[core.path(file.path)] or false
 			file.special = cha and (cha.is_block or cha.is_char or cha.is_fifo or cha.is_sock) or false
 		end
 	end
-	return actions.prepare(action, snapshot.files, destination, source, managed, editable)
+	return actions.prepare(action, snapshot.files, facts)
 end
 
 function M.run(snapshot, action)
