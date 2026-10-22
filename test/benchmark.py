@@ -11,7 +11,7 @@ for count in [100, 5000]:
         for index in range(count):
             write(directory / f"file-{index:05d}", "fixture\n")
         before = time.monotonic()
-        t.chezmoi("execute-template", "{{ .chezmoi.destDir }}")
+        t.chezmoi("execute-template", '{{ .chezmoi.destDir }}{{ "\\x00" }}{{ .chezmoi.sourceDir }}')
         managed = t.chezmoi("managed", "--include=all", "--exclude=none", "--path-style=absolute", "--nul-path-separator")
         status = t.chezmoi("status", "--include=all", "--exclude=none", "--path-style=absolute",
                            "--recursive=true", "--", t.dest / ".config")

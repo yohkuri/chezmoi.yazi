@@ -86,28 +86,19 @@ local function preflight(snapshot, action)
 		return nil, "No target. Select a file or hover over one."
 	end
 	local run = process.client(snapshot.opts)
-	local context = run { "execute-template", [[{{ .chezmoi.destDir }}{{ "\x00" }}{{ .chezmoi.sourceDir }}]] }
-	local destination, source = (context or ""):match("^([^%z]+)%z([^%z]+)$")
-	destination, source = core.path(destination), core.path(source)
-	if not destination or not source then
+	local dirs = core.dirs(run)
+	if not dirs then
 		return nil, "Cannot resolve chezmoi context. No action was run."
 	end
-	local output = run { "managed", "--include=all", "--exclude=none", "--path-style=absolute", "--nul-path-separator" }
-	local managed = output and core.managed(output, destination)
+	local destination, source = dirs.destination, dirs.source
+	local managed = core.list_managed(run, destination, "all", "none")
 	if not managed then
 		return nil, "Cannot acquire managed targets. No action was run."
 	end
 	local editable
 	editable = {}
 	if action.name == "edit" or action.name == "forget" or action.name == "destroy" then
-		output = run {
-			"managed",
-			"--include=files,symlinks,dirs",
-			"--exclude=externals",
-			"--path-style=absolute",
-			"--nul-path-separator",
-		}
-		editable = output and core.managed(output, destination)
+		editable = core.list_managed(run, destination, "files,symlinks,dirs", "externals")
 		if not editable then
 			return nil, "Cannot acquire source entries. No action was run."
 		end
@@ -115,14 +106,7 @@ local function preflight(snapshot, action)
 	local source_dirs
 	if action.name == "destroy" and action.recursive == false then
 		-- Destination metadata can differ from the source tree destroy removes.
-		output = run {
-			"managed",
-			"--include=dirs",
-			"--exclude=externals",
-			"--path-style=absolute",
-			"--nul-path-separator",
-		}
-		source_dirs = output and core.managed(output, destination)
+		source_dirs = core.list_managed(run, destination, "dirs", "externals")
 		if not source_dirs then
 			return nil, "Cannot acquire source directories. No action was run."
 		end

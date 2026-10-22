@@ -1,4 +1,4 @@
-local actions = require(".actions")
+local core = require(".core")
 local M = {}
 
 -- stderr is deliberately discarded: besides containing secrets, read_line_with
@@ -63,7 +63,7 @@ function M.run(command, args, timeout, limit, cancelled)
 end
 
 function M.client(opts, cancelled)
-	local context = actions.context(opts)
+	local context = core.context(opts)
 	return function(args)
 		local all = {
 			"--no-tty",

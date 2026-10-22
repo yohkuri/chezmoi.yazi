@@ -96,25 +96,54 @@ function M.failed(files, reason)
 	return { records = records, error = reason }
 end
 
--- run(args) returns stdout or nil plus a sanitized failure category.
-function M.collect(files, opts, run)
-	local destination, err = run { "execute-template", "{{ .chezmoi.destDir }}" }
-	destination = destination and M.path(destination)
-	if not destination then
-		return M.failed(files, err or "parse")
+-- The same executable, configuration and state for queries and actions.
+function M.context(opts)
+	local args = {}
+	for _, key in ipairs { "config", "source", "destination", "persistent_state", "cache" } do
+		if opts[key] then
+			args[#args + 1], args[#args + 2] = "--" .. key:gsub("_", "-"), opts[key]
+		end
 	end
-	local output
-	output, err = run {
+	return args
+end
+
+-- run(args) returns stdout or nil plus a sanitized failure category.
+function M.dirs(run)
+	local output, err = run { "execute-template", [[{{ .chezmoi.destDir }}{{ "\x00" }}{{ .chezmoi.sourceDir }}]] }
+	if not output then
+		return nil, err
+	end
+	local destination, source = output:match("^([^%z]+)%z([^%z]+)$")
+	destination, source = M.path(destination), M.path(source)
+	if not destination or not source then
+		return nil, "parse"
+	end
+	return { destination = destination, source = source }
+end
+
+-- Every query names both filters, so the user's include/exclude never narrows it.
+function M.list_managed(run, destination, include, exclude)
+	local output, err = run {
 		"managed",
-		"--include=all",
-		"--exclude=none",
+		"--include=" .. include,
+		"--exclude=" .. exclude,
 		"--path-style=absolute",
 		"--nul-path-separator",
 	}
-	local index
-	if output then
-		index, err = M.managed(output, destination)
+	if not output then
+		return nil, err
 	end
+	return M.managed(output, destination)
+end
+
+function M.collect(files, opts, run)
+	local dirs, err = M.dirs(run)
+	if not dirs then
+		return M.failed(files, err or "parse")
+	end
+	local destination = dirs.destination
+	local index
+	index, err = M.list_managed(run, destination, "all", "none")
 	if not index then
 		local failed = M.failed(files, err)
 		failed.destination = destination

@@ -34,6 +34,21 @@ end
 equal(core.status("DA /d/new\nline\n", {}, "/d/new\nline")["/d/new\nline"], "DA")
 equal(core.status("DA /d/new\nline\n M /d/a\n", {}, "/d/new\nline"), nil)
 equal(#core.chunks({ "aaaa", "bbbb", "cc" }, 9), 2)
+local function answer(output, why)
+	return function() return output, why end
+end
+local template
+local dirs = assert(core.dirs(function(args)
+	template = args[2]
+	return "/d/./x\0/s/../t"
+end))
+equal(dirs.destination, "/d/x")
+equal(dirs.source, "/t")
+equal(template, [[{{ .chezmoi.destDir }}{{ "\x00" }}{{ .chezmoi.sourceDir }}]], "one query for both directories")
+for _, bad in ipairs { "/d", "/d\0/s\0", "/d\0s", "\0/s" } do
+	equal(select(2, core.dirs(answer(bad))), "parse", "reject malformed directories")
+end
+equal(select(2, core.dirs(answer(nil, "timeout"))), "timeout")
 
 local opts = { directory_summary = true, argument_bytes = 8192, max_retries = 8 }
 local managed = { "/d/clean", "/d/dir", "/d/dir/new", "/d/dir/other", "/d/local" }
@@ -42,7 +57,7 @@ local broken, calls, empty_queries, recursive_queries, max_argument_bytes = {}, 
 local unfiltered = 0
 local function run(args)
 	if args[1] == "execute-template" then
-		return "/d"
+		return "/d\0/s"
 	end
 	local targets, recursive, include, exclude, filters, after = {}, false, false, false, 0, false
 	for _, arg in ipairs(args) do
