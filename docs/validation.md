@@ -874,6 +874,41 @@ The initial project commit range from `main` to the pull request head passed
 the local commit validator and the pull request's `checks` job. The isolated
 Git histories above remain the negative-case coverage for invalid messages.
 
+### Dependency updates
+
+On 2026-10-22, CI annotated that `actions/checkout` v4, `actions/setup-node` v4
+and `jdx/mise-action` v3 target the deprecated Node.js 20. The workflow moved
+to checkout and setup-node v7 and mise-action v5, and `actions/upload-artifact`
+from v4 to v7 alongside them; its step runs only when E2E fails, so it never
+warned and v7 has not run. commitlint moved to 21.2.4. None of the breaking
+changes in their release notes applies: `package.json` has no `packageManager`
+field, `npm` caching is set explicitly, checkout keeps
+`persist-credentials: false`, and mise-action's new 24-hour delay concerns the
+mise binary only, not the tools `mise.toml` pins. That is a reading of the
+notes, not a run of each changed path.
+
+`test/check.py` passed on macOS 26.6.2 with 63 core and 126 action policy
+assertions and 68 Python tests, whose commit-validation cases ran commitlint
+21.2.4. On PR #16's first push, the `checks` job, whose `ubuntu-latest` was
+already the `ubuntu-26.04` image, and `E2E smoke` on `ubuntu-24.04` passed for
+both the push and the pull request; mise-action selected mise 2026.10.17. Their
+only annotation left was the `ubuntu-latest` migration notice. The `checks` job
+now names `ubuntu-26.04`, so its Ubuntu release changes only by an edit,
+though GitHub still updates the image's packages weekly; E2E stays on 24.04,
+where its pinned binaries were validated.
+
+`.github/dependabot.yml` asks for grouped monthly updates. Two of Dependabot's
+own commit messages, taken from `actions/checkout` with their headers rewritten
+the way this configuration words them, passed `npm run lint:commits -- --file`:
+commitlint skips body lines holding a URL, and the bodies are ASCII. A grouped
+header such as `build: bump the npm group with 3 updates` fits, and so does
+`ci: bump actions/upload-artifact from 7 to 8 in the actions group`; a
+single-package header such as
+`build: bump @commitlint/config-conventional from 21.2.4 to 21.3.0 in the npm group`
+is 82 columns and fails. No Dependabot pull request has run here yet. Its
+cooldown covers only Dependabot: this change took commitlint 21.2.4 and
+`fast-uri` 3.1.9 by hand, within four days of their releases.
+
 ## Acquisition measurement
 
 ```sh

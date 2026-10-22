@@ -337,7 +337,12 @@ Yazi types are downloaded to ignored `.dev/types` at a fixed revision with a
 SHA-256 check. `types/compat.lua` supplies missing runtime declarations and the
 plugin theme extension. No personal Yazi configuration is required.
 JavaScript tools are locked in `package-lock.json`. None of these tools is a
-plugin runtime dependency.
+plugin runtime dependency. Each month Dependabot opens one grouped pull request
+for the npm packages and one for the workflow's actions, plus one per security
+fix as it is published (`.github/dependabot.yml`). It does not update
+`mise.toml`, the Yazi type revision, or the workflow's runner labels and
+SHA-256-pinned Yazi and chezmoi downloads. Its commits go through the same
+commit validation.
 
 Validate the commits that a pull request will introduce:
 

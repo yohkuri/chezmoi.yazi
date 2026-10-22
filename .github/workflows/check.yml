@@ -2,6 +2,10 @@ name: checks
 
 on:
   push:
+    # Dependabot's pull requests run the same jobs through pull_request. A
+    # branch filter alone would stop tag pushes, so tags are listed too.
+    branches-ignore: ["dependabot/**"]
+    tags: ["**"]
   pull_request:
 
 permissions:
@@ -9,15 +13,15 @@ permissions:
 
 jobs:
   checks:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: jdx/mise-action@v3
-      - uses: actions/setup-node@v4
+      - uses: jdx/mise-action@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -66,11 +70,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: jdx/mise-action@v3
+      - uses: jdx/mise-action@v5
       - name: Install tmux and pinned runtime binaries
         env:
           YAZI_URL: https://github.com/sxyazi/yazi/releases/download/v26.9.1/yazi-x86_64-unknown-linux-gnu.zip
@@ -100,7 +104,7 @@ jobs:
         run: test/e2e.py --smoke --artifacts "$RUNNER_TEMP/chezmoi-yazi-e2e"
       - name: Upload E2E failure evidence
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-smoke-${{ github.run_attempt }}
           path: ${{ runner.temp }}/chezmoi-yazi-e2e
