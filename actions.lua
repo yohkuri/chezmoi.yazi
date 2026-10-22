@@ -36,16 +36,6 @@ function M.parse(args)
 	return action
 end
 
-function M.context(opts)
-	local args = {}
-	for _, key in ipairs { "config", "source", "destination", "persistent_state", "cache" } do
-		if opts[key] then
-			args[#args + 1], args[#args + 2] = "--" .. key:gsub("_", "-"), opts[key]
-		end
-	end
-	return args
-end
-
 -- Escape controls in UI text, never in the actual argument vector.
 function M.display(path)
 	return (path:gsub("\\", "\\\\"):gsub("[%z\1-\31\127]", function(c) return string.format("\\x%02x", c:byte()) end))
@@ -125,7 +115,7 @@ end
 
 function M.args(plan, opts, name)
 	name = name or plan.action.name
-	local args = M.context(opts)
+	local args = core.context(opts)
 	args[#args + 1] = name
 	-- The plugin owns the separate preview/confirmation/apply stages.
 	if name == "edit" then

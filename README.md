@@ -254,8 +254,9 @@ desc = "Reload theme"
 
 ## Evaluation and limits
 
-Background status acquisition calls destination discovery, `managed`, and
-`status`; it never calls mutation commands. Explicit actions are described
+Background status acquisition calls `execute-template` for the destination
+and source directories, `managed`, and `status`; it never calls mutation
+commands. Explicit actions are described
 above. Templates and encrypted files are evaluated by
 chezmoi, with all entry categories included and secret skipping disabled.
 Thus configured `include`/`exclude` preferences for a bare status command are
