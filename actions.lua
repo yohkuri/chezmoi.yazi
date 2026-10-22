@@ -1,32 +1,57 @@
 -- Command policy and argument construction, independent of Yazi's UI.
 local core = require(".core")
 local M = {}
+-- recursive: takes --recursive. options: other accepted options; argv is built
+-- in M.args. editable: targets need a source entry. root: may target the
+-- destination root, which managed omits. confirm: when the plugin asks first.
+-- effect: the summary line. menu and refresh are the plugin's own commands.
 local commands = {
-	menu = true,
-	refresh = true,
-	add = true,
-	["re-add"] = true,
-	edit = true,
-	diff = true,
-	apply = true,
-	forget = true,
-	destroy = true,
+	menu = {},
+	refresh = {},
+	add = {
+		recursive = true,
+		options = { template = true, encrypt = true },
+		confirm = "broad",
+		effect = "Destination -> source (existing source entries may be replaced).",
+	},
+	["re-add"] = {
+		recursive = true,
+		root = true,
+		confirm = "broad",
+		effect = "Destination -> source. Templates and non-files are skipped by chezmoi.",
+	},
+	edit = {
+		options = { apply = true },
+		editable = true,
+		effect = "Edit source entries; destination files are unchanged until apply.",
+	},
+	diff = { recursive = true, root = true, effect = "Preview source -> destination changes." },
+	apply = {
+		recursive = true,
+		root = true,
+		effect = "Source -> destination. Configured entry types, including scripts, are respected.",
+	},
+	forget = { editable = true, confirm = "always", effect = "Remove source entries; keep destination files." },
+	destroy = {
+		recursive = true,
+		editable = true,
+		confirm = "always",
+		effect = "Permanently delete source AND destination entries.",
+	},
 }
-local recursive = { add = true, ["re-add"] = true, diff = true, apply = true, destroy = true }
 
 function M.parse(args)
 	local name = args[1] or "refresh"
-	if not commands[name] then
+	local command = commands[name]
+	if not command then
 		return nil,
 			name == "remove" and "remove is unavailable. Use forget (keep files) or destroy (delete files)."
 				or "Unknown chezmoi command. Use menu for available actions."
 	end
-	local action = { name = name, recursive = recursive[name] }
+	local action = { name = name, recursive = command.recursive }
 	for key, value in pairs(args) do
 		if key ~= 1 then
-			local allowed = key == "recursive" and recursive[name]
-				or (key == "template" or key == "encrypt") and name == "add"
-				or key == "apply" and name == "edit"
+			local allowed = key == "recursive" and command.recursive or command.options and command.options[key]
 			if not allowed or value ~= true and value ~= false and value ~= "true" and value ~= "false" then
 				return nil, "Unsupported option: " .. tostring(key)
 			end
@@ -66,19 +91,12 @@ function M.prepare(action, files, destination, source, managed, editable)
 			why = "Non-recursive destroy cannot target a directory; chezmoi would still delete its descendants"
 		elseif action.name ~= "add" and not managed[path] then
 			-- The destination root itself is not listed by managed.
-			local root = path == destination
-				and (action.name == "diff" or action.name == "apply" or action.name == "re-add")
-				and action.recursive
-				and next(managed)
+			local root = path == destination and commands[action.name].root and action.recursive and next(managed)
 			if not root then
 				why = "Not managed by chezmoi"
 			end
 		end
-		if
-			not why
-			and (action.name == "edit" or action.name == "forget" or action.name == "destroy")
-			and not editable[path]
-		then
+		if not why and commands[action.name].editable and not editable[path] then
 			why = "No editable source entry (external, removal, or script)"
 		end
 		if why then
@@ -126,7 +144,7 @@ function M.args(plan, opts, name)
 	if name == "apply" or name == "diff" and (plan.action.name == "apply" or plan.action.apply) then
 		args[#args + 1], args[#args + 2] = "--include=all", "--exclude=none"
 	end
-	if recursive[name] then
+	if commands[name].recursive then
 		args[#args + 1] = "--recursive=" .. tostring(plan.action.recursive ~= false)
 	end
 	if name == "add" then
@@ -144,22 +162,13 @@ function M.args(plan, opts, name)
 end
 
 function M.confirm_before(plan)
-	local name = plan.action.name
-	return name == "forget" or name == "destroy" or (name == "add" or name == "re-add") and plan.broad
+	local confirm = commands[plan.action.name].confirm
+	return confirm == "always" or confirm == "broad" and plan.broad
 end
 
 function M.summary(plan, name)
 	name = name or plan.action.name
-	local effects = {
-		add = "Destination -> source (existing source entries may be replaced).",
-		["re-add"] = "Destination -> source. Templates and non-files are skipped by chezmoi.",
-		forget = "Remove source entries; keep destination files.",
-		destroy = "Permanently delete source AND destination entries.",
-		apply = "Source -> destination. Configured entry types, including scripts, are respected.",
-		edit = "Edit source entries; destination files are unchanged until apply.",
-		diff = "Preview source -> destination changes.",
-	}
-	local lines = { effects[name], "Targets: " .. #plan.targets }
+	local lines = { commands[name].effect, "Targets: " .. #plan.targets }
 	for _, target in ipairs(plan.targets) do
 		local scope = target.dir and (plan.action.recursive == false and " [directory only]" or " [including descendants]")
 			or ""
