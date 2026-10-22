@@ -52,6 +52,12 @@ check(
 )
 check(plan({ "destroy" }, { replaced_dir }) ~= nil, "recursive destroy still accepts a replaced source directory")
 check(plan({ "add" }, { file("/d/source/a") }) == nil, "reject source tree")
+-- managed never lists the destination root.
+for _, name in ipairs { "re-add", "diff", "apply" } do
+	check(plan({ name }, { file("/d", true) }), name .. " may target the destination root")
+	check(plan({ name, recursive = false }, { file("/d", true) }) == nil, name .. " targets the root only recursively")
+end
+check(plan({ "forget" }, { file("/d", true) }) == nil, "forget cannot target the destination root")
 local nested_source = "/d/.local/share/chezmoi"
 local nested_managed = { ["/d/a"] = true, ["/d/.local"] = true, ["/d/.local/bin"] = true, ["/d/.locality"] = true }
 for _, path in ipairs { "/d", "/d/.local", "/d/.local/share", "/d/.local/bin/.." } do
