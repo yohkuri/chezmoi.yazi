@@ -63,7 +63,7 @@ def environment(root):
 # process.client puts these before every query; they keep its output exact.
 QUERY_FLAGS = ["--no-tty", "--no-pager", "--color=false", "--progress=false", "--skip-secrets=false"]
 # Queries override the user's filters. The preflight narrows its source-entry
-# and source-directory queries on purpose (interaction.lua); any managed query
+# and source-directory queries on purpose (actions.facts); any managed query
 # may pass those pairs, since a call does not say which query it is.
 FILTERS = {"status": {("all", "none")},
            "managed": {("all", "none"), ("files,symlinks,dirs", "externals"), ("dirs", "externals")}}

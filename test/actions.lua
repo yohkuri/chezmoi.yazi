@@ -8,8 +8,17 @@ end
 local function file(path, dir) return { path = path, local_path = true, exists = true, dir = dir or false } end
 local managed = { ["/d/a"] = true, ["/d/dir"] = true, ["/d/dir/b"] = true, ["/d/script"] = true }
 local editable = { ["/d/a"] = true, ["/d/dir"] = true, ["/d/dir/b"] = true }
-local function plan(args, files)
-	return actions.prepare(assert(actions.parse(args)), files, "/d", "/d/source", managed, editable)
+local function facts(source, entries, source_dirs)
+	return {
+		destination = "/d",
+		source = source or "/d/source",
+		managed = entries or managed,
+		editable = entries or editable,
+		source_dirs = source_dirs or {},
+	}
+end
+local function plan(args, files, source_dirs)
+	return actions.prepare(assert(actions.parse(args)), files, facts(nil, nil, source_dirs))
 end
 
 for _, args in ipairs {
@@ -40,23 +49,29 @@ check(
 	plan({ "destroy", recursive = false }, { file("/d/a"), file("/d/dir", true) }) == nil,
 	"unsafe directory rejects the entire selection"
 )
-local replaced_dir = file("/d/dir")
-replaced_dir.source_dir = true
+local replaced_dir, source_dirs = file("/d/dir"), { ["/d/dir"] = true }
 check(
-	plan({ "destroy", recursive = false }, { replaced_dir }) == nil,
+	plan({ "destroy", recursive = false }, { replaced_dir }, source_dirs) == nil,
 	"reject nonrecursive destroy when only the source is a directory"
 )
 check(
-	plan({ "destroy", recursive = false }, { file("/d/a"), replaced_dir }) == nil,
+	plan({ "destroy", recursive = false }, { file("/d/a"), replaced_dir }, source_dirs) == nil,
 	"source directory rejects the entire selection"
 )
-check(plan({ "destroy" }, { replaced_dir }) ~= nil, "recursive destroy still accepts a replaced source directory")
+check(
+	plan({ "destroy" }, { replaced_dir }, source_dirs) ~= nil,
+	"recursive destroy still accepts a replaced source directory"
+)
 check(plan({ "add" }, { file("/d/source/a") }) == nil, "reject source tree")
 -- managed never lists the destination root.
 for _, name in ipairs { "re-add", "diff", "apply" } do
 	check(plan({ name }, { file("/d", true) }), name .. " may target the destination root")
 	check(plan({ name, recursive = false }, { file("/d", true) }) == nil, name .. " targets the root only recursively")
 end
+check(
+	actions.prepare(assert(actions.parse { "apply" }), { file("/d", true) }, facts(nil, {})) == nil,
+	"no managed entry, no root"
+)
 check(plan({ "forget" }, { file("/d", true) }) == nil, "forget cannot target the destination root")
 local nested_source = "/d/.local/share/chezmoi"
 local nested_managed = { ["/d/a"] = true, ["/d/.local"] = true, ["/d/.local/bin"] = true, ["/d/.locality"] = true }
@@ -65,37 +80,20 @@ for _, path in ipairs { "/d", "/d/.local", "/d/.local/share", "/d/.local/bin/.."
 		local p, err = actions.prepare(
 			assert(actions.parse { "destroy", recursive = recursive }),
 			{ file("/d/a"), file(path, true) },
-			"/d",
-			nested_source,
-			nested_managed,
-			nested_managed
+			facts(nested_source, nested_managed)
 		)
 		check(p == nil and err:find("contains the source directory", 1, true), "source ancestor rejects entire destroy")
 	end
 end
 for _, name in ipairs { "add", "diff", "apply", "forget" } do
 	check(
-		actions.prepare(
-			assert(actions.parse { name }),
-			{ file("/d/.local", true) },
-			"/d",
-			nested_source,
-			nested_managed,
-			nested_managed
-		),
+		actions.prepare(assert(actions.parse { name }), { file("/d/.local", true) }, facts(nested_source, nested_managed)),
 		"source ancestor restriction applies only to destroy"
 	)
 end
 for _, path in ipairs { "/d/.local/bin", "/d/.locality" } do
 	check(
-		actions.prepare(
-			assert(actions.parse { "destroy" }),
-			{ file(path, true) },
-			"/d",
-			nested_source,
-			nested_managed,
-			nested_managed
-		),
+		actions.prepare(assert(actions.parse { "destroy" }), { file(path, true) }, facts(nested_source, nested_managed)),
 		"destroy allows sibling directories and similar prefixes"
 	)
 end
@@ -183,6 +181,75 @@ for _, case in ipairs {
 	end
 end
 check(not forced, "no action passes --force: " .. tostring(forced))
+local discovery = [[execute-template {{ .chezmoi.destDir }}{{ "\x00" }}{{ .chezmoi.sourceDir }}]]
+local queries = {
+	managed = "managed --include=all --exclude=none --path-style=absolute --nul-path-separator",
+	editable = "managed --include=files,symlinks,dirs --exclude=externals --path-style=absolute --nul-path-separator",
+	source_dirs = "managed --include=dirs --exclude=externals --path-style=absolute --nul-path-separator",
+}
+-- Each query lists only its own name, so facts cannot swap their results unnoticed.
+local function chezmoi(failing)
+	local calls = {}
+	return function(args)
+		local call = table.concat(args, " ")
+		calls[#calls + 1] = call
+		if failing and call:find(failing, 1, true) then
+			return nil, "exit"
+		end
+		if call == discovery then
+			return "/d\0/d/source"
+		end
+		for name, query in pairs(queries) do
+			if call == query then
+				return "/d/" .. name .. "\0"
+			end
+		end
+		return nil, "exit"
+	end,
+		calls
+end
+for _, case in ipairs {
+	{ { "add" }, { "managed" } },
+	{ { "re-add" }, { "managed" } },
+	{ { "diff" }, { "managed" } },
+	{ { "apply" }, { "managed" } },
+	{ { "edit", apply = true }, { "managed", "editable" } },
+	{ { "forget" }, { "managed", "editable" } },
+	{ { "destroy" }, { "managed", "editable" } },
+	{ { "destroy", recursive = false }, { "managed", "editable", "source_dirs" } },
+} do
+	local run, calls = chezmoi()
+	local fresh = assert(actions.facts(assert(actions.parse(case[1])), run))
+	local expected = { discovery }
+	for _, query in ipairs(case[2]) do
+		expected[#expected + 1] = queries[query]
+	end
+	check(
+		table.concat(calls, "\n") == table.concat(expected, "\n"),
+		"fresh queries for " .. case[1][1] .. ": " .. table.concat(calls, " | ")
+	)
+	check(fresh.destination == "/d" and fresh.source == "/d/source", "facts directories")
+	local queried = {}
+	for _, query in ipairs(case[2]) do
+		queried[query] = true
+	end
+	for _, query in ipairs { "managed", "editable", "source_dirs" } do
+		check(
+			queried[query] and fresh[query] and fresh[query]["/d/" .. query] or not queried[query] and fresh[query] == nil,
+			query .. " holds its own query's result, only when queried"
+		)
+	end
+end
+for failing, message in pairs {
+	["execute-template"] = "Cannot resolve chezmoi context",
+	[queries.managed] = "Cannot acquire managed targets",
+	[queries.editable] = "Cannot acquire source entries",
+	[queries.source_dirs] = "Cannot acquire source directories",
+} do
+	local run = chezmoi(failing)
+	local fresh, err = actions.facts(assert(actions.parse { "destroy", recursive = false }), run)
+	check(fresh == nil and err:find(message, 1, true) and err:find("No action was run", 1, true), message)
+end
 check(not actions.display("a\n\27b"):find("[%c]"), "escape display controls")
 check(actions.summary(p, "apply"):find("Source %-> destination"), "describe direction")
 print("PASS " .. n .. " action policy assertions")

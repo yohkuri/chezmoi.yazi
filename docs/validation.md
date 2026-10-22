@@ -922,6 +922,39 @@ counts the commands started after a cancellation, so that rests on the code
 and the pure case; how much sooner an action starts in a large tree was not
 measured. Not run: these on Linux, and `test/runtime.py --git-plugin`.
 
+### Shared chezmoi queries
+
+On 2026-10-22 the discovery and `managed` queries moved into `core.dirs` and
+`core.list_managed`, which status acquisition and the action preflight now
+share, and the preflight's chezmoi queries moved into `actions.facts`.
+Background discovery now also asks for the source directory, with the
+template the preflight already used, so a source directory that does not
+parse as an absolute path now fails status too. `test/actions.lua` runs
+`actions.facts` against a fake `run` and pins, for each command, the exact
+`managed` queries after discovery and their order: the source-entry query only
+for edit, forget and destroy, the source-directory query only for
+nonrecursive destroy, whose result is absent otherwise. Each query answers
+with a different path, so a result stored in the wrong field fails. It also
+checks each failure message. `support.check_call` cannot tell those queries
+apart, since any `managed` call may pass any of the three filter pairs. New
+cases pin the command table's destination-root exception: of the commands
+that need a managed target, only recursive re-add, diff and apply may target
+the root, and not when nothing is managed; no other suite selects the root.
+`test/core.lua` pins the discovery template and adds malformed discovery
+output.
+
+On macOS 26.6.2 with Yazi 26.9.1 and chezmoi 2.73.3, `test/check.py` passed
+with 63 core and 126 action policy assertions and 68 Python tests, 8 and 52
+more than before. `test/runtime.py` (16 passes), `test/e2e.py` (14) and
+`test/manual_runtime.py` (15) passed in one run each, and `support.stop`
+killed no leftover process. `test/benchmark.py`, which now times the
+two-directory template, took 0.034 s for 100 files and 0.159 s for 5,000,
+against 0.033 s and 0.153 s in the sample table above from the
+destination-only template; with one run each, the difference says nothing.
+It ran before the last changes to `actions.lua` and the pure tests, which
+leave what it times alone. Not run: these on Linux, and
+`test/runtime.py --git-plugin`.
+
 ## Force-push commit validation
 
 On 2026-10-03, PR #3 was rebased onto the dependency-update commit from PR #4.

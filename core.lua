@@ -1,4 +1,4 @@
--- Pure parsing, query planning, and reduction. No Yazi globals or filesystem I/O.
+-- Pure parsing, query planning, and reduction; chezmoi runs only through an injected run. No Yazi globals or filesystem I/O.
 local M = {}
 
 function M.path(s)
