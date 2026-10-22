@@ -336,8 +336,8 @@ The Python harness uses only the standard library; no pip installation is used.
 Yazi types are downloaded to ignored `.dev/types` at a fixed revision with a
 SHA-256 check. `types/compat.lua` supplies missing runtime declarations and the
 plugin theme extension. No personal Yazi configuration is required.
-JavaScript tools are locked in `package-lock.json`; the `smol-toml` override
-selects its security fix. None of these tools is a plugin runtime dependency.
+JavaScript tools are locked in `package-lock.json`. None of these tools is a
+plugin runtime dependency.
 
 Validate the commits that a pull request will introduce:
 
