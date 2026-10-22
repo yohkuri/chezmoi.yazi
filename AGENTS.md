@@ -26,7 +26,8 @@ Private conversation with the user may use their preferred language.
   to this repository's GitHub remote; README says how to install them.
 - Name topic branches `<type>/<short-subject>`, where `<type>` is a commit
   type that `@commitlint/config-conventional` accepts (`.commitlintrc.yml`
-  extends it), unless the user specifies a different name.
+  extends it), unless the user specifies a different name. Dependabot's
+  `dependabot/...` branches keep their own names.
 - Every change must go through a pull request before it reaches `main`.
 - Merge pull requests exclusively with **rebase and merge**. Do not use merge
   commits or squash merges.
