@@ -636,6 +636,65 @@ re-sends through tmux passthrough, and the detached tmux has no terminal to
 answer. The same wait would explain the 5.1 to 5.2 s after SIGHUP above;
 that path was not traced.
 
+### Answering Yazi's terminal probe
+
+Read off the Yazi 26.9.1 source (`yazi-emulator/src/probe.rs`, and
+`report.rs`, `stop.rs` and `quit.rs` in `yazi-actor/src/app`): once tmux's
+XTVERSION answer names it, Yazi re-sends DA1 as `\ePtmux;\e\e[0c\e\\`, and
+`app:stop`, which `ui.hide` reaches, and `app:quit` each wait up to 5 s for a
+DA1 report. The detached tmux has no terminal to pass the query to, so every
+command screen and every quit paid that wait. On 2026-10-24, before this
+change, a profiling wrapper that is not kept put 125 s of a 177 s
+`test/e2e.py` run of three scenarios in waits for the command screen, 4 to
+5 s each.
+
+`Runtime.session` now opens every pane with `pipe-pane -IO` running
+`test/da1.py`, which answers each passthrough DA1 with `\e[?62;22c` and
+records the answer. `support.fixture` and `test/e2e.py` fail a run that
+opened a pane but recorded no answer, so a Yazi that changes the query
+fails instead of running slowly. Each answered probe also runs Yazi's
+`app:theme` while the terminal's light or dark mode is unknown, as with a
+real terminal that answers DA1 but not the color queries. Attaching the
+harness's session inside a second detached tmux did not help: Yazi still
+took 5.04 s to quit, in two runs.
+
+Without those waits, notifications pile up. Read off the source
+(`yazi-core/src/notify/notify.rs`, and `tick.rs` and `push.rs` in
+`yazi-actor/src/notify`): Yazi shows three at a time, starts a queued one's
+timeout only once it shows, and drops one identical to a message it still
+holds. In both guide runs made with the old 10-second `wait_screen` default,
+one of them beside the other two suites, notifications still covered the
+finish menu at the timeout, and the source-ancestor rejection showed after
+9.84 and 9.95 s. `SCREEN_TIMEOUT` in `test/support.py` raises the default to
+30 s; a passing run waits no longer, and a failing one reports 20 s later.
+Shortening the notifications in tests, or waiting for them to clear, is left
+open.
+
+Review found that tmux expands formats in `-c` and both formats and strftime
+sequences in the `pipe-pane` command: a `%s` in that command became the
+epoch time, and a `-c` directory containing `#S` started the pane in `$HOME`
+instead, both seen in tmux 3.8. `Runtime.session` now doubles `#` in `-c`
+and `%` and `#` in the command, and each escaped spelling reached the shell
+and the directory intact. `test/da1.py` records an answer before sending it
+and writes its stderr to `da1.log` in the fixture, which a failed check
+prints. A new Python test feeds
+`test/da1.answer` a stream of three queries in every chunk size and expects
+three.
+
+On macOS 26.6.2 with Yazi 26.9.1, chezmoi 2.73.3, tmux 3.8 and Python
+3.14.9, on `b88709b` plus this change, one run each, in turn:
+`test/runtime.py` passed 16 in 79 s, `test/e2e.py` 14 in 63 s,
+`test/manual_runtime.py` 15 in 129 s, and `support.stop` killed no leftover
+process. Single runs at `b88709b` took 252 s, 240 s (the sum of
+per-scenario runs) and 247 s. `test/benchmark.py` took 0.035 s for 100 files
+and 0.156 s for 5,000; this change does not touch what it times.
+`test/check.py` passed with 63 core and 126 action policy assertions and 69
+Python tests, one more than before. With a scratch wrapper in place of
+`Runtime.session`, the three suites passed together in 124 s, once. Not run:
+these on Linux, where CI's smoke job on Ubuntu 24.04's tmux will be the
+first, and `test/runtime.py --git-plugin`. How often the longer screen waits
+come close to 30 s was not measured beyond these runs.
+
 ## Development tooling checks
 
 Locally verified on 2026-09-20:

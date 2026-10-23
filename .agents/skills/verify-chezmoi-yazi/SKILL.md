@@ -56,6 +56,12 @@ Every change runs `test/check.py`. Then, by what changed:
   whatever verdicts it records.
 - **`test/benchmark.py`** times three CLI calls in a synthetic tree. It does
   not predict latency in a real dotfiles repository.
+- **The three Yazi-driven suites** run Yazi in a detached tmux with no
+  terminal behind it. `test/da1.py` answers only the DA1 query that Yazi
+  passes through tmux, so whatever Yazi learns from a real terminal's other
+  answers goes unexercised. While the light or dark mode is unknown, each
+  answer also runs `app:theme`, so a check that a key reloads the theme must
+  not let Yazi hide between the theme write and the key.
 - **CI** runs `test/e2e.py --smoke` (status-refresh and commands) on Ubuntu
   24.04 with pinned Yazi and chezmoi. The full runtime, E2E and guide suites
   run only where someone runs them by hand, which so far means macOS.
@@ -80,6 +86,12 @@ readability. Say so rather than letting a green run imply it.
   once its borders are whole and two captures in a row agree
   (`wait_screen(..., stable=True)`), as `confirmation_pages` does. After a
   resize, wait for Yazi to redraw before a key that reads the layout.
+- Yazi shows three notifications at a time, starts a queued one's timeout
+  only once it shows, and drops one identical to a notification it still
+  holds. A notification, or text one covers, can therefore wait behind
+  several earlier ones; `SCREEN_TIMEOUT` in `test/support.py` allows for
+  that. To see a repeated notification, first wait for the earlier one to
+  go, as `source_ancestor` in `test/action_cases.py` does.
 - Text wraps at the terminal width, and the harness resizes to as narrow as
   40 columns. Assert on a phrase that survives wrapping at the narrowest size
   the check runs at, or on `screen.row` for file rows.

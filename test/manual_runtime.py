@@ -321,9 +321,7 @@ def test(t):
 def foreground_launcher():
     before = set((REPO / ".dev/manual-runs").glob("*/results.json"))
     with fixture() as t:
-        t.tmux("new-session", "-d", "-s", "test", "-x", "140", "-y", "40",
-               "-c", str(REPO), str(REPO / "test/manual.py"))
-        t.started = True
+        t.session(REPO / "test/manual.py", cwd=REPO)
         t.tmux("set-option", "-w", "remain-on-exit", "on")
         t.wait_screen(lambda s: "P: PASS/check/next" in s and "CMM" in s, "foreground launcher")
         number = next(i + 1 for i, case in enumerate(CASES) if case["key"] == "edit")
@@ -372,9 +370,7 @@ def resumed_theme():
                 save(t.root, saved)
                 root = Path(value["root"])
                 write(t.root / "config/keymap.toml", '[[mgr.prepend_keymap]]\non="P"\nrun="plugin manual -- accept"\n')
-                t.tmux("new-session", "-d", "-s", "test", "-x", "140", "-y", "40",
-                       "-c", str(REPO), str(REPO / "test/manual.py"), "open", str(t.root))
-                t.started = True
+                t.session(REPO / "test/manual.py", "open", t.root, cwd=REPO)
                 t.tmux("set-option", "-w", "remain-on-exit", "on")
                 title = f"3/12 Theme, wide signs and colors - step {step + 1}/3"
                 t.wait_screen(lambda s: title in s and "P: PASS/check/next" in s, "resumed theme ready")

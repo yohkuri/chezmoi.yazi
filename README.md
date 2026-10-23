@@ -428,7 +428,10 @@ The runtime test needs Yazi, chezmoi, tmux, and the uv-managed Python. It
 creates isolated source/destination/config/state/cache directories and a
 private tmux socket; it never applies the user's dotfiles or edits their Yazi
 configuration. It checks actual rendered terminal output as well as plugin
-records.
+records. Like the E2E and guide suites, it opens its pane with `test/da1.py`
+answering the device attributes query that Yazi sends through tmux; with no
+terminal behind the private tmux, Yazi would otherwise wait five seconds for
+the answer each time it hides for a command or quits.
 
 Run the complete black-box E2E suite, or its shorter CI smoke scenario:
 
