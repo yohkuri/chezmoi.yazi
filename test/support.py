@@ -139,8 +139,8 @@ def stop(root, grace=10):
     # Yazi whose terminal closes while a plugin waits in ya.confirm can keep
     # running, and SIGTERM does not end it (docs/validation.md has the cause).
     # It can be a grandchild of the pane, as under the guide's launcher, so
-    # look at whole process groups. The guide's own Yazi takes about five
-    # seconds to quit, so wait ten.
+    # look at whole process groups. Yazi whose terminal probe goes unanswered
+    # takes about five seconds to quit (test/da1.py), so wait ten.
     killed = []
     for pid in settle(groups, grace):
         try:
@@ -181,11 +181,17 @@ def settle(groups, timeout):
     return left
 
 
+# Yazi shows three notifications at a time and starts a queued one's timeout
+# only once it shows, so a notification, or text one covers, can wait behind
+# several earlier ones: the plugin's last 7 s, the guide's up to 10 s.
+SCREEN_TIMEOUT = 30
+
+
 class Runtime:
     def __init__(self, git_plugin=None, *, instrument=True, probe=True, keep=None):
         self.root = Path(tempfile.mkdtemp(prefix="chezmoi-yazi-test-")).resolve()
         self.owned_root = self.root
-        self.started = False
+        self.started = self.opened = False
         self.last_capture = ""
         self.last_capture_ansi = ""
         self.keep = bool(os.environ.get("KEEP_FIXTURE")) if keep is None else keep
@@ -208,6 +214,7 @@ class Runtime:
         self.barrier, self.report = self.instrument / "barrier", self.instrument / "report.json"
         self.dispatch = self.instrument / "dispatch.lua"
         self.socket = root / "tmux.sock"
+        self.replies = root / "da1-replies"
         self.args = chezmoi_args(root)
         command = shutil.which("chezmoi")
         assert command, "chezmoi is required"
@@ -260,10 +267,22 @@ class Runtime:
         return run(["tmux", "-S", str(self.socket), "-f", "/dev/null", *map(str, args)],
                    cwd=self.root, env=self.env, timeout=5)
 
-    def start(self, settle=0.7):
+    def session(self, *command, cwd=None):
+        """Open the test pane running command, with test/da1.py answering Yazi's probe."""
         assert not self.socket.exists(), "Refusing an existing socket"
-        self.tmux("new-session", "-d", "-s", "test", "-x", "140", "-y", "40", "yazi", self.dest)
-        self.started = True
+        # tmux expands formats in -c, and formats and strftime sequences in pipe-pane's command.
+        directory = ["-c", str(cwd).replace("#", "##")] if cwd else []
+        reply = ("exec " + shlex.join([sys.executable, str(REPO / "test/da1.py"), str(self.replies)])
+                 + " 2>>" + shlex.quote(str(self.root / "da1.log")))
+        reply = reply.replace("%", "%%").replace("#", "##")
+        # Even if only pipe-pane fails, the server runs and close must stop it.
+        self.started = self.opened = True
+        # Attach the pipe in the same tmux call, so that it is in place before Yazi probes.
+        self.tmux("new-session", "-d", "-s", "test", "-x", "140", "-y", "40", *directory, *command,
+                  ";", "pipe-pane", "-IO", "-t", "test", reply)
+
+    def start(self, settle=0.7):
+        self.session("yazi", self.dest)
         if settle:
             time.sleep(settle)
 
@@ -283,7 +302,7 @@ class Runtime:
             self.last_capture = capture
         return capture
 
-    def wait_screen(self, predicate, description, timeout=10, stable=False):
+    def wait_screen(self, predicate, description, timeout=SCREEN_TIMEOUT, stable=False):
         """Return a capture that satisfies predicate; with stable, only once two
         captures in a row are the same, so that no redraw is half done."""
         deadline = time.monotonic() + timeout
@@ -377,6 +396,14 @@ class Runtime:
         queries = [check_call(json.loads(line)) for line in read(self.calls).splitlines()]
         assert any(queries), "No query was recorded"
 
+    def check_replies(self):
+        """Check that test/da1.py answered Yazi's probe if a pane was opened."""
+        if self.opened and not self.replies.exists():
+            log = self.root / "da1.log"
+            raise AssertionError(
+                "test/da1.py answered no DA1 query, so each hide and quit waited 5 s; "
+                "check its QUERY against this Yazi. Its stderr:\n" + (read(log) if log.exists() else "(none)"))
+
     def close(self):
         assert self.root == self.owned_root and not self.root.is_symlink()
         assert re.fullmatch(r"chezmoi-yazi-test-[\w-]+", self.root.name)
@@ -407,6 +434,7 @@ def fixture(git_plugin=None, **kwargs):
         instance.started = False
         instance.check_calls()
         assert not killed, "The test ended with a process waiting, such as on a prompt"
+        instance.check_replies()
     finally:
         instance.close()
 

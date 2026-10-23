@@ -13,6 +13,7 @@ import unittest
 from contextlib import redirect_stderr
 import io
 from unittest import mock
+from da1 import QUERY, answer
 from support import (QUERY_FLAGS, REPO, Runtime, check_call, environment, leftover, lua, owned, processes,
                      read, run, stop, write)
 
@@ -49,6 +50,15 @@ class SupportTests(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 stop(root)
             self.assertTrue(marker.exists())
+
+    def test_da1_counts_each_query_once_across_reads(self):
+        stream = b"draw" + QUERY + b"\x1b[0c" + QUERY + QUERY + b"more"
+        for size in range(1, len(stream) + 1):
+            tail, total = b"", 0
+            for start in range(0, len(stream), size):
+                count, tail = answer(tail + stream[start:start + size])
+                total += count
+            self.assertEqual(total, 3, size)
 
     def test_check_call(self):
         context = ["--config", "/c", "--cache", "/k"]

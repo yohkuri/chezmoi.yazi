@@ -199,6 +199,7 @@ def run_case(name, args):
     try:
         baseline(t)
         SCENARIOS[name](t)
+        t.check_replies()
         print(f"PASS {name}")
     except Exception:
         failed = True
