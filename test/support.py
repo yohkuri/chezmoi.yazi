@@ -197,6 +197,7 @@ class Runtime:
         self.root = Path(tempfile.mkdtemp(prefix="chezmoi-yazi-test-")).resolve()
         self.owned_root = self.root
         self.started = self.opened = False
+        self.probe = probe
         self.last_capture = ""
         self.last_capture_ansi = ""
         self.keep = bool(os.environ.get("KEEP_FIXTURE")) if keep is None else keep
@@ -364,6 +365,10 @@ class Runtime:
                 return result
             time.sleep(0.1)
         raise AssertionError(f"Runtime condition timed out: {result}\n{self.logs()}\n{self.capture()}")
+
+    def idle(self):
+        """Wait until no action holds the lock and no status pass runs."""
+        return self.wait(lambda s: not s["action_busy"] and not s["running"])
 
     def refresh(self, predicate):
         epoch = self.snapshot()["epoch"]

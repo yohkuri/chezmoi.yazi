@@ -77,11 +77,39 @@ def box_rows(capture, title):
     """Return the stripped rows inside the box titled title, or None until
     every row has both side borders and the bottom border is drawn."""
     lines = plain(capture).splitlines()
-    top = next((i for i, line in enumerate(lines) if "╭" in line and title in line), None)
-    if top is None:
-        return None
-    left = cell_width(lines[top].split("╭")[0])
-    width = cell_width(lines[top].split("╭")[1].split("╮")[0])
+    top = next(_tops(lines, title), None)
+    return None if top is None else _box(lines, *top)
+
+
+def box_texts(capture, title):
+    """Return the text of every whole box titled title, its rows joined and
+    its whitespace dropped: a wrap can drop the space where it breaks, so
+    compare with compact text."""
+    lines = plain(capture).splitlines()
+    boxes = (_box(lines, *top) for top in _tops(lines, title))
+    return [compact("".join(rows)) for rows in boxes if rows is not None]
+
+
+def compact(text):
+    return "".join(text.split())
+
+
+def _tops(lines, title):
+    """Yield the line and the indexes of both top corners of each box whose top
+    border, not the rest of its line, holds title."""
+    for i, line in enumerate(lines):
+        corner = line.find("╭")
+        while corner != -1:
+            end = line.find("╮", corner)
+            # Another corner before end means this box's right corner is hidden.
+            if end != -1 and "╭" not in line[corner + 1:end] and title in line[corner:end]:
+                yield i, corner, end
+            corner = line.find("╭", corner + 1)
+
+
+def _box(lines, top, corner, end):
+    left = cell_width(lines[top][:corner])
+    width = cell_width(lines[top][corner + 1:end])
     rows = []
     for line in lines[top + 1:]:
         column, text, edges, inside = 0, "", "", False

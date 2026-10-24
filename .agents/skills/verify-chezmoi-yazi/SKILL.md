@@ -94,7 +94,16 @@ readability. Say so rather than letting a green run imply it.
   holds. A notification, or text one covers, can therefore wait behind
   several earlier ones; `SCREEN_TIMEOUT` in `test/support.py` allows for
   that. To see a repeated notification, first wait for the earlier one to
-  go, as `source_ancestor` in `test/action_cases.py` does. The runtime and
+  go, as `source_ancestor` in `test/action_cases.py` does. To tell apart a
+  notification whose words an earlier one or a row also shows, wait for its
+  whole error line, reason through path, in one box from `screen.box_texts`,
+  compared through `screen.compact`; a path alone also matches a
+  confirmation, which lists its targets, and any path still matches a longer
+  one it begins. The plugin queues a rejection's notification before it ends
+  the action, so the notification can show while the lock is held: where the
+  probe runs, wait with `idle` before the next action key, as the
+  `replaced_dirs` loop in `extended` does. The other rejections in
+  `extended`, and `finish`, still rely on the key settle for this. The runtime and
   E2E fixtures shorten the plugin's notifications to `NOTIFY_TIMEOUT`
   through its `notify_timeout`, and so do the walks that
   `test/manual_runtime.py` starts through `configure_guide`, for the

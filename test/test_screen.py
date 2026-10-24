@@ -50,5 +50,36 @@ class ScreenTests(unittest.TestCase):
         for capture in [covered, unfinished, box[1:]]:
             self.assertIsNone(screen.box_rows("\n".join(capture), "chezmoi destroy"))
 
+    def test_box_texts_join_wrapped_rows_of_every_whole_box(self):
+        notices = ["  ╭ chezmoi──╮",
+                   "  │Rejected: │",
+                   "  │/dest/spac│",
+                   "  │e name    │",
+                   "  ╰──────────╯",
+                   "  ╭ chezmoi──╮",
+                   "  │Rejected: │",
+                   "  │/dest/b   │",
+                   "  ╰──────────╯",
+                   "  ╭ chezmoi──╮",
+                   "  │Covered   │"]
+        texts = screen.box_texts("\n".join(notices), "chezmoi")
+        self.assertEqual(texts, ["Rejected:/dest/spacename", "Rejected:/dest/b"])
+        self.assertIn(screen.compact("Rejected: /dest/space name"), texts[0])
+
+    def test_box_titles_come_from_the_top_border(self):
+        # A pane left of a box can show the title; a box on the same line is
+        # read from its own corner.
+        lines = [" chezmoi.db ╭ other──╮ ╭ chezmoi─╮",
+                 " cache      │Left    │ │Right    │",
+                 " data       ╰────────╯ ╰─────────╯"]
+        self.assertEqual(screen.box_texts("\n".join(lines), "chezmoi"), ["Right"])
+        self.assertEqual(screen.box_rows("\n".join(lines), "other"), ["Left"])
+        # A box whose right corner another box covers is not read through it.
+        covered = [" ╭ other──╭ chezmoi─╮",
+                   " │Left    │Right    │",
+                   " ╰────────╰─────────╯"]
+        self.assertEqual(screen.box_texts("\n".join(covered), "chezmoi"), ["Right"])
+        self.assertIsNone(screen.box_rows("\n".join(covered), "other"))
+
 if __name__ == "__main__":
     unittest.main()
