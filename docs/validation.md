@@ -840,6 +840,37 @@ fixes, one run each, in turn: `test/runtime.py` passed 16 in 58 s,
 and 72 Python tests, two more. Not run: these on Linux and
 `test/runtime.py --git-plugin`.
 
+### Running one runtime case
+
+`test/runtime.py` now takes `--case NAME`, repeated to select more, like
+`test/e2e.py`; with none it runs all seven in their former order. Each case
+still gets a fresh fixture with the shared baseline, which `status` and
+`action-coordination` used to set up themselves. Timed from the output of
+one full run, the cases took about 12 s (`status`), 6 s (`commands`), 16 s
+(`command-edges`), 5 s (`action-coordination`), 6 s (`confirmation-pages`),
+10 s (`source-ancestor`) and 5 s (`visual-selection`); alone,
+`--case source-ancestor` took 10.3 s and `--case visual-selection` 5.2 s.
+
+A review found that only `status` checks git.yazi coexistence, so
+`--git-plugin` with other cases checked nothing of it and still passed.
+`--git-plugin` now adds `status` when it is not selected, as `test/e2e.py`
+adds its coexistence scenario: `--git-plugin` with git.yazi `f703392` and
+`--case visual-selection` ran that case and then `status`, whose coexistence
+check passed. A failing case now prints `FAIL NAME` with its `--case` name
+before the traceback; a case replaced in a scratch wrapper by one that
+raised printed `FAIL visual-selection` and exited 1 without running the
+next case, as the suite stopped at its first failure before. Not taken from
+the review: running the remaining cases after a failure, a case runner
+shared with `test/e2e.py`, and dropping a case named twice.
+
+On 2026-10-24, on macOS 26.6.2 with Yazi 26.9.1, chezmoi 2.73.3, tmux 3.8
+and Python 3.14.9, on `7816d04` plus this change with the review fixes, one
+run each, in turn: `test/runtime.py` passed 16 in 59 s, `test/e2e.py` 14 in
+44 s, and `test/manual_runtime.py` 15 in 93 s. `test/check.py` passed with 63
+core, 126 action policy and 20 main assertions and 72 Python tests. Not run:
+these on Linux, `test/runtime.py --git-plugin` with every case, and the five
+cases other than `source-ancestor` and `visual-selection` alone.
+
 ## Development tooling checks
 
 Locally verified on 2026-09-20:

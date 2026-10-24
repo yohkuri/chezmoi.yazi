@@ -2,6 +2,7 @@
 """Real Yazi/chezmoi checks in an isolated fixture."""
 import argparse
 import json
+import sys
 import time
 from support import baseline, fixture, read, run, write
 from action_cases import commands, extended, configure, finish, confirm, confirmation_pages, source_ancestor, visual_selection
@@ -17,7 +18,6 @@ def test(t, git_plugin):
     def has(name, key, value):
         return lambda s: record(s, name).get(key) == value
 
-    baseline(t)
     source("new\nline", "newline edit\n")
     sentinel = t.root / "script-ran"
     assert " R " in t.chezmoi("status", "--path-style=absolute", t.dest / ".config")
@@ -149,7 +149,6 @@ def test(t, git_plugin):
 
 
 def action_coordination(t):
-    baseline(t)
     configure(t)
     t.start()
     instance_id = t.snapshot()["instance"]
@@ -201,21 +200,29 @@ def action_coordination(t):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--git-plugin")
+    # Each case runs in its own fixture, by default all in this order; the names match test/e2e.py's where they
+    # share a scenario.
+    cases = {
+        "status": lambda t: test(t, args.git_plugin),
+        "commands": commands,
+        "command-edges": extended,
+        "action-coordination": action_coordination,
+        "confirmation-pages": confirmation_pages,
+        "source-ancestor": source_ancestor,
+        "visual-selection": visual_selection,
+    }
+    parser.add_argument("--case", action="append", choices=cases, dest="cases",
+                        help="Run only this case; repeat to select more")
     args = parser.parse_args()
-    with fixture(args.git_plugin) as instance:
-        test(instance, args.git_plugin)
-    with fixture(args.git_plugin) as instance:
-        baseline(instance)
-        commands(instance)
-    with fixture(args.git_plugin) as instance:
-        baseline(instance)
-        extended(instance)
-    with fixture(args.git_plugin) as instance:
-        action_coordination(instance)
-    with fixture(args.git_plugin) as instance:
-        baseline(instance)
-        confirmation_pages(instance)
-    for scenario in [source_ancestor, visual_selection]:
-        with fixture(args.git_plugin) as instance:
-            baseline(instance)
-            scenario(instance)
+    selected = list(args.cases or cases)
+    # Only status checks git.yazi coexistence.
+    if args.git_plugin and "status" not in selected:
+        selected.append("status")
+    for name in selected:
+        try:
+            with fixture(args.git_plugin) as instance:
+                baseline(instance)
+                cases[name](instance)
+        except Exception:
+            print(f"FAIL {name}", file=sys.stderr)
+            raise
