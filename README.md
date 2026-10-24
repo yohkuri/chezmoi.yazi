@@ -186,6 +186,7 @@ require("chezmoi"):setup {
   max_retries = 8,               -- extra status queries per acquisition pass
   argument_bytes = 8192,         -- target argument budget per initial batch
   output_limit = 16 * 1024 * 1024,
+  notify_timeout = 7,            -- least seconds a command notification shows
   -- config = "/absolute/path/chezmoi.toml",
   -- source = "/absolute/path/source",
   -- destination = "/absolute/path/destination",
@@ -198,6 +199,12 @@ By default chezmoi resolves its usual configuration and destination. Optional
 context paths are passed consistently to every command. `command` is one
 executable name/path, not a shell expression. Disabling `directory_summary`
 omits the fourth slot and avoids evaluating descendants for summary purposes.
+`notify_timeout` covers the notifications that commands show, such as a
+rejected target or a completed command; the warning that status is
+unavailable keeps its 5 seconds. It takes 0.001 to 1e9 seconds. Yazi shows
+up to three notifications at a time, as many as fit the height, starts a
+queued one's time only when it shows, and keeps a new one longer while older
+ones are showing, so one can stay longer than this.
 
 Large directories can cover most of the managed tree. Smaller timeouts or a
 lower retry budget trade completeness for latency; failed coverage remains
@@ -316,7 +323,8 @@ test/check.py
 
 `npm run check` uses `.markdownlint-cli2.yaml`, `.luarc.json`, and
 `.stylua.toml`, runs ShellCheck on `.githooks/*` and `scripts/*.sh`, then runs
-the pure Lua status and action suites, Python syntax checks, and harness unit
+the pure Lua status and action suites, a stubbed `main.lua` suite for setup
+options and notification timeouts, Python syntax checks, and harness unit
 tests. LuaLS checks the plugin and in-Yazi probes as Lua 5.5.
 `test/test_skills.py` checks that every file under `.agents/skills/` has its
 symlink under `.claude/skills/`.

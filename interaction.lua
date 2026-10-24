@@ -3,8 +3,13 @@ local actions = require(".actions")
 local process = require(".process")
 local M = {}
 
+-- Seconds a notification shows: setup's default notify_timeout until main.lua
+-- sets the option here before each action.
+M.default_timeout = 7
+M.timeout = M.default_timeout
+
 function M.notify(content, level)
-	ya.notify { title = "chezmoi", content = content, level = level or "warn", timeout = 7 }
+	ya.notify { title = "chezmoi", content = content, level = level or "warn", timeout = M.timeout }
 end
 
 local function choose(candidates)

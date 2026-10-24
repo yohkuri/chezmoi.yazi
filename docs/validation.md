@@ -660,15 +660,15 @@ took 5.04 s to quit, in two runs.
 
 Without those waits, notifications pile up. Read off the source
 (`yazi-core/src/notify/notify.rs`, and `tick.rs` and `push.rs` in
-`yazi-actor/src/notify`): Yazi shows three at a time, starts a queued one's
-timeout only once it shows, and drops one identical to a message it still
-holds. In both guide runs made with the old 10-second `wait_screen` default,
-one of them beside the other two suites, notifications still covered the
-finish menu at the timeout, and the source-ancestor rejection showed after
-9.84 and 9.95 s. `SCREEN_TIMEOUT` in `test/support.py` raises the default to
-30 s; a passing run waits no longer, and a failing one reports 20 s later.
-Shortening the notifications in tests, or waiting for them to clear, is left
-open.
+`yazi-actor/src/notify`): Yazi shows up to three at a time, as many as fit the
+height, starts a queued one's timeout only once it shows, and drops one
+identical to a message it still holds. In both guide runs made with the old
+10-second `wait_screen` default, one of them beside the other two suites,
+notifications still covered the finish menu at the timeout, and the
+source-ancestor rejection showed after 9.84 and 9.95 s. `SCREEN_TIMEOUT` in
+`test/support.py` raises the default to 30 s; a passing run waits no longer, and
+a failing one reports 20 s later. The next section shortens the notifications in
+tests.
 
 Review found that tmux expands formats in `-c` and both formats and strftime
 sequences in the `pipe-pane` command: a `%s` in that command became the
@@ -694,6 +694,72 @@ Python tests, one more than before. With a scratch wrapper in place of
 these on Linux, where CI's smoke job on Ubuntu 24.04's tmux will be the
 first, and `test/runtime.py --git-plugin`. How often the longer screen waits
 come close to 30 s was not measured beyond these runs.
+
+On `d0ae402`, whose tree `d53cbc7` merged unchanged, `test/manual_runtime.py`
+passed 3 of 3 runs in 130 to 133 s. Its longest screen waits were the finish
+menu, 12.40 to 12.43 s, and the source-ancestor rejection, 9.91 to 9.95 s,
+nearly the same in each run. A profiling wrapper that is not kept and that
+wrongly held every screen wait to 10 s failed all three runs on those two
+waits; `test/runtime.py` and `test/e2e.py` passed under it.
+
+### Shorter notifications in automated runs
+
+Before this change, the same profiling wrapper put about 36 s of each
+`test/runtime.py` and `test/e2e.py` run in waits for the plugin's 7-second
+notifications to go: four waits of about 7.3 s for the previous source-ancestor
+rejection to clear, and about 7 s for the unsafe directory destroy rejection,
+in one run each. `setup` now takes `notify_timeout`, the seconds that the
+notifications from commands show, 7 by default. The warning that status is
+unavailable keeps its 5 seconds. `Runtime.setup` sets it to `NOTIFY_TIMEOUT`,
+2 s. A first version gave `source_ancestor`'s previous rejection 5 s to
+clear, which failed once with `interaction.notify` changed back to a fixed
+7 s. A review found that too tight: read off `push.rs`, Yazi adds the age of
+the oldest notification it holds to a new one's timeout, so the 5-second
+status warning can keep the rejection past 5 s. That wait is back at
+`SCREEN_TIMEOUT`. `setup` takes 0.001 to 1e9 seconds, a range the plugin
+chose well inside what Yazi takes: read off `serde_with` 3.22.0, which
+converts the timeout, Yazi drops a notification below 1e-9 s, where it rounds
+to zero, and fails from about 1.8e19 s. A new pure test, `test/main.lua`,
+loads `main.lua` with stubs for Yazi's globals instead. It checks that
+`setup` rejects a `notify_timeout` outside that range and takes both ends,
+that a parse error, a refused action and a target with no file each notify
+with the configured value, and that the default stays 7 after an entry. It
+failed with each of these removed: the option from the numeric check, the new
+range, either place that sets the timeout, `opts` in either of
+`begin_action`'s returns, and the timeout in `interaction.notify`; and with
+either end of the range made exclusive, or the default read from
+`interaction.timeout` again. The value
+now comes from `begin_action`'s snapshot, so a refresh no longer takes a
+separate `ya.sync` call for it; only a parse error does.
+
+In the guide, a wrapper that is not kept and that saved each screen during
+waits over 2 s showed what the long waits waited for, in one run. The finish
+menu (12.40 s) and the source-ancestor rejection (9.86 s) sat behind queues
+of the plugin's command notifications and the guide's own 10-second errors,
+such as "Checks failed" and "Could not prepare case 9". `configure_guide` now
+takes a `notify_timeout` that the walk keeps: every case's `setup` options
+get it, and `test/manual.lua` shows its own notifications for that long
+instead of 3 to 10 s. `test/manual_runtime.py` passes `NOTIFY_TIMEOUT`; a
+walk that `test/manual.py create` starts keeps the defaults for the person
+reading it. A new Python test checks that the value, 0 included, reaches a
+restarted case's options only when given, and fails with the line that adds
+it removed. With
+the change, the same wrapper saw the finish menu in 2.42 s and the
+source-ancestor rejection in 2.60 s. Two waits stay long: the compact guide,
+5.3 s behind the status warning, and the foreground launcher's finish menu,
+6.1 s behind a 7-second command notification, since that check starts the
+guide through `test/manual.py`. `SCREEN_TIMEOUT` stays at 30 s; a passing
+run does not wait for it.
+
+On 2026-10-24, on macOS 26.6.2 with Yazi 26.9.1, chezmoi 2.73.3, tmux 3.8
+and Python 3.14.9, on `d53cbc7` plus this change, one run each, in turn:
+`test/runtime.py` passed 16 in 60 s, `test/e2e.py` 14 in 42 s, and
+`test/manual_runtime.py` 15 in 92 s, against 79 s, 63 s and 129 s in the
+runs of the previous section. `test/check.py` passed with 63 core, 126 action
+policy and 20 main assertions and 70 Python tests, one more. Not run: these on
+Linux, `test/runtime.py --git-plugin`, a person's walk of the guide with its
+default notifications, and an invalid `notify_timeout` in Yazi; only
+`test/main.lua`'s stubs pass one to `setup`.
 
 ## Development tooling checks
 

@@ -364,6 +364,18 @@ class ManualTests(unittest.TestCase):
         self.assertEqual((Path(restarted["root"]) / "git-plugin").resolve(), plugin)
         self.assertNotEqual(initial["root"], restarted["root"])
 
+    def test_notify_timeout_reaches_every_case_only_when_given(self):
+        for notify_timeout in [None, 0, 2]:
+            with self.subTest(notify_timeout=notify_timeout), self.fresh_cases(), \
+                    patch("manual_backend.run", return_value="test"):
+                initial = initialize(self.session, None, notify_timeout)
+                restarted = transition(self.session, "restart", {"token": initial["token"]})
+                for value in [initial, restarted]:
+                    if notify_timeout is None:
+                        self.assertNotIn("notify_timeout", value["opts"])
+                    else:
+                        self.assertEqual(value["opts"]["notify_timeout"], notify_timeout)
+
     def test_finished_walk_reopens_on_restart_or_jump(self):
         for operation in ["restart", "jump"]:
             with self.subTest(operation=operation):

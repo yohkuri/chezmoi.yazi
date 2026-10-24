@@ -9,11 +9,11 @@ import subprocess
 from support import REPO, Runtime, chezmoi_args, environment, owned, read, run, stop, write
 
 
-def configure_guide(t, git_plugin):
+def configure_guide(t, git_plugin, notify_timeout=None):
     from manual_backend import initialize
     theme = read(REPO / "test/manual-theme.toml")
     write(t.root / "baseline-theme.toml", theme + ('\n[git]\nuntracked_sign="G "\n' if git_plugin else ""))
-    return initialize(t.root, git_plugin)
+    return initialize(t.root, git_plugin, notify_timeout)
 
 
 def install_guide(t, initial, git_plugin):

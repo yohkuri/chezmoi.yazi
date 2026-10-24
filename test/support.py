@@ -181,10 +181,15 @@ def settle(groups, timeout):
     return left
 
 
-# Yazi shows three notifications at a time and starts a queued one's timeout
-# only once it shows, so a notification, or text one covers, can wait behind
-# several earlier ones: the plugin's last 7 s, the guide's up to 10 s.
+# Yazi shows up to three notifications at a time, as many as fit the height,
+# and starts a queued one's timeout only once it shows, so a notification, or text one covers, can wait behind
+# several earlier ones: where a test keeps the defaults, as the guide's
+# foreground launcher does, the plugin's last 7 s and the guide's up to 10 s.
 SCREEN_TIMEOUT = 30
+# The plugin's notify_timeout here and in the guide walks that
+# test/manual_runtime.py starts, which also shortens the guide's own; short of
+# the 7-second default so that a wait for a notification to go is short too.
+NOTIFY_TIMEOUT = 2
 
 
 class Runtime:
@@ -228,7 +233,7 @@ class Runtime:
         (root / "config/plugins/chezmoi.yazi").symlink_to(REPO)
         opts = dict(command=command, config=self.cfg, source=self.source, destination=self.dest,
                     persistent_state=root / "chezmoi.db", cache=root / "cache/chezmoi",
-                    timeout=1, cache_ttl=0.2, error_backoff=0.5)
+                    timeout=1, cache_ttl=0.2, error_backoff=0.5, notify_timeout=NOTIFY_TIMEOUT)
         init = 'require("chezmoi"):setup ' + lua(opts) + '\n'
         config = '[mgr]\nshow_hidden=true\nlinemode="none"\n'
         for name in (["chezmoi", "git"] if git_plugin else ["chezmoi"]):

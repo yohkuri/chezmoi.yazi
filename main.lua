@@ -96,7 +96,7 @@ end)
 
 local begin_action = ya.sync(function(st)
 	if st.action_busy then
-		return { error = "Another chezmoi action is already running." }
+		return { error = "Another chezmoi action is already running.", opts = st.opts }
 	end
 	if not st.opts then
 		return { error = 'Call require("chezmoi"):setup() first.' }
@@ -125,6 +125,8 @@ local end_action = ya.sync(function(st, executed)
 end)
 
 local cancelled = ya.sync(function(st, epoch) return st.epoch ~= epoch end)
+
+local notify_timeout = ya.sync(function(st) return st.opts and st.opts.notify_timeout end)
 
 local publish = ya.sync(function(st, work, result)
 	st.inflight = nil
@@ -168,6 +170,7 @@ function M:setup(opts)
 		max_retries = 8,
 		argument_bytes = 8192,
 		output_limit = 16 * 1024 * 1024,
+		notify_timeout = interaction.default_timeout,
 	}
 	for key, value in pairs(opts) do
 		if
@@ -192,6 +195,7 @@ function M:setup(opts)
 		"max_retries",
 		"argument_bytes",
 		"output_limit",
+		"notify_timeout",
 	} do
 		local n = defaults[key]
 		if type(n) ~= "number" or n ~= n or n == math.huge or n < 0 then
@@ -205,6 +209,11 @@ function M:setup(opts)
 	end
 	if defaults.timeout == 0 or defaults.argument_bytes < 256 or defaults.output_limit < 1024 then
 		error("Invalid chezmoi process limits")
+	end
+	-- Kept well inside what Yazi takes: it drops a notification whose timeout
+	-- rounds to zero nanoseconds, below 1e-9 s, and fails from about 1.8e19 s.
+	if defaults.notify_timeout < 0.001 or defaults.notify_timeout > 1e9 then
+		error("Invalid chezmoi option: notify_timeout")
 	end
 	if type(defaults.directory_summary) ~= "boolean" then
 		error("directory_summary must be boolean")
@@ -266,8 +275,11 @@ end
 function M:entry(job)
 	local name = job.args[1] or "refresh"
 	if name ~= "work" then
+		-- Each entry runs in a fresh Lua state, so the timeouts set below last
+		-- for this action only.
 		local action, err = actions.parse(job.args)
 		if not action then
+			interaction.timeout = notify_timeout() or interaction.timeout
 			return interaction.notify(err)
 		end
 		if action.name == "refresh" then
@@ -276,6 +288,7 @@ function M:entry(job)
 		-- Commit both visual select and unset ranges before the sync snapshot.
 		ya.emit("escape", { visual = true })
 		local snapshot = begin_action()
+		interaction.timeout = snapshot.opts and snapshot.opts.notify_timeout or interaction.timeout
 		if snapshot.error then
 			return interaction.notify(snapshot.error)
 		end

@@ -198,6 +198,8 @@ def start_case(root, state, index):
         opts = dict(command=str(t.root / "chezmoi-wrapper"), config=str(t.cfg), source=str(t.source),
                     destination=str(t.dest), persistent_state=str(t.root / "chezmoi.db"), cache=str(t.root / "cache/chezmoi"),
                     timeout=1, cache_ttl=0.2, error_backoff=0.5)
+        if state.get("notify_timeout") is not None:
+            opts["notify_timeout"] = state["notify_timeout"]
         write(t.root / "attempt.json", json.dumps(dict(opts=opts)))
         attempt = dict(case=index, root=str(t.root), opts=opts, step=0,
                        steps=[dict(visual="unanswered", status="NOT RUN") for _ in spec["steps"]])
@@ -237,10 +239,11 @@ def execution_info():
                                for pattern in ["*.lua", "test/*.lua", "test/*.py", "test/manual-theme.toml"] for p in REPO.glob(pattern)})
 
 
-def initialize(root, git_plugin):
+def initialize(root, git_plugin, notify_timeout=None):
+    """Start a walk; notify_timeout, for automated runs, shortens every notification in it."""
     git_plugin = str(Path(git_plugin).resolve(strict=True)) if git_plugin else None
     state = dict(version=2, case_keys=[case["key"] for case in CASES],
-                 session=str(root), git_plugin=git_plugin, **execution_info(),
+                 session=str(root), git_plugin=git_plugin, notify_timeout=notify_timeout, **execution_info(),
                  results=["NOT RUN"] * len(CASES), attempts=[], finished=False)
     start_case(root, state, 0)
     save(root, state)
