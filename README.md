@@ -436,7 +436,10 @@ The runtime test needs Yazi, chezmoi, tmux, and the uv-managed Python. It
 creates isolated source/destination/config/state/cache directories and a
 private tmux socket; it never applies the user's dotfiles or edits their Yazi
 configuration. It checks actual rendered terminal output as well as plugin
-records. Like the E2E and guide suites, it opens its pane with `test/da1.py`
+records. Each of its cases runs in a fresh fixture; use `--case NAME` to run
+only that case, repeated to select more, and `--help` to list the names.
+With `--git-plugin`, the `status` case, which holds the coexistence check,
+always runs. Like the E2E and guide suites, it opens its pane with `test/da1.py`
 answering the device attributes query that Yazi sends through tmux; with no
 terminal behind the private tmux, Yazi would otherwise wait five seconds for
 the answer each time it hides for a command or quits.
