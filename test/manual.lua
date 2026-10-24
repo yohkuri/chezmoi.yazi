@@ -11,6 +11,11 @@ local Tab = rawget(_G, "Tab")
 local Status = rawget(_G, "Status")
 local Modal = rawget(_G, "Modal")
 
+-- An automated walk shortens every notification (manual_backend.initialize).
+local function notify(content, timeout, level)
+	ya.notify { title = "Manual guide", content = content, timeout = initial.opts.notify_timeout or timeout, level = level }
+end
+
 local function summary(v)
 	local r = v.result
 	return "Files: " .. (r.files or "pending") .. " | State: " .. (r.diagnostic or "pending") .. " | Visual: " .. r.visual
@@ -231,7 +236,7 @@ local function select_long()
 	end)
 	release()
 	if not ok then
-		ya.notify { title = "Manual guide", content = tostring(err), timeout = 8, level = "error" }
+		notify(tostring(err), 8, "error")
 	end
 end
 
@@ -358,12 +363,7 @@ function M:entry(job)
 		if verdict then
 			return
 		end
-		return ya.notify {
-			title = "Manual guide",
-			content = "An action or guide operation is still running.",
-			timeout = 3,
-			level = "warn",
-		}
+		return notify("An action or guide operation is still running.", 3, "warn")
 	end
 	local ok, result = pcall(function()
 		if baseline then
@@ -389,10 +389,10 @@ function M:entry(job)
 	if ok then
 		release(result)
 		if result.result.error then
-			ya.notify { title = "Manual guide", content = result.result.error, timeout = 10, level = "error" }
+			notify(result.result.error, 10, "error")
 		end
 		if result.result.message then
-			ya.notify { title = "Manual guide", content = result.result.message, timeout = 5 }
+			notify(result.result.message, 5)
 		end
 	else
 		local file = io.open(session .. "/manual-errors.jsonl", "a")
@@ -401,12 +401,7 @@ function M:entry(job)
 			file:close()
 		end
 		release()
-		ya.notify {
-			title = "Manual guide",
-			content = tostring(result) .. ". Fixture retained; retry W.",
-			timeout = 10,
-			level = "error",
-		}
+		notify(tostring(result) .. ". Fixture retained; retry W.", 10, "error")
 	end
 end
 

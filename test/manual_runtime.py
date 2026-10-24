@@ -10,7 +10,7 @@ from action_cases import confirm, enter, finish, native_confirm
 from manual import configure_guide, install_guide
 from manual_backend import current, load, remove_attempts, save, transition
 from manual_cases import CASES
-from support import REPO, fixture, owned, read, write, stop
+from support import NOTIFY_TIMEOUT, REPO, fixture, owned, read, write, stop
 
 
 def control(t, key, settle=0.3):
@@ -35,7 +35,7 @@ def assert_mode_colors(t, mode, background):
 
 def test(t):
     write(t.root / "manual.json", json.dumps(dict(version=1, root=str(t.root), repo=str(REPO))))
-    v = configure_guide(t, None)
+    v = configure_guide(t, None, NOTIFY_TIMEOUT)
     install_guide(t, v, None)
     t.dest = Path(v["opts"]["destination"])
     t.start()
@@ -359,7 +359,7 @@ def resumed_theme():
         with fixture() as t:
             write(t.root / "manual.json", json.dumps(dict(version=1, root=str(t.root), repo=str(REPO))))
             try:
-                value = configure_guide(t, None)
+                value = configure_guide(t, None, NOTIFY_TIMEOUT)
                 index = next(i for i, case in enumerate(CASES) if case["key"] == "theme")
                 value = transition(t.root, "jump", dict(token=value["token"], index=index))
                 for _ in range(step):

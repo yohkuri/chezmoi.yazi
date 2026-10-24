@@ -20,8 +20,10 @@ Every change runs `test/check.py`. Then, by what changed:
   plugin's own prompts too. `core.lua` and `actions.lua` build chezmoi's
   arguments and parse its output, and their unit suites check that only
   against hand-written expectations, never the real chezmoi.
-- **`test/core.lua`, `test/actions.lua`, `test/.luarc.json`, `test/test_*.py`**:
-  nothing more locally; CI also runs the two Lua suites under 5.1 and 5.4.
+- **`test/core.lua`, `test/actions.lua`, `test/main.lua`, `test/.luarc.json`,
+  `test/test_*.py`**: nothing more locally; CI also runs the first two Lua
+  suites under 5.1 and 5.4. `test/main.lua` loads `main.lua` with stubs for
+  Yazi's globals, so it shows only what those stubs let the code reach.
 - **`test/manual.py`, `test/manual_*`, `test/manual.lua`,
   `test/manual-theme.toml`**: `test/manual_runtime.py`.
 - **`test/benchmark.py`**: `test/benchmark.py`.
@@ -86,12 +88,20 @@ readability. Say so rather than letting a green run imply it.
   once its borders are whole and two captures in a row agree
   (`wait_screen(..., stable=True)`), as `confirmation_pages` does. After a
   resize, wait for Yazi to redraw before a key that reads the layout.
-- Yazi shows three notifications at a time, starts a queued one's timeout
+- Yazi shows up to three notifications at a time, as many as fit the
+  height, starts a queued one's timeout
   only once it shows, and drops one identical to a notification it still
   holds. A notification, or text one covers, can therefore wait behind
   several earlier ones; `SCREEN_TIMEOUT` in `test/support.py` allows for
   that. To see a repeated notification, first wait for the earlier one to
-  go, as `source_ancestor` in `test/action_cases.py` does.
+  go, as `source_ancestor` in `test/action_cases.py` does. The runtime and
+  E2E fixtures shorten the plugin's notifications to `NOTIFY_TIMEOUT`
+  through its `notify_timeout`, and so do the walks that
+  `test/manual_runtime.py` starts through `configure_guide`, for the
+  guide's own notifications too. The walk keeps the value in its state, so
+  `test/manual.py open` resumes it with the value it was started with; a walk
+  that `test/manual.py create` starts, as a person or the foreground launcher
+  check does, keeps the defaults.
 - Text wraps at the terminal width, and the harness resizes to as narrow as
   40 columns. Assert on a phrase that survives wrapping at the narrowest size
   the check runs at, or on `screen.row` for file rows.
