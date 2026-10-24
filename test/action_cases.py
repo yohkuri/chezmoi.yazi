@@ -37,15 +37,24 @@ def returned(t):
     time.sleep(0.15)
 
 
+def released(t):
+    """Wait for the action lock where the probe runs. The plugin queues a
+    rejection's notification before it ends the action, so the notification
+    can show while the lock is held; E2E has no probe and relies on the key
+    settle."""
+    if t.probe:
+        t.idle()
+
+
 def finish(t, next_confirm=False, success=True, next_command=False):
-    screen = t.wait_screen(lambda s: "Press Enter to return to Yazi" in s, "command exit prompt")
-    assert ("chezmoi exited with code 0." in screen) == success, screen
+    capture = t.wait_screen(lambda s: "Press Enter to return to Yazi" in s, "command exit prompt")
+    assert ("chezmoi exited with code 0." in capture) == success, capture
     enter(t)
     if next_confirm:
         t.wait_screen(lambda s: "Continue?" in s, "confirmation after command")
     elif not next_command:
         returned(t)
-    return screen
+    return capture
 
 
 def confirm(t, yes=True):
@@ -276,6 +285,7 @@ def extended(t):
     before = read(t.calls) if logged else ""
     t.key("D")
     t.wait_screen(lambda s: "Non-recursive destroy" in s, "unsafe directory destroy rejected")
+    released(t)
     if logged:
         new_calls = [json.loads(line) for line in read(t.calls)[len(before):].splitlines()]
         assert not any("destroy" in args and "--no-tty" not in args for args in new_calls), (
@@ -283,12 +293,17 @@ def extended(t):
     assert read(t.source / "newdir/child") == "child\n"
     assert read(t.dest / "newdir/child") == "child\n"
     # Source directories remain unsafe when the destination is a file or link.
+    reason = "Non-recursive destroy cannot target a directory; chezmoi would still delete its descendants"
     for name in replaced_dirs:
         before = read(t.calls) if logged else ""
         t.key("1"); t.key("s")
         t.key(keys[name]); t.key("s"); t.key("D")
-        capture = t.wait_screen(lambda s: "Non-recursive destroy" in s and name in s,
+        # The row and the previous rejection already show name and the reason,
+        # so wait for this target's whole error line in one notification.
+        error = screen.compact(f"{reason}: {t.dest / name}")
+        capture = t.wait_screen(lambda s: any(error in text for text in screen.box_texts(s, "chezmoi")),
                                 "source directory rejects the entire selection")
+        released(t)
         assert "Continue?" not in capture
         if logged:
             new_calls = [json.loads(line) for line in read(t.calls)[len(before):].splitlines()]
@@ -328,11 +343,11 @@ def extended(t):
     assert read(t.dest / "source") == "edited by fixture\n"
     # Standalone diff follows diff.exclude; apply preview follows apply's scope.
     t.key("4"); t.key("d")
-    screen = finish(t)
-    assert "pending.sh" not in screen, screen
+    capture = finish(t)
+    assert "pending.sh" not in capture, capture
     t.key("p")
-    screen = finish(t, next_confirm=True)
-    assert "pending.sh" in screen, screen
+    capture = finish(t, next_confirm=True)
+    assert "pending.sh" in capture, capture
     assert not (t.root / "script-ran").exists()
     confirm(t); finish(t)
     assert (t.root / "script-ran").exists()

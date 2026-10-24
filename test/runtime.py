@@ -177,7 +177,7 @@ def action_coordination(t):
     t.control.unlink()
     finish(t, next_confirm=True)
     confirm(t, False)
-    t.wait(lambda s: not s["action_busy"] and not s["running"])
+    t.idle()
     # Freeze selection before menu input, even if DDS moves the hover elsewhere.
     t.key("2"); t.key("C")
     t.wait_screen(lambda s: "Add options" in s, "menu snapshot")
@@ -193,7 +193,7 @@ def action_coordination(t):
     calls = [json.loads(line) for line in read(t.calls).splitlines()]
     readd = [args for args in calls if "re-add" in args and "--no-tty" not in args][-1]
     assert str(t.dest / "clean") in readd and str(t.dest / ".exact/keep") in readd
-    t.wait(lambda s: not s["action_busy"] and not s["running"])
+    t.idle()
     assert "runtime error:" not in t.logs(), t.logs()
     print("PASS action coordination: stale worker, operation lock, menu snapshot, cross-directory selection")
 

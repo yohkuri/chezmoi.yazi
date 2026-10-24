@@ -761,6 +761,85 @@ Linux, `test/runtime.py --git-plugin`, a person's walk of the guide with its
 default notifications, and an invalid `notify_timeout` in Yazi; only
 `test/main.lua`'s stubs pass one to `setup`.
 
+### Waiting for the second unsafe destroy rejection
+
+`Runtime.key` sleeps 0.1 s after each key. A wrapper that is not kept logged
+each key and the wait after it, in one run of each suite: about 25 s of
+`test/runtime.py`, 17 s of `test/e2e.py` and 36 s of the guide went to these
+sleeps. With them moved before the next key instead, so that a screen wait
+started at once, the three suites took 56 s, 42 s and 89 s against 58 s, 41 s
+and 91 s, one run each: Yazi took a median of 65 ms to show a key's effect in
+`test/e2e.py`, so the waits took up most of the time the sleeps had. The change
+was dropped.
+
+With the sleep removed altogether, `test/runtime.py` failed in each of three
+runs at the outside-link add in `extended`. A wrapper that is not kept saved
+each screen every 20 ms. The loop over `replaced_dirs` waited for
+"Non-recursive destroy" and the name on the screen after `D`, but the previous
+rejection still showed that reason, and the name shows in its row. The wait
+passed before Yazi handled `D`, and the add that followed was refused with
+"Another chezmoi action is already running." The checks after the wait, that
+no destroy reached chezmoi and that the source child was preserved, could pass
+without the rejection they were to follow. Only the 0.1 s sleeps between the
+keys hid this. The wait now looks for this target's whole error line, reason
+through path, in one notification: `screen.box_texts` returns each whole box
+whose top border holds the title, its rows joined and its whitespace dropped,
+since a wrap can drop the space it breaks at, and the wait compares through
+`screen.compact`. A path alone would also match a confirmation, which lists
+its targets. Read off `main.lua` and `interaction.lua`, the plugin queues a
+rejection's notification and only then ends the action, so the notification
+can show while the lock is held. Where the probe runs, the loop and the
+`newdir` rejection before it then wait with `Runtime.idle`, which
+`test/runtime.py` and `test/manual_runtime.py` now also use for the same
+wait; E2E has no probe and keeps relying on the key settle. No failure was
+seen from that gap. With the sleep removed except after a `g` chord,
+`test/runtime.py` had failed there in two of three runs; with the new wait,
+it passed in each of three, after each review round below too. With `D`
+removed from the loop, `test/e2e.py --case command-edges` failed at that
+wait, each time.
+
+A `/code-review xhigh` found that the first version judged a box's title from
+its whole line, so a pane left of a box showing `chezmoi.db` could make any
+box count, and read only the first box on a line; that it kept no space where
+a row wrapped, so a path with a space would not match; that `finish()` still
+had a local `screen` hiding the module, as `extended` had; and that the
+verify skill suggested waiting on a path alone. All four are fixed. New Python
+tests check that `box_texts` joins wrapped rows across a space, reads every
+box, skips one that is not whole, takes the title from the top border and
+reads a second box on the same line; they failed with the title read from the
+whole line, with only the first corner of a line read, and with the
+whitespace kept. Not taken: waiting on the probe's `epoch` and `action_busy`
+instead of the screen everywhere, since E2E has no probe.
+
+A second `/code-review xhigh` reproduced a box whose right corner another box
+covered being read through to that box's corner; `_tops` now skips a top
+border with another corner inside it, and a test, which failed without the
+skip, checks it. It found that matching the reason and the path apart let a
+reason from one error line pair with another line's path, so the wait now
+takes the whole line; a path still matches a longer one it begins. It also
+found the lock's cause misstated here and in the verify skill, and the wait
+for the lock written three ways. Not taken here: the same gap after the
+other rejections in `extended` and after `finish`, which predate this change
+and still rely on the key settle, and ending the action before the plugin
+notifies, which would make the gap go away in both suites but changes the
+plugin; and reading the first whole box in `box_rows` instead of the first
+box, as its one caller already waits for a stable capture.
+
+The same runs without the sleep showed two more failures, neither changed
+here. `test/e2e.py` failed once in three runs at `source_ancestor`, where an
+action key followed a `g` chord. With 0.1 s after each chord kept, it passed
+six runs; why a key was lost there was not read off Yazi's source. The guide
+failed in each of three runs at the Forget case, where a key followed one of
+its digit keys, which run `plugin manual -- nav` asynchronously.
+
+On 2026-10-24, on macOS 26.6.2 with Yazi 26.9.1, chezmoi 2.73.3, tmux 3.8
+and Python 3.14.9, on `ee3a5b1` plus this change with both rounds of review
+fixes, one run each, in turn: `test/runtime.py` passed 16 in 58 s,
+`test/e2e.py` 14 in 43 s, and `test/manual_runtime.py` 15 in 92 s.
+`test/check.py` passed with 63 core, 126 action policy and 20 main assertions
+and 72 Python tests, two more. Not run: these on Linux and
+`test/runtime.py --git-plugin`.
+
 ## Development tooling checks
 
 Locally verified on 2026-09-20:
