@@ -30,7 +30,7 @@ chezmoi.yazi: refusing a push to `main`.
   your local main, move them to one first:
 
       git switch -c <type>/<short-subject> main
-      git branch -f main origin/main
+      git branch -f main origin/main    # in a fork: upstream/main
 
   Then push the topic branch and open the pull request:
 

@@ -16,14 +16,14 @@
 cat >&2 <<'MSG'
 chezmoi.yazi: refusing a commit on `main`.
 
-  Changes reach main through a pull request, and branch protection refuses
-  any other push to it, so a commit made here cannot be published as it is.
+  Changes reach this repository's main only through a pull request from a
+  topic branch, from a fork too, so a commit made on main cannot become one.
 
   Commit on a topic branch instead. This also carries over commits already
   made on main, as long as they are not pushed:
 
       git switch -c <type>/<short-subject>
-      git branch -f main origin/main
+      git branch -f main origin/main    # in a fork: upstream/main
       git commit
 
   To commit on main deliberately:

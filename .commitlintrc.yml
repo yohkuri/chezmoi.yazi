@@ -1,6 +1,6 @@
-# Commit message rules. The Commit messages section of AGENTS.md describes
-# them in prose; this file, plus the ASCII check in `scripts/check-ascii.lua`,
-# is what enforces them.
+# Commit message rules. The Commit messages sections of AGENTS.md and
+# CONTRIBUTING.md describe them in prose; this file, plus the ASCII check in
+# `scripts/check-ascii.lua`, is what enforces them.
 defaultIgnores: false
 
 extends:
