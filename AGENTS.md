@@ -23,7 +23,8 @@ Private conversation with the user may use their preferred language.
   open a pull request targeting `main`, validate and review it, then merge it.
 - Never commit directly to `main` or push changes directly to `main`.
   `.githooks/pre-commit` refuses the commit, and `.githooks/pre-push` the push
-  to this repository's GitHub remote; README says how to install them.
+  to this repository's GitHub remote; `CONTRIBUTING.md` says how to install
+  them.
 - Name topic branches `<type>/<short-subject>`, where `<type>` is a commit
   type that `@commitlint/config-conventional` accepts (`.commitlintrc.yml`
   extends it), unless the user specifies a different name. Dependabot's
@@ -43,8 +44,10 @@ Private conversation with the user may use their preferred language.
 
 - Follow Conventional Commits.
 - Do not use emojis or Gitmoji in the subject, body, or footers.
-- Start the subject with a lowercase letter; proper nouns such as `GitHub` and
-  `API` may retain their capitalization.
+- Start the subject with a lowercase letter, even when its first word is a
+  proper noun such as `GitHub` or `API`: commitlint refuses `GitHub support`
+  and accepts `add GitHub support`. Later in the subject, proper nouns keep
+  their capitalization.
 - Keep the complete header within 72 display columns and prefer subjects of
   at most 50 display columns. East Asian wide/fullwidth characters count as
   two columns; other characters count as one.
@@ -65,7 +68,8 @@ Private conversation with the user may use their preferred language.
 - Run `test/check.py` for Markdown, LuaLS, StyLua, ShellCheck, pure Lua
   tests, and Python syntax and harness unit tests.
   Install development dependencies with `npm ci --ignore-scripts` and
-  `npm run setup:types` first. README lists the other tools, such as Node.js.
+  `npm run setup:types` first. `CONTRIBUTING.md` lists the other tools, such
+  as Node.js.
 - Validate commit messages with `npm run lint:commits -- BASE HEAD`, or
   `npm run lint:commits -- --file PATH` before a commit exists.
   Commit messages must use ASCII English; this makes character lengths
@@ -88,6 +92,6 @@ Private conversation with the user may use their preferred language.
   a test side effect. Preview scoped chezmoi changes before scoped apply.
 - Clean up only test-owned temporary resources. Preserve failure diagnostics
   with `KEEP_FIXTURE=1` when needed.
-- Keep README instructions, design notes, validation evidence, and CI aligned
-  with implementation changes. Record measured evidence without presenting
-  unexecuted checks as passed.
+- Keep README and `CONTRIBUTING.md` instructions, design notes, validation
+  evidence, and CI aligned with implementation changes. Record measured
+  evidence without presenting unexecuted checks as passed.

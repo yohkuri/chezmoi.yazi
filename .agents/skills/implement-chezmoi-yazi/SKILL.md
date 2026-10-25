@@ -12,11 +12,11 @@ description: >-
 ## Read the reason first
 
 The invariants and their reasons are in `docs/design.md`, including the
-decisions D3 and D4; in the README, both its Plugin conventions and the
-sections that promise behavior to users, such as Commands and Evaluation and
-limits; and in comments in the code. Read the parts that cover what you
-change. This skill does not restate them: every earlier draft that did got
-them wrong somewhere.
+decisions D3 and D4; in `CONTRIBUTING.md`'s How the code is laid out; in
+the README's sections that promise behavior to users, such as Commands and
+Evaluation and limits; and in comments in the code. Read the parts that
+cover what you change. This skill does not restate them: every earlier draft
+that did got them wrong somewhere.
 
 ## Find the tests that match the change
 
