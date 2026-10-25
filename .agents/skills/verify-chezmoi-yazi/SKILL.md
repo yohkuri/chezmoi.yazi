@@ -27,6 +27,7 @@ Every change runs `test/check.py`. Then, by what changed:
 - **`test/manual.py`, `test/manual_*`, `test/manual.lua`,
   `test/manual-theme.toml`**: `test/manual_runtime.py`.
 - **`test/benchmark.py`**: `test/benchmark.py`.
+- **`test/all.py`**: one `test/all.py` run.
 - **Any other file under `test/`**: `test/runtime.py`, `test/e2e.py` and
   `test/manual_runtime.py`, plus `test/benchmark.py` for `test/support.py`.
   Most harness files are shared by two or three of these suites, and each
@@ -34,6 +35,16 @@ Every change runs `test/check.py`. Then, by what changed:
   others.
 - **Docs (`test/MANUAL.md` included), CI or tooling (`test/check.py`
   included) alone**: nothing more.
+
+`test/all.py` runs `test/check.py`, `test/runtime.py`, `test/e2e.py` and
+`test/manual_runtime.py` at once, and a failure in one does not stop the
+others. It runs neither `test/benchmark.py` nor `--git-plugin`, and only one
+may run at a time, as its docstring explains. Its suites share the machine,
+so before treating a failure there as a finding, rerun that suite alone and
+report both runs. The load can also let a check that waits a fixed time for
+something not to happen pass without seeing it, such as `runtime.py`'s
+`sleep(0.25)` before it counts calls: when a change is guarded by such a
+check, run that suite alone too.
 
 ## What each suite cannot establish
 
