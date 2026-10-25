@@ -343,6 +343,8 @@ test/runtime.py
 test/manual_runtime.py
 test/e2e.py
 test/e2e.py --smoke
+# test/check.py, test/runtime.py, test/manual_runtime.py and test/e2e.py at once:
+test/all.py
 # Optional, using an existing git.yazi checkout:
 test/runtime.py --git-plugin /absolute/path/to/git.yazi
 test/e2e.py --git-plugin /absolute/path/to/git.yazi
@@ -870,6 +872,86 @@ run each, in turn: `test/runtime.py` passed 16 in 59 s, `test/e2e.py` 14 in
 core, 126 action policy and 20 main assertions and 72 Python tests. Not run:
 these on Linux, `test/runtime.py --git-plugin` with every case, and the five
 cases other than `source-ancestor` and `visual-selection` alone.
+
+### Running the suites at once
+
+On `67f8dae`, a scratch script started `test/runtime.py`, `test/e2e.py` and
+`test/manual_runtime.py` together, three times. All three passed each time,
+in 58 to 60 s, 43 s and 91 to 97 s, about their times alone; each run took
+as long as its guide. Timed from each log's creation and last write. Most of
+each suite is spent waiting on the screen; this machine has 10 cores. No
+Yazi process or fixture of these runs was left.
+
+`test/all.py` now starts `test/check.py` and the three suites at once and
+prints each one's output whole as it ends, then a PASS or FAIL line per
+suite, and exits 1 if any failed. Started from `/tmp`, it passed all four in
+92 s. Two guide runs at once still fail: `foreground_launcher` expects
+exactly one new report under `.dev/manual-runs`. A new
+`test/test_all.py` runs two scripts in a temporary root and checks that each
+output comes whole, in the order the scripts end, with stderr, and that one
+failure fails the run; it failed with `as_completed` removed, with the exit
+code fixed at 0, and with stderr not captured. Its first version relied on
+a 0.5 s sleep to order the scripts and failed once in its first run, not in
+ten more; the scripts now order themselves through a file.
+
+A review found more, each reproduced by the reviewer with scratch scripts.
+A suite that could not start, or printed bytes that are not UTF-8, raised
+out of `test/all.py` and lost every other suite's output; a Ctrl-C lost it
+too; Python block-buffers stdout into a pipe, so a suite's stderr came out
+ahead of what it had printed before; an output without a final newline ran
+into the end marker; and unknown arguments such as `--git-plugin` were
+ignored. `test/all.py` now reports a suite that cannot start as failed,
+replaces bytes it cannot decode, sets `PYTHONUNBUFFERED=1` for the suites,
+ends each output with a newline, and takes no arguments. On Ctrl-C it waits
+for the suites, which get the signal too, and prints what they print while
+they clean up: in a scratch run with SIGINT sent to its process group, a
+suite that trapped it printed its cleanup line inside its block, and the run
+exited 1. A third test covers the rest; it failed with each of these
+changes undone. The ordering test now gives up after 5 s instead of hanging
+if the scripts ever run one after the other, which a pool of one worker
+showed, and waits 1 s instead of 0.3 s after the file, since `test/check.py`
+runs it under `test/all.py`'s load. The verify skill now says to rerun a
+suite that failed there alone before treating the failure as a finding.
+
+Not taken from the review: changing `foreground_launcher` so that two
+guides can run at once; stopping the suites when `test/all.py` itself gets
+SIGTERM, which a suite run directly does not handle either; and another name
+than `all`, which `test/test_all.py` imports under an alias. The reviewer
+also noted that every Yazi of the three suites shares one DDS socket under
+`$TMPDIR`, so a Yazi of one suite quitting could hand the server over while
+`test/runtime.py` sends `ya emit-to`; that a message is lost then is a
+hypothesis, not seen in the four runs above.
+
+A second review, after a `/simplify` pass, found that the ordering test
+passed whatever `test/all.py` set when it ran under `test/all.py` itself,
+since it inherited `PYTHONUNBUFFERED=1`; the reviewer showed it with the
+setting removed. The test now clears the variable, and with it set in the
+parent it still failed with the setting removed. `test/all.py` now decodes
+the output itself as UTF-8, since `text=True` followed the locale and turned
+a lone `\r` into a new line; the test failed with `text=True` back and with
+each `\r` replaced. Its script for stderr order starts Python through sh,
+since a shebang cannot hold a path with a space. An interrupted run exits
+130 instead of 1. A bash loop around it still goes on, as it does around a
+suite: in a scratch run, `uv run` exited 130 both when its Python child
+exited 130 and when it died of SIGINT, and bash went on in both cases. A
+block that Ctrl-C cuts short while printing is printed again; that was not
+exercised. The docstring now says that a SIGINT sent to `test/all.py` alone
+is not passed on, since a Ctrl-C in the terminal already reaches the suites
+and a second one would cut their cleanup short. The verify skill now says
+that load can let a check that waits a fixed time for something not to
+happen pass without seeing it, and to run that suite alone too. Not taken:
+waiting on through a second Ctrl-C, and progress lines while the suites run,
+which the whole-block output rules out.
+
+On 2026-10-25, on macOS 26.6.2 with Yazi 26.9.1, chezmoi 2.73.3, tmux 3.8
+and Python 3.14.9, on `67f8dae` plus this change with both rounds of review
+fixes and a `/simplify` pass, one `test/all.py` run passed in 92 s:
+`test/check.py` with 63 core, 126 action policy and 20 main assertions and
+75 Python tests, three more, in 9 s; `test/runtime.py` 16 in 59 s;
+`test/e2e.py` 14 in 43 s; `test/manual_runtime.py` 15 in 92 s. Not run:
+these on Linux or a machine with fewer cores, and `test/all.py` with a real
+suite failing or interrupted; only `test/test_all.py` and the scratch runs
+cover those.
 
 ## Development tooling checks
 

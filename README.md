@@ -411,7 +411,11 @@ tests with an internal probe, `test/e2e.py` for black-box terminal tests,
 `test/manual.py` for an interactive fixture, `test/manual_runtime.py` for
 automated terminal checks of that fixture's guide, or `test/benchmark.py` for
 acquisition measurements. Run these commands from the repository root with
-the required tools on `PATH`; none invokes mise.
+the required tools on `PATH`; none invokes mise. `test/all.py` runs
+`test/check.py`, `test/runtime.py`, `test/e2e.py` and `test/manual_runtime.py`
+at once, in about the guide's time alone, and prints each suite's output
+whole as it ends. Run one at a time, with no other guide run or walk
+meanwhile; its docstring says why.
 
 Start an interactive fixture with `test/manual.py`. The command starts Yazi
 directly in your terminal with ordered English instructions in a bottom guide.
