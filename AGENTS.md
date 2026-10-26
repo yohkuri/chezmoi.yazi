@@ -15,7 +15,9 @@ All public repository content must be written in English, including documentatio
 code comments, user-facing messages, commit messages, issues, pull request titles
 and descriptions, review comments, and release notes. Non-English strings are
 allowed only when required as test data, such as Unicode filename fixtures.
-Private conversation with the user may use their preferred language.
+Keep emoji out of the repository's Markdown files, except at the head of
+each point in the README's opening list. Private conversation with the user
+may use their preferred language.
 
 ## GitHub Flow
 

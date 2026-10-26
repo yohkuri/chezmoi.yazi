@@ -1321,6 +1321,36 @@ workflow shell block passed normal-push, missing-base force-push, new-branch,
 and PR cases, and rejected an invalid commit with a missing push base. Workflow
 YAML parsing and full reachable-history commit validation also passed locally.
 
+## Installation and release tags
+
+On 2026-10-26, with Yazi 26.9.1 on macOS and `YAZI_CONFIG_HOME` and
+`XDG_CACHE_HOME` pointed at empty temporary directories,
+`ya pkg add yohkuri/chezmoi` installed `main` at `daa34ca`: the six root Lua
+files, `README.md` and `LICENSE`, and not `docs/`, so an installed README's
+links into `docs/` lead nowhere offline. `ya pkg delete yohkuri/chezmoi`
+removed the directory and its `package.toml` entry. Yazi was not started on
+the installed copy; the suites load the checkout through a symlink instead.
+
+The step in `.github/workflows/tag.yml` was run under `bash -e`, CI's shell
+(macOS's bash 3.2.57 with Git 2.54.0, not CI's Ubuntu bash and Git), in a
+clone whose origin was a local bare repository, with commits changing
+`main.lua`'s `@since` standing in for moves between Yazi releases. It tagged
+the head before a move up and not the commits after it, and a re-run read the
+tag as there. No move, a move down and a newly created `main` tagged nothing.
+A `before` not in the history, an unreadable `@since`, a tag already naming
+another commit, an origin that did not answer and a refused tag push each
+failed by name, the last printing the commands to tag by hand. The workflow
+has not run on GitHub, and no `rev = "=yazi-<version>"` pin has been tried:
+no tag exists yet.
+
+`ya pkg add` over a `plugins/chezmoi.yazi` placed by hand, a copied
+directory or a symlink to a clone, stopped with "You have modified the
+contents of the `chezmoi.yazi` plugin" and left it as it was. The
+`CONTRIBUTING.md` lines that link a clone in ran under sh and zsh with the
+default location, `XDG_CONFIG_HOME` and `YAZI_CONFIG_HOME`; a second run
+refused and left the clone untouched. `test/check.py` passed: 63 core, 126
+action policy and 20 main assertions, and 75 Python tests.
+
 ## Limits of the evidence
 
 The Ubuntu 24.04 E2E smoke scenario is validated in CI. The full runtime and E2E

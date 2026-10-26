@@ -63,8 +63,17 @@ You'll push to `origin` (your fork) and pull from `upstream` to stay in
 step with `main`. The `-f` fetches `upstream` straight away, so
 `upstream/main` exists before anything below asks for it.
 
-To try your checkout in your own Yazi, install it as the README's
-[Installation](README.md#installation) says for a local checkout.
+To try your checkout in your own Yazi, link it in as the plugin, then set
+it up as the README's [Quick start](README.md#quick-start) says. If you
+installed the plugin with `ya pkg add`, run `ya pkg delete yohkuri/chezmoi`
+first. Run these from the clone's root; they find Yazi's configuration
+directory as Yazi does, and refuse when something is already there:
+
+```sh
+plugin=${YAZI_CONFIG_HOME:-${XDG_CONFIG_HOME:-$HOME/.config}/yazi}/plugins/chezmoi.yazi
+mkdir -p "${plugin%/*}"
+test ! -e "$plugin" && ln -s "$PWD" "$plugin" || echo "$plugin is already there"
+```
 
 ## Install the git hooks
 
@@ -302,9 +311,9 @@ Your commits land on `main` exactly as you wrote them, which is why the
 message rules above are checked rather than tidied up afterwards.
 
 Dependabot opens one grouped pull request a month for the npm packages and
-one for the workflow's actions, plus one for each security fix as it is
+one for the workflows' actions, plus one for each security fix as it is
 published (`.github/dependabot.yml`). It does not update `mise.toml`, the
-type annotations' revision, the workflow's runner labels, or the
+type annotations' revision, the workflows' runner labels, or the
 SHA-256-pinned Yazi and chezmoi downloads. Its commits go through the same
 commit check.
 
@@ -316,7 +325,13 @@ stores the configuration and render state in the synchronous plugin state;
 `entry` and `fetch` do the asynchronous work. Every `ya.sync` block is
 declared unconditionally at the top level. Messages between contexts carry
 plain values and tables, never live file userdata or UI objects. The
-leading `@since` annotation enforces the supported Yazi minimum.
+leading `@since` annotation enforces the supported Yazi minimum. Raising
+it moves the plugin to a newer Yazi: on the push to `main`,
+`.github/workflows/tag.yml` tags the commit `main` stood at before as
+`yazi-<old version>`, which the README tells users of the older Yazi to pin.
+Land the changes the newer Yazi needs in the same pull request, and fixes
+meant for the older Yazi in an earlier one: the tag names `main` before that
+pull request, so no commit of its own reaches the older Yazi.
 
 | Module | Responsibility |
 | ------ | -------------- |
