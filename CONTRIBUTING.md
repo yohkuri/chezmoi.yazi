@@ -327,6 +327,8 @@ leading `@since` annotation enforces the supported Yazi minimum.
 | `process.lua` | Running chezmoi: background queries with a timeout, an output limit, cancellation and stderr discarded, built on the flags `M.client` adds; and `M.interactive`, which hands the terminal to a command with no timeout. |
 | `render.lua` | The signs and styles from the theme, and the cells of a row. |
 
+The user docs are the README and the `docs/` pages other than `design.md`
+and `validation.md`, now `docs/commands.md` and `docs/configuration.md`.
 `docs/design.md` records the accepted decisions and their reasons, and
 `docs/validation.md` the evidence behind them and the platforms that remain
 unverified.
@@ -343,7 +345,7 @@ reasons behind the code are written, among them
 [How the code is laid out](#how-the-code-is-laid-out), and how to tell a
 test that should follow your change from one that guards against it.
 
-A change that alters what the README, this page, `test/MANUAL.md`,
+A change that alters what the user docs, this page, `test/MANUAL.md`,
 `docs/design.md` or CI describe updates them in the same pull request. A
 change that alters what was validated adds a dated entry to
 `docs/validation.md`: what ran, on which OS, Yazi and chezmoi, the counts
