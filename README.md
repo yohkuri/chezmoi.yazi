@@ -1,58 +1,114 @@
 # chezmoi.yazi
 
-Run scoped chezmoi commands and show management and status in Yazi's linemode.
-A managed file gets a
-`C` marker and the original two `chezmoi status` columns. Directories also show
-whether any managed descendant differs, including missing destination files.
+[chezmoi](https://www.chezmoi.io/) knows which of your files it manages and
+which would change on the next apply, but it tells you only when you ask.
+chezmoi.yazi shows it in [Yazi](https://github.com/sxyazi/yazi)'s file list
+as you browse, and runs chezmoi's commands on the files you select.
 
-Tested with **Yazi 26.9.1 and chezmoi 2.72.2 on macOS**. The plugin requires
-Yazi 26.9.1 or newer and local Unix destination paths. Windows and source-tree
-display are unsupported;
-other Yazi/chezmoi versions and Linux have not been verified locally.
+- 🏷️ **Status beside each file** — a `C` on every managed file, and the two
+  columns `chezmoi status` prints for it.
+- 📂 **Directory summaries** — a directory shows when anything managed
+  under it differs, files missing from the destination included.
+- ⌨️ **Commands on the selection** — add, re-add, edit, diff, apply, forget
+  and destroy, on the selected files or the hovered one, from a menu or a
+  key of your own.
+- 🛡️ **Asks where it matters** — apply shows the diff and asks first,
+  forget and destroy always ask, and the plugin never adds `--force`.
+- 🎨 **Your theme** — every style and sign can be set in `theme.toml` or a
+  flavor.
+- 🤝 **Beside git.yazi** — both plugins' signs on the same row.
+
+## Requirements
+
+Yazi **26.9.1**. Older releases refuse to load the plugin, and newer ones are
+untested: Yazi changes its plugin API between releases.
+
+chezmoi, found as `chezmoi` on your `PATH` or wherever `setup`'s `command`
+points. The test suites last ran in full on macOS with chezmoi 2.73.3, and CI
+runs a short end-to-end check with 2.72.2 on Ubuntu 24.04;
+[Validation](docs/validation.md) has the earlier runs. Destination paths must
+be local Unix paths: Windows and source-tree display are unsupported.
 
 ## Installation
 
-Place this repository at `~/.config/yazi/plugins/chezmoi.yazi` (or under
-`$YAZI_CONFIG_HOME/plugins` if configured). For a local checkout, symlink that
-directory to the checkout instead. Keep all root Lua files together.
+```sh
+ya pkg add yohkuri/chezmoi
+```
 
-Add to `init.lua`:
+If you placed the plugin in `plugins/chezmoi.yazi` yourself, `ya pkg add`
+stops and asks you to delete it. Remove it first; if it is a symlink to a
+clone, remove only the link itself.
+
+`main` is the release: `ya pkg upgrade` takes its head. chezmoi.yazi supports
+one Yazi at a time and moves to the next when its maintainer does, on no
+fixed schedule, so a newer Yazi can be out for a while before chezmoi.yazi
+follows it.
+
+When it moves, the commit `main` stood at just before is tagged
+`yazi-<version>`, naming the Yazi it left: the last chezmoi.yazi for that
+Yazi. If your Yazi is older than the one under
+[Requirements](#requirements), pin the newest of the
+[tags](https://github.com/yohkuri/chezmoi.yazi/tags) whose version is not
+above your Yazi's. A Yazi chezmoi.yazi skipped has no tag of its own, and the
+tag you pin is untested on it. `ya pkg add` wrote an entry for chezmoi.yazi
+in `package.toml`, in Yazi's configuration directory: `$YAZI_CONFIG_HOME`, or
+else `$XDG_CONFIG_HOME/yazi`, or else `~/.config/yazi`. Change its `rev` line
+to the tag with `=` in front, leave the rest of the entry as it is, and run
+`ya pkg install`:
+
+```diff
+ [[plugin.deps]]
+ use = "yohkuri/chezmoi"
+-rev = "daa34ca"
++rev = "=yazi-<version>"
+ hash = "34a345d1abf2dfcbfa37bab195979c03"
+```
+
+> [!IMPORTANT]
+> Keep the `=`. It is what makes `ya pkg upgrade` pass the entry by; without
+> it, the next upgrade takes `main`'s head again, which your Yazi refuses.
+
+The `rev` you start from and the `hash` will read differently in yours.
+Deleting the `rev` line and running `ya pkg upgrade` returns to `main`. The
+tags start at 26.9.1: no release supports an older Yazi. There is one for
+each Yazi from there on that chezmoi.yazi has left, and none for the one it
+supports now.
+
+## Quick start
 
 ```lua
+-- ~/.config/yazi/init.lua
 require("chezmoi"):setup()
 ```
 
-Add to `yazi.toml`:
-
 ```toml
+# ~/.config/yazi/yazi.toml
 [[plugin.prepend_fetchers]]
-url = "*"
-run = "chezmoi"
+url   = "*"
+run   = "chezmoi"
 group = "chezmoi"
 
 [[plugin.prepend_fetchers]]
-url = "*/"
-run = "chezmoi"
+url   = "*/"
+run   = "chezmoi"
 group = "chezmoi"
 ```
 
-Add optional menu and manual refresh bindings to `keymap.toml`:
+The signs appear beside whichever linemode you have selected. To open the
+menu of commands and to refresh the status from a key:
 
 ```toml
+# ~/.config/yazi/keymap.toml
 [[mgr.prepend_keymap]]
-on = ["c", "m"]
-run = "plugin chezmoi -- menu"
+on   = ["c", "m"]
+run  = "plugin chezmoi -- menu"
 desc = "Chezmoi actions"
 
 [[mgr.prepend_keymap]]
-on = ["c", "r"]
-run = "plugin chezmoi -- refresh"
+on   = ["c", "r"]
+run  = "plugin chezmoi -- refresh"
 desc = "Refresh chezmoi status"
 ```
-
-The plugin adds a linemode child and preserves the selected linemode. Its
-default order is `1600`, after git.yazi's default `1500`. Keep git.yazi's own
-setup and fetcher entries when using both plugins.
 
 ## Reading the display
 
@@ -159,12 +215,29 @@ Closing the terminal while one of the plugin's confirmations is open can leave
 Yazi running until it is killed with SIGKILL; see
 [Confirmations](docs/commands.md#confirmations).
 
+## Alongside git.yazi
+
+Install [git.yazi](https://github.com/yazi-rs/plugins/tree/main/git.yazi)
+with `ya pkg add yazi-rs/plugins:git` and set it up as its README says, with
+its own `setup` call and its own fetchers in the `git` group, beside the
+`chezmoi` ones. chezmoi.yazi's default `order` is `1600`, after git.yazi's
+default `1500`, so git.yazi's sign comes first; set either plugin's `order`
+to change that.
+
+## Documentation
+
+- [Commands](docs/commands.md) — what each action runs on, what it asks
+  before running, and what happens while chezmoi has the terminal
+- [Configuration](docs/configuration.md) — every `setup` option, refresh,
+  the theme keys, and what the background status queries run
+- [Design](docs/design.md) — the accepted decisions and their reasons
+- [Validation](docs/validation.md) — what has been tested, on which
+  platforms, and what remains unverified
+
 ## Contributing
 
 Bug reports and pull requests are welcome; see
-[CONTRIBUTING.md](CONTRIBUTING.md). See [validation](docs/validation.md) for
-evidence and remaining platform limits, and [design](docs/design.md) for the
-accepted decisions and rationale.
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
