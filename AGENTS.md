@@ -92,6 +92,7 @@ Private conversation with the user may use their preferred language.
   a test side effect. Preview scoped chezmoi changes before scoped apply.
 - Clean up only test-owned temporary resources. Preserve failure diagnostics
   with `KEEP_FIXTURE=1` when needed.
-- Keep README and `CONTRIBUTING.md` instructions, design notes, validation
-  evidence, and CI aligned with implementation changes. Record measured
-  evidence without presenting unexecuted checks as passed.
+- Keep the user docs (the README and the `docs/` pages other than
+  `design.md` and `validation.md`), `CONTRIBUTING.md` instructions, design
+  notes, validation evidence, and CI aligned with implementation changes.
+  Record measured evidence without presenting unexecuted checks as passed.

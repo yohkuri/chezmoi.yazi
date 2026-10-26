@@ -369,11 +369,13 @@ early stdout closure, partial stdout, stderr backpressure, and termination.
 stderr is discarded to avoid both secret exposure and partial-stdout loss
 from Yazi 26.9.1's concurrent stream reads. No Python or GNU timeout dependency
 is needed by the plugin. Arbitrary grandchildren and termination during Yazi
-exit are not covered by the timeout guarantee; see the README's limits.
+exit are not covered by the timeout guarantee; see
+[Evaluation and limits](configuration.md#evaluation-and-limits).
 
 ## Public configuration
 
-The minimal interface below is implemented. README lists all options.
+The minimal interface below is implemented.
+[Configuration](configuration.md#setup-options) lists all options.
 
 ```lua
 require("chezmoi"):setup {

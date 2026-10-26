@@ -13,10 +13,10 @@ description: >-
 
 The invariants and their reasons are in `docs/design.md`, including the
 decisions D3 and D4; in `CONTRIBUTING.md`'s How the code is laid out; in
-the README's sections that promise behavior to users, such as Commands and
-Evaluation and limits; and in comments in the code. Read the parts that
-cover what you change. This skill does not restate them: every earlier draft
-that did got them wrong somewhere.
+what the user docs promise users: the README and the `docs/` pages other
+than `design.md` and `validation.md`; and in comments in the code. Read the
+parts that cover what you change. This skill does not restate them: every
+earlier draft that did got them wrong somewhere.
 
 ## Find the tests that match the change
 
@@ -25,8 +25,8 @@ literally: the pure suites, the Python harness, and the guide text under
 `test/`. Before changing a string, an argument or a flag, search `test/` for
 it. A match may be a copy that changes with it, or a check that the old value
 must stay, such as the query flags that `support.check_call` requires; decide
-which from the design and the README before changing the test. Strings that no
-test matches are not covered, so check them against the design instead.
+which from the design and the user docs before changing the test. Strings that
+no test matches are not covered, so check them against the design instead.
 
 Many of these matches run only in the Yazi-driven suites, so a green
 `test/check.py` does not show that a change kept them;
