@@ -1351,6 +1351,44 @@ default location, `XDG_CONFIG_HOME` and `YAZI_CONFIG_HOME`; a second run
 refused and left the clone untouched. `test/check.py` passed: 63 core, 126
 action policy and 20 main assertions, and 75 Python tests.
 
+## README picture
+
+On 2026-10-27, with Yazi 26.9.1 and chezmoi 2.73.3 on macOS,
+`test/readme.py` ran in a private tmux 100 columns wide, since no real
+terminal was at hand. At 12 rows it asked for 100x21 and waited; resized,
+it opened Yazi on `~` with `.zshrc` hovered, and the capture showed
+`"C M "` on `.zshrc` and `Brewfile`, `"CMM "` on `.tmux.conf`, `"C D "`
+on `.vimrc`, `"C  *"` on `.config`, `"C   "` on the other dotfiles and
+`"    "` on `.cache`, `.lesshst`, `.zsh_history` and the four folders.
+The capture's colors were the flavor's, `#89dceb` on each `C`. Quitting
+with `q` exited 0 and removed the scratch home. Closing the window, while
+it waited and while Yazi was open, removed it too and left no process. A
+SIGINT sent to the script while Yazi was open left Yazi running, and `q`
+then exited 0. A SIGTERM to the script while Yazi was open exited 143
+after about 5 seconds: Yazi took that long to quit, and left the alternate
+screen first. Two SIGTERMs 0.3 seconds apart did the same, with no Yazi
+left. With a `chezmoi` on `PATH` that fails, the script printed the failed
+command, its exit code and its stderr line by line, exited 1 and removed
+the scratch home; with stdin redirected it refused to start. Resized from
+100 to 40 and then 99 columns, the window showed only the tmux note and
+the current request. With `XDG_CONFIG_DIRS` naming a `chezmoi.toml` that
+sets another `sourceDir`, which a bare `chezmoi source-path` follows, and
+`XDG_DATA_DIRS` holding another source, the script opened the same screen.
+In an earlier fixture, with `TMUX` unset inside that tmux, Yazi logged an
+error configuring the default tmux server, and the script printed it and
+exited 1.
+
+The picture in `docs/images/readme.png` is a screenshot of a run in
+Ghostty 1.3.1 on macOS 26.6.2, taken by the user on 2026-10-27 at 100x21,
+with the font raised to 28pt with Command-= on a display without Retina
+scaling, and the window captured without its shadow: 1417x740 pixels,
+about 14 per column. A first take at the user's usual 14pt was 817 pixels
+wide with the shadow, too coarse for a Retina display. The PNG shows the
+same signs as the tmux capture, in the flavor's colors; how it looks was
+judged by eye and checked by nothing. `test/check.py` passed: 63 core, 126
+action policy and 20 main assertions, and 88 Python tests, 13 of them the
+new `test/test_readme.py`.
+
 ## Limits of the evidence
 
 The Ubuntu 24.04 E2E smoke scenario is validated in CI. The full runtime and E2E
