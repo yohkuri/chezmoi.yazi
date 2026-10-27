@@ -5,6 +5,12 @@ which would change on the next apply, but it tells you only when you ask.
 chezmoi.yazi shows it in [Yazi](https://github.com/sxyazi/yazi)'s file list
 as you browse, and runs chezmoi's commands on the files you select.
 
+![Yazi listing a home directory: a C beside each dotfile chezmoi manages, with M on .zshrc and Brewfile, which apply would change, MM on .tmux.conf, edited since the last apply, D on .vimrc, which apply would remove, and a star on .config, which holds such a file; nothing beside .zsh_history, Desktop and the rest, which chezmoi does not manage](docs/images/readme.png)
+
+The picture is the [Quick start](#quick-start) in Ghostty 100 columns wide,
+with hidden files shown, on the flavor in
+[Theme and flavor](#theme-and-flavor).
+
 - 🏷️ **Status beside each file** — a `C` on every managed file, and the two
   columns `chezmoi status` prints for it.
 - 📂 **Directory summaries** — a directory shows when anything managed
@@ -199,6 +205,24 @@ modified_sign = "~"
 
 [Theme and flavor](docs/configuration.md#theme-and-flavor) lists every key
 with its default.
+
+The picture at the top is on the
+[Catppuccin Mocha](https://github.com/yazi-rs/flavors) flavor, installed with
+`ya pkg add yazi-rs/flavors:catppuccin-mocha`, with the plugin's colors
+taken from its palette:
+
+```toml
+# ~/.config/yazi/theme.toml
+[flavor]
+dark  = "catppuccin-mocha"
+light = "catppuccin-mocha"
+
+[chezmoi]
+managed  = { fg = "#89dceb" }
+modified = { fg = "#f9e2af" }
+changed  = { fg = "#f9e2af" }
+deleted  = { fg = "#f38ba8" }
+```
 
 ## Evaluation and limits
 

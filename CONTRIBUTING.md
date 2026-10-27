@@ -35,6 +35,7 @@ format the same file differently, and CI would refuse what yours passed.
 | `test/e2e.py` | Yazi, chezmoi and tmux; Git with `--git-plugin` |
 | `test/manual_runtime.py` | Yazi, chezmoi, tmux and Git |
 | `test/manual.py` | Yazi, chezmoi, Git and a real terminal; no tmux |
+| `test/readme.py` | Yazi, chezmoi, a real terminal with a Nerd Font, and the flavor the README names installed with `ya pkg add`; no tmux |
 | `test/benchmark.py` | chezmoi |
 
 The pinned Lua matches the Yazi 26.9.1 build: its `lua55` feature and
@@ -163,6 +164,7 @@ edits your Yazi configuration.
 | `test/e2e.py` | Black-box tests that see only the terminal, the process and the files |
 | `test/manual.py` | An interactive fixture with a guide, for a person to walk |
 | `test/manual_runtime.py` | The guide's walk, with its keys pressed by a script |
+| `test/readme.py` | The README's Quick start in your terminal, for the README's picture |
 | `test/benchmark.py` | Timings of the chezmoi queries the plugin runs |
 | `test/all.py` | `test/check.py`, `test/runtime.py`, `test/e2e.py` and `test/manual_runtime.py` at once |
 
@@ -235,6 +237,32 @@ controls and what each case checks.
 `test/manual_runtime.py` presses the guide's keys in a private tmux. It
 checks that the guide runs; it is not a person's walk, whatever verdicts it
 records.
+
+### `test/readme.py`
+
+```sh
+test/readme.py
+```
+
+The picture at the top of the README is a screenshot of it. It writes the
+README's Quick start and the `theme.toml` block under Theme and flavor as
+they stand into a scratch home, with hidden files shown, and links the
+flavor from where `ya pkg add` put yours. In that home it builds dotfiles
+that chezmoi reports in each state the picture shows, waits for the window
+to reach the size it names and opens Yazi in your terminal. Quitting Yazi
+removes the scratch home. Take the screenshot outside tmux, on the
+flavor's background, `#1e1e2e` for Catppuccin Mocha, at a font size that
+makes a column about 14 pixels wide, so the picture is about 1400 pixels
+wide and stays sharp on a Retina display. Raise it for that window alone,
+with Command-= in Ghostty, rather than in your configuration, and before
+the window reaches the size: a font change takes columns away, and once
+Yazi is open nothing checks the size again. Capture the window without its
+shadow: on macOS, Command-Shift-4, then Space, then a click on the window
+with Option held.
+
+It is not in CI, and nothing compares the picture with what the setup
+draws: retake it after a change moves what the picture shows.
+`test/test_readme.py` checks only that the README's blocks still read.
 
 ### `test/all.py`
 

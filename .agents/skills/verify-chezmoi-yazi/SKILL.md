@@ -19,7 +19,9 @@ Every change runs `test/check.py`. Then, by what changed:
   `test/manual_runtime.py`, whichever module it is; the guide drives the
   plugin's own prompts too. `core.lua` and `actions.lua` build chezmoi's
   arguments and parse its output, and their unit suites check that only
-  against hand-written expectations, never the real chezmoi.
+  against hand-written expectations, never the real chezmoi. A change to
+  what a row shows also needs the README picture retaken with
+  `test/readme.py`.
 - **`test/core.lua`, `test/actions.lua`, `test/main.lua`, `test/.luarc.json`,
   `test/test_*.py`**: nothing more locally; CI also runs the first two Lua
   suites under 5.1 and 5.4. `test/main.lua` loads `main.lua` with stubs for
@@ -27,6 +29,9 @@ Every change runs `test/check.py`. Then, by what changed:
 - **`test/manual.py`, `test/manual_*`, `test/manual.lua`,
   `test/manual-theme.toml`**: `test/manual_runtime.py`.
 - **`test/benchmark.py`**: `test/benchmark.py`.
+- **`test/readme.py`**: a run of it in a real terminal, quitting Yazi; it
+  exits non-zero when Yazi logs a warning or exits with an error.
+  `test/test_readme.py` checks only how it reads the README.
 - **`test/all.py`**: one `test/all.py` run.
 - **Any other file under `test/`**: `test/runtime.py`, `test/e2e.py` and
   `test/manual_runtime.py`, plus `test/benchmark.py` for `test/support.py`.
