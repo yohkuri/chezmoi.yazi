@@ -68,7 +68,10 @@ check, run that suite alone too.
   without the wrapper.
 - **`test/e2e.py`** sees only the screen, process exit and fixture files. It
   cannot say why a row is wrong, and it has no view of process counts,
-  generations or the action lock; those are runtime-only assertions.
+  generations or the action lock; those are runtime-only assertions. Its
+  default run leaves out `confirmation-pages`, `source-ancestor` and
+  `visual-selection`, so name them with `--case` when a change to what they
+  drive needs them without the wrapper.
 - **`test/manual_runtime.py`** presses the guide's keys in a private tmux. It
   is an automated execution check of the guide, never a human acceptance walk,
   whatever verdicts it records.
@@ -82,11 +85,13 @@ check, run that suite alone too.
   not let Yazi hide between the theme write and the key.
 - **CI** runs `test/e2e.py --smoke` (status-refresh and commands) on Ubuntu
   24.04 with pinned Yazi and chezmoi. The full runtime, E2E and guide suites
-  run only where someone runs them by hand, which so far means macOS.
+  run only where someone runs them by hand, which so far means macOS and,
+  for `test/LEDGER.md`, one Ubuntu 24.04 container.
 
-Nothing here establishes Linux beyond the smoke run, other Yazi versions,
-git.yazi in the guided walk, a real editor, or a person's judgment of
-readability. Say so rather than letting a green run imply it.
+Nothing here establishes Linux beyond the smoke run and that container's
+runs, other Yazi versions, git.yazi in the guided walk, a real editor, or a
+person's judgment of readability. Say so rather than letting a green run
+imply it.
 
 ## Writing a terminal-driven check
 
