@@ -156,8 +156,9 @@ SCENARIOS = {
     "theme-reload": theme_reload,
     "git-coexistence": git_coexistence,
 }
-DEFAULT_CASES = ["status-refresh", "navigation", "failure-recovery", "theme-reload", "commands", "command-edges",
-                 "confirmation-pages", "source-ancestor", "visual-selection"]
+# The other action scenarios, command-edges, confirmation-pages, source-ancestor and visual-selection, run only
+# with --case: test/runtime.py runs the same functions with more checks (test/LEDGER.md).
+DEFAULT_CASES = ["status-refresh", "navigation", "failure-recovery", "theme-reload", "commands"]
 
 
 def version(command):

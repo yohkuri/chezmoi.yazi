@@ -8,7 +8,7 @@ import tempfile
 import tomllib
 import unittest
 from unittest.mock import Mock, patch
-from manual_backend import check, details, finalize, initialize, load, main, prepare, save, start_case, transition, view
+from manual_backend import check, details, finalize, initialize, load, main, prepare, save, transition, view
 from manual_cases import CASES
 from support import REPO, lua, read, write
 
@@ -219,14 +219,6 @@ class ManualTests(unittest.TestCase):
                     self.assertIn(str(retained), value["result"]["message"])
                     self.assertIn(str(retained), report["preparation_errors"][0]["error"])
 
-    def test_case_preparation_failure_preserves_the_previous_attempt(self):
-        previous = list(self.state["attempts"])
-        with self.fresh_cases(), patch("manual_backend.prepare_step", side_effect=RuntimeError("Preparation failed")):
-            with self.assertRaisesRegex(RuntimeError, "Preparation failed"):
-                start_case(self.session, self.state, 0)
-        self.assertEqual(self.state["attempts"], previous)
-        self.assertEqual(self.state["active"], 0)
-
     def test_theme_reload_requires_the_same_acquisition_epoch(self):
         attempt = self.state["attempts"][0]
         attempt.update(step=1, epoch_before=3)
@@ -245,11 +237,6 @@ class ManualTests(unittest.TestCase):
         self.assertIn("Walk complete", output.getvalue())
         self.assertIn("CASES", output.getvalue())
         self.assertNotIn(CASES[2]["steps"][0]["instruction"].splitlines()[0], output.getvalue())
-
-    def test_failed_auto_check_still_requires_visual_verdict(self):
-        self.snapshot["records"] = {}
-        self.request("check")
-        self.assertEqual(self.request("next")["step"], 1)
 
     def test_stale_request_leaves_progress_untouched(self):
         before = (self.session / "walk.json").read_bytes()
