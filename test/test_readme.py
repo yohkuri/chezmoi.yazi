@@ -24,6 +24,11 @@ def readme_text(quick, theme):
 
 
 class SetupBlockTests(unittest.TestCase):
+    def test_skips_a_block_named_for_another_file(self):
+        # Writing it would reach through the links to this checkout or your flavors.
+        other = "```toml\n# ~/.config/yazi/flavors/catppuccin-mocha.yazi/flavor.toml\n[mgr]\n```\n"
+        self.assertEqual(sorted(blocks(other, INIT, YAZI, KEYMAP)), sorted(FILES))
+
     def test_refuses_a_missing_block(self):
         with self.assertRaisesRegex(ValueError, "no `keymap.toml` block"):
             blocks(INIT, YAZI)

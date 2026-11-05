@@ -1401,7 +1401,7 @@ the first recorded full run on Linux. Of 1,122 single-line mutants of the root
 Lua, the pure suites killed 79% of `core.lua`'s, 78% of `actions.lua`'s, 25% of
 `main.lua`'s and none of `render.lua`'s.
 
-Test code then went from 5743 lines to 5417, without Markdown and
+Test code then went from 5743 lines to 5444, without Markdown and
 `test/.luarc.json`. `test/test_githooks.py`, `test/test_format_hook.py`,
 `test/test_all.py` and two tests of `test/test_skills.py` went at the
 maintainer's call, so the hooks, the format hook, the link checker and
@@ -1412,7 +1412,9 @@ unit test; with the tests restored, seven fail them and the eighth fails
 `backend_paths`. With `head` left out of `execution_info`, the Python tests pass
 and `resume_execution_guard` fails. `command-edges` stayed in `test/e2e.py`'s
 default run, since `test/command.py` exits non-zero on Ctrl-C whatever chezmoi
-returns.
+returns. `test_skips_a_block_named_for_another_file` came back too: `if named:`
+in `setup_blocks` passes every other test, and such a block would be written
+through the links to the checkout or a flavor.
 
 `M.interactive` now clears the screen after the Enter prompt. `finish` had
 matched the previous command's prompt, which `ui.hide` shows until the new
@@ -1422,7 +1424,13 @@ which all three pass now. With no delay, `commands` fails under both
 `test/runtime.py` and `test/e2e.py` when the clear runs only on success, when it
 is gone, without the attribute reset, and when the editor prints no color.
 `/bin/sh` replaced by a missing path keeps the output, which no suite covers.
-`Runtime.wait_exit` refused a pane exiting 3.
+`Runtime.wait_exit` refused a pane exiting 3. A later review found that keys
+pressed while a command ran answered the prompt, which then cleared the output
+unread: with Enter sent during a failing editor, Yazi came back after 2.00 s with
+an empty main screen. The prompt's shell now drops such keys first; without that,
+`commands` fails under both runners with no delay. In a pty, the prompt still
+waits with no `stty` on `PATH`, and with stdin not a terminal it reads its line.
+On Linux this has run only in CI's smoke run, and no real terminal has shown it.
 
 The maintainer looked at the clear on real terminals, running `test/manual.py`
 and Case 4's Add on macOS. This was not a walk: no verdict was recorded, and
@@ -1438,11 +1446,11 @@ reset. An earlier report of the whole scrollback going did not recur with the
 
 On macOS 26.6.2 with Yazi 26.9.1, chezmoi 2.74.0, tmux 3.8 and Lua 5.5.1, each
 alone, one run each, none killing a process: `test/check.py` with 63 core, 126
-action policy and 20 main assertions and 57 Python tests, `test/runtime.py`
-(16 passes) in 61 s, `test/e2e.py` (6 scenarios) in 24 s, the three by
-`--case` in 20 s and `test/manual_runtime.py` (15 passes) in 94 s.
+action policy and 20 main assertions and 58 Python tests, `test/runtime.py`
+(16 passes) in 63 s, `test/e2e.py` (6 scenarios) in 26 s, the three by
+`--case` in 21 s and `test/manual_runtime.py` (15 passes) in 90 s.
 `test/all.py` passed all four in 91 s, and `test/benchmark.py` timed 5000 files
-at 0.159 s.
+at 0.166 s.
 
 One failure stays open. With `ya.sleep(0.7)` after the clear, `command-edges` in
 `test/e2e.py` lost the `v` after Ctrl-C in 7 of 20 runs, the wait timing out with
