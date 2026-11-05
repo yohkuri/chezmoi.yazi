@@ -1,10 +1,8 @@
 """Every skill file under .agents/skills is reachable from .claude/skills."""
 import os
 from pathlib import Path
-import shutil
-import tempfile
 import unittest
-from support import REPO, run, write
+from support import REPO, run
 
 HOW = """Claude Code reads skills from .claude/skills. Give each file under
 .agents/skills a relative symlink at the same path there, one per file:
@@ -14,9 +12,6 @@ HOW = """Claude Code reads skills from .claude/skills. Give each file under
 # A hook or `git rebase -x` sets GIT_DIR or GIT_INDEX_FILE, which would point
 # these commands at the caller's repository instead of the one named by cwd.
 ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
-# The fixture repositories must not see the developer's global ignores, which
-# could hide the very paths a case plants.
-ISOLATED = dict(ENV, GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM="1")
 
 
 def git(root, *args, env=ENV):
@@ -69,52 +64,6 @@ class SkillLinkTests(unittest.TestCase):
         sources, found = problems(REPO)
         self.assertTrue(sources, "No skill files listed under .agents/skills")
         self.assertEqual(found, [], HOW + "\n".join(found))
-
-    def test_reports_each_mismatch(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            git(root, "-c", "init.templateDir=", "init", "--quiet", env=ISOLATED)
-            names = ["ok.md", "my notes.md", "日本語.md", "missing.md", "copy.md", "wrong.md"]
-            for skill in "ab":
-                (root / ".agents/skills" / skill).mkdir(parents=True)
-                for name in names:
-                    write(root / ".agents/skills" / skill / name, "x\n")
-            write(root / ".gitignore", "/.agents/skills/a/ignored.md\n/.claude/skills/a/hidden.md\n")
-            write(root / ".agents/skills/a/hidden.md", "x\n")
-            write(root / ".agents/skills/a/ignored.md", "x\n")
-            (root / ".claude/skills/a").mkdir(parents=True)
-            for name in ["ok.md", "my notes.md", "日本語.md", "ignored.md", "gone.md", "hidden.md"]:
-                (root / ".claude/skills/a" / name).symlink_to(f"../../../.agents/skills/a/{name}")
-            shutil.copy(root / ".agents/skills/a/copy.md", root / ".claude/skills/a/copy.md")
-            (root / ".claude/skills/a/wrong.md").symlink_to("../../.agents/skills/a/wrong.md")
-            (root / ".claude/skills/b").symlink_to("../../.agents/skills/b")
-            # Staged and untracked files are both listed.
-            git(root, "add", ".agents/skills/a", ".claude/skills/a/ok.md", env=ISOLATED)
-            sources, found = problems(root, ISOLATED)
-            self.assertIn(Path(".agents/skills/a/ok.md"), sources)
-            self.assertEqual(sorted(found), [
-                ".claude/skills/a/copy.md: must be a symlink to ../../../.agents/skills/a/copy.md, "
-                "not missing or a copy",
-                ".claude/skills/a/gone.md: nothing listed at .agents/skills/a/gone.md for it to point at",
-                ".claude/skills/a/hidden.md: ignored by Git, so it would never be committed",
-                ".claude/skills/a/ignored.md: nothing listed at .agents/skills/a/ignored.md for it to point at",
-                ".claude/skills/a/missing.md: must be a symlink to ../../../.agents/skills/a/missing.md, "
-                "not missing or a copy",
-                ".claude/skills/a/wrong.md: must be a symlink to ../../../.agents/skills/a/wrong.md, "
-                "not ../../.agents/skills/a/wrong.md",
-                ".claude/skills/b: a symlink to a directory; remove it and link each file",
-            ])
-
-    def test_reports_a_linked_skills_directory(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            git(root, "-c", "init.templateDir=", "init", "--quiet", env=ISOLATED)
-            (root / ".agents/skills/a").mkdir(parents=True)
-            write(root / ".agents/skills/a/SKILL.md", "x\n")
-            (root / ".claude").mkdir()
-            (root / ".claude/skills").symlink_to("../.agents/skills")
-            self.assertEqual(problems(root, ISOLATED)[1], [
-                ".claude/skills: a symlink to a directory; remove it and link each file"])
 
 
 if __name__ == "__main__":

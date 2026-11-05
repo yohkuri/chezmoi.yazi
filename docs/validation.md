@@ -1482,6 +1482,17 @@ after two re-adds of the same file. With that, one run each passed:
 process. How often the window is caught without the grace was not
 measured beyond the one failure in five runtime runs.
 
+The tooling tests went in the commit after that, at the maintainer's call
+and against the ledger's policy row: `test/test_githooks.py`,
+`test/test_format_hook.py`, `test/test_all.py` and the two tests of
+`test/test_skills.py` that exercised the link checker on fixture
+repositories; `test_skills.test_repository` stays. The hooks, the format
+hook, the link checker and `test/all.py` keep no tests from here on, and
+the entries above are the evidence for them. `test/check.py` passed in
+full in 7 s with 52 Python tests; `test/runtime.py` (16 passes) passed in
+65 s, `test/e2e.py` (5 scenarios) in 9 s and `test/manual_runtime.py` (13
+passes) in 80 s, none killing a process.
+
 ## Limits of the evidence
 
 The Ubuntu 24.04 E2E smoke scenario is validated in CI. The full runtime, E2E
