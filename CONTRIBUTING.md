@@ -180,7 +180,9 @@ Which of them your change needs, in short:
 `.agents/skills/verify-chezmoi-yazi/SKILL.md` maps each file under `test/`
 to its suites, says when a `test/all.py` run is not enough on its own, and
 holds the rules for writing a test: how a fixture stays isolated, what it
-may clean up, and how to wait on the screen.
+may clean up, and how to wait on the screen. `test/LEDGER.md` lists every
+test, what it protects, where tests overlap, and which are worth little,
+with the measurements behind each verdict.
 
 ### `test/runtime.py`
 
