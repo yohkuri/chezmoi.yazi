@@ -214,8 +214,12 @@ test/e2e.py --git-plugin /absolute/path/to/git.yazi
 It starts a fresh isolated Yazi for each scenario and checks the visible
 terminal output, the process's exit and the fixture files. It runs the real
 chezmoi binary directly, without the runtime suite's probe or command
-wrapper. `--case NAME` runs one scenario, `--keep` keeps the fixtures, and
-`--artifacts DIR` saves failure captures and logs.
+wrapper. By default it runs the four status scenarios and `commands`; the
+action scenarios it shares with `test/runtime.py`, `command-edges`,
+`confirmation-pages`, `source-ancestor` and `visual-selection`, run only
+by `--case`, since the runtime suite runs the same functions with more
+checks (`test/LEDGER.md`). `--case NAME` runs one scenario, `--keep` keeps
+the fixtures, and `--artifacts DIR` saves failure captures and logs.
 
 ### `test/manual.py`
 

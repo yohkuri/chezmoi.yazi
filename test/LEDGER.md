@@ -4,8 +4,9 @@ Every test in this repository, what it protects, where tests repeat each
 other or depart from the paths the plugin really takes, and which ones are
 worth little. Measured on 2026-11-05 on the checkout at `a52116c`; the
 numbers below are from that run, and the verdicts are a reading of the
-code against them. Each verdict is a proposal, not a change: nothing was
-removed.
+code against them. The verdicts were proposals; those in Tier 1 of
+[Low-value tests](#low-value-tests) were applied the same day, and the
+inventory and the tables below describe the tree after that.
 
 ## How the ledger was measured
 
@@ -15,7 +16,8 @@ Lua 5.4.6 (`lua5.4`, since no Lua 5.5 package was at hand; `test/check.py`
 runs the pure suites with the Lua 5.5.1 that `mise.toml` pins), uv 0.11.32
 and Python 3.14.6. This is the first recorded run of the full runtime, E2E
 and guide suites on Linux; CI runs only `test/e2e.py --smoke` there. One run
-each, in this order, every one passing and leaving no fixture or Yazi:
+each, in this order, before the Tier 1 removals, every one passing and
+leaving no fixture or Yazi:
 
 | Command | Result | Time |
 | --- | --- | --- |
@@ -101,16 +103,16 @@ case.
 | `test/core.lua` | pure Lua, 63 assertions | `core.lua`: path rules, NUL and status parsing, chunking, discovery, `collect` | `test/check.py`; CI also under Lua 5.1 and 5.4 | 0.01 s |
 | `test/actions.lua` | pure Lua, 126 assertions | `actions.lua`: option parsing, preflight rejections, target reduction, argv, confirmation policy, `facts` queries | `test/check.py`; CI also under 5.1 and 5.4 | 0.01 s |
 | `test/main.lua` | pure Lua with stubbed Yazi globals, 20 assertions | `main.lua` `setup`'s `notify_timeout` and the timeout of three notification paths | `test/check.py`; CI's Lua 5.1 and 5.4 runs skip it | 0.01 s |
-| `test/test_support.py` | Python unit, 8 tests | harness helpers: Lua serializer, byte I/O, `owned`, `stop`, `da1.answer`, `check_call`, cleanup retry | `test/check.py`, CI | 2.7 s |
-| `test/test_screen.py` | Python unit, 9 tests | `test/screen.py`, the parser E2E and the action cases read the screen with | `test/check.py`, CI | 0.01 s |
-| `test/test_manual.py` | Python unit, 39 tests | `test/manual_backend.py` and `test/manual.py`: the guide's state machine, archive and launcher | `test/check.py`, CI | 0.3 s |
+| `test/test_support.py` | Python unit, 6 tests | harness helpers: Lua serializer, `owned`, `stop`, `da1.answer`, `check_call`, cleanup retry | `test/check.py`, CI | 2.6 s |
+| `test/test_screen.py` | Python unit, 8 tests | `test/screen.py`, the parser E2E and the action cases read the screen with | `test/check.py`, CI | 0.01 s |
+| `test/test_manual.py` | Python unit, 37 tests | `test/manual_backend.py` and `test/manual.py`: the guide's state machine, archive and launcher | `test/check.py`, CI | 0.3 s |
 | `test/test_readme.py` | Python unit, 13 tests | `test/readme.py`'s reading of the README's blocks | `test/check.py`, CI | 0.01 s |
 | `test/test_skills.py` | Python unit, 3 tests | the symlinks from `.claude/skills` to `.agents/skills` | `test/check.py`, CI | 0.04 s |
 | `test/test_githooks.py` | Python unit, 10 tests | `.githooks/pre-commit` and `pre-push` | `test/check.py`, CI | 0.4 s |
 | `test/test_format_hook.py` | Python unit, 3 tests; skipped without jq | `scripts/format-lua-hook.sh` | `test/check.py`, CI | 0.3 s |
 | `test/test_all.py` | Python unit, 3 tests | `test/all.py`'s output ordering and exit codes | `test/check.py`, CI | 1.2 s |
 | `test/runtime.py` | Yazi in tmux, probe and command wrapper, 7 cases | the plugin's records, calls, rendering and actions | by hand | 62 s |
-| `test/e2e.py` | Yazi in tmux, screen only, 9 scenarios plus `git-coexistence` | rendering and actions as a user sees them | `--smoke` in CI; the rest by hand | 42 s |
+| `test/e2e.py` | Yazi in tmux, screen only, 5 default scenarios, 4 more by `--case`, plus `git-coexistence` | rendering and actions as a user sees them | `--smoke` in CI; the rest by hand | 8 s; 34 s for the four by `--case` |
 | `test/manual_runtime.py` | Yazi in tmux, 6 functions | the guide that `test/manual.py` runs, and the plugin flows it drives | by hand | 89 s |
 | `test/benchmark.py` | measurement | timings of the three queries; asserts only output line counts | by hand | 1 s |
 | `test/readme.py`, `test/manual.py` | tools for a person | the README picture; the human walk | by hand | n/a |
@@ -208,23 +210,25 @@ the harness's own correctness.
 | Test | Protects | Overlap | Verdict |
 | --- | --- | --- | --- |
 | `test_lua_string_roundtrip` | `support.lua` writes fixture values Lua reads back byte for byte; needs `lua` on `PATH` | `test_manual.test_lua_serializer_handles_nested_case_arrays` | keep |
-| `test_binary_text_roundtrip` | `write` and `read` keep CR, LF and NUL | none; the functions are one-line wrappers | low: cannot fail unless someone adds normalization |
 | `test_owned_marker_and_symlink` | the fixture-ownership guards and `stop`'s socket check | none | keep, it guards deletion |
 | `test_da1_counts_each_query_once_across_reads` | `da1.answer` over every chunk size | none | keep |
 | `test_check_call` | the call oracle, with 14 ways past an earlier version | none | keep |
 | `test_stop_kills_only_what_outlives_the_server` | leftover Yazi after the tmux server stops; 2.4 s, needs tmux | none | keep; the slowest unit test, for the leftover Yazi found behind weeks of flaky runs |
-| `test_process_timeout` | `support.run(timeout=)` raises `TimeoutExpired` | tests the standard library through a one-line wrapper | low: drop |
 | `test_cleanup_retries_transient_nonempty_directory` | the `ENOTEMPTY` retry seen in CI | none | keep |
+
+`test_binary_text_roundtrip`, which checked two one-line wrappers, and
+`test_process_timeout`, which checked the standard library's timeout
+through one, were removed as Tier 1.
 
 ### test_screen.py
 
-All nine protect the parser E2E and the action cases read the screen
+All eight protect the parser E2E and the action cases read the screen
 with, and each covers a case the flake history named: exact names, the
-wrong pane, blank status, ANSI and the hover glyph, pane boundaries, cell
-widths, whole borders, wrapped boxes, titles from the top border. One
-exception: `test_current_rows_require_three_panes` covers
-`screen.current_rows`, which nothing else calls. Low: drop the test with
-the function. `screen.DECORATIONS` is an empty translation table, so the
+wrong pane, blank status, ANSI and the hover glyph, cell widths, whole
+borders, wrapped boxes, titles from the top border.
+`test_current_rows_require_three_panes`, which covered
+`screen.current_rows`, a function nothing called, was removed with it as
+Tier 1. `screen.DECORATIONS` is an empty translation table, so the
 `translate` calls are no-ops; the hover glyph is handled by `endswith`.
 
 ### test_manual.py
@@ -237,13 +241,11 @@ the function. `screen.DECORATIONS` is an empty translation table, so the
 | `test_accept_saves_pass_and_advances_without_answering_the_next_step` | `P` saves, advances, leaves the next step unanswered; a stale repeat changes nothing | the stale part repeats twice below | keep |
 | `test_accept_stays_when_file_or_state_checks_fail` | failed checks keep the step and say so | the row two above | merge |
 | `test_accept_preserves_verdict_if_preparing_next_step_fails` | PASS survives a failed preparation; the error is recorded and a retry works | `..._cli_failure_preserves_existing_results`, `..._history_retains_fixtures...` | keep |
-| `test_case_preparation_cli_failure_preserves_existing_results` | seven operations leave saved results alone when a new case cannot be built | `..._failure_preserves_the_previous_attempt` | keep |
+| `test_case_preparation_cli_failure_preserves_existing_results` | seven operations leave saved results alone when a new case cannot be built | none | keep |
 | `test_preparation_error_history_retains_fixtures_without_changing_verdicts` | preparation history shows in details and keeps fixtures after a clean exit | the two rows above, `..._completed_details...` | merge into the accept row |
 | `test_retained_preparation_diagnostics_do_not_corrupt_json_or_saved_pass` | `KEEP_FIXTURE=1` diagnostics go to stderr, stdout stays JSON | guide `backend_diagnostics`, which runs the real CLI | keep one level |
-| `test_case_preparation_failure_preserves_the_previous_attempt` | `start_case` leaves `attempts` alone on failure | `..._cli_failure_preserves_existing_results` | drop: subsumed |
 | `test_theme_reload_requires_the_same_acquisition_epoch` | `check` compares the epoch for theme steps | guide `resumed_theme` | keep, it is direct and cheap |
 | `test_completed_details_show_results_instead_of_old_instructions` | the details viewer after completion | guide `test()` checks the same screen | low: cheap duplicate |
-| `test_failed_auto_check_still_requires_visual_verdict` | `next` does not advance after a failed check | the first row, same assertion with a passing check | low: drop |
 | `test_stale_request_leaves_progress_untouched` | a stale token raises and writes nothing | the accept row and the next row | merge |
 | `test_stale_cli_request_returns_latest_view_without_changing_results` | the CLI answers a stale token with the current view, for three statuses | none at the CLI level | keep |
 | `test_declining_apply_is_verified_from_files` | `check` reads a file expectation | the only unit test where a file check fails | keep |
@@ -270,6 +272,11 @@ the function. `screen.DECORATIONS` is an empty translation table, so the
 | `test_old_harness_error_preserves_latest_retry_result_after_case_change` | 2026-10-11 defect, five statuses | none | keep |
 | `test_invalid_error_token_falls_back_to_current_step` | seven malformed tokens | none | keep |
 | `test_successful_cleanup_happens_after_archiving` | archive first, then remove | none | keep |
+
+Removed as Tier 1: `test_failed_auto_check_still_requires_visual_verdict`,
+which made the first row's `next` assertion again after a failed check,
+and `test_case_preparation_failure_preserves_the_previous_attempt`, which
+`test_case_preparation_cli_failure_preserves_existing_results` subsumes.
 
 ### test_readme.py
 
@@ -322,10 +329,10 @@ according to `docs/validation.md`.
 | `failure-recovery` | 1 s | `C!!` and recovery | the runtime `status` case |
 | `theme-reload` | 0.4 s | wide signs, equal cell widths, an RGB color | the runtime `status` case; the cell-width check is this scenario's own |
 | `commands` | 5 s | as runtime `commands`; the CI smoke | identical code |
-| `command-edges` | 14 s | as runtime, minus the no-destroy-call checks | identical code |
-| `confirmation-pages` | 5 s | as runtime | identical code |
-| `source-ancestor` | 10 s | as runtime, minus the no-destroy-call check | identical code |
-| `visual-selection` | 5 s | as runtime | identical code |
+| `command-edges` | 14 s, `--case` only | as runtime, minus the no-destroy-call checks | identical code |
+| `confirmation-pages` | 5 s, `--case` only | as runtime | identical code |
+| `source-ancestor` | 10 s, `--case` only | as runtime, minus the no-destroy-call check | identical code |
+| `visual-selection` | 5 s, `--case` only | as runtime | identical code |
 | `git-coexistence` | optional | git.yazi's sign before chezmoi's on one row | the runtime `status` case with `--git-plugin` |
 
 The scenarios shared with `test/runtime.py` are the same functions in
@@ -333,7 +340,8 @@ The scenarios shared with `test/runtime.py` are the same functions in
 command wrapper, no probe, the real chezmoi streaming its output. What it
 loses are the wrapper's call checks and the probe's waits for the action
 lock, which E2E replaces with the 0.1-second key settle. E1, E2 and E5
-failed in both suites at the same line.
+failed in both suites at the same line. Since Tier 1, the four shared
+scenarios other than `commands` run only when named with `--case`.
 
 ### test/manual_runtime.py
 
@@ -354,10 +362,11 @@ runs the same re-add, and the step passes either way.
 
 ## Duplicates
 
-1. `test/e2e.py` runs `command-edges`, `confirmation-pages`,
-   `source-ancestor` and `visual-selection` with the very functions
-   `test/runtime.py` runs, with fewer assertions, 34 s of its 42 s. CI
-   runs neither; only `commands` and `status-refresh` are the smoke.
+1. `test/e2e.py` ran `command-edges`, `confirmation-pages`,
+   `source-ancestor` and `visual-selection` by default with the very
+   functions `test/runtime.py` runs, with fewer assertions, 34 s of its
+   42 s. CI runs neither; only `commands` and `status-refresh` are the
+   smoke. Since Tier 1 they run only by `--case`.
 2. `test/manual_runtime.py`'s `test` drives add, re-add, template and
    encrypted add, forget, destroy, diff, apply, plain and apply edit,
    Ctrl-C, mixed and directory rejections, shallow destroy, the source
@@ -438,25 +447,49 @@ runs the same re-add, and the step passes either way.
 ## Low-value tests
 
 Ranked by what dropping or merging them would save against what they
-could still catch. Each is a proposal.
+could still catch, in three tiers. Tier 1, the unconditional removals,
+was applied on 2026-11-05 in the commit after the ledger's; Tiers 2 and 3
+remain proposals.
+
+### Tier 1, applied
+
+| Rank | Test | Why | Saved | Done |
+| --- | --- | --- | --- | --- |
+| 1 | `test/e2e.py` default scenarios `command-edges`, `confirmation-pages`, `source-ancestor`, `visual-selection` | the same functions as `test/runtime.py` with fewer assertions; E1, E2 and E5 failed in both at the same line; only the missing wrapper was new | 34 s of every default E2E run | taken out of `DEFAULT_CASES`; they still run by `--case` |
+| 2 | `test_manual.test_failed_auto_check_still_requires_visual_verdict` | the same `next` assertion as `test_automatic_checks_never_supply_visual_verdict` | 4 lines | removed |
+| 3 | `test_manual.test_case_preparation_failure_preserves_the_previous_attempt` | `test_case_preparation_cli_failure_preserves_existing_results` asserts the same through the CLI | 7 lines | removed |
+| 4 | `test_support.test_process_timeout` | tested `subprocess.run`'s timeout through a one-line wrapper | 3 lines | removed |
+| 5 | `test_screen.test_current_rows_require_three_panes` | covered a function nothing called | 3 lines and 8 of `screen.py` | removed with `screen.current_rows` |
+| 6 | `test_support.test_binary_text_roundtrip` | two one-line wrappers that cannot fail unless someone adds normalization | 5 lines | removed |
+
+After the removals, on the same container, with lua-language-server
+3.19.2, StyLua 2.6.0 and ShellCheck 0.11.0 from their releases and `lua`
+still 5.4.6, `test/check.py` passed in full in 8 s: Markdown, LuaLS,
+StyLua and ShellCheck clean, 63 core, 126 action policy and 20 main
+assertions, and 83 Python tests, five fewer. Then, one run each:
+`test/runtime.py` (16 passes) in 63 s, `test/e2e.py` (5 scenarios) in 8 s
+against 42 s before, the four scenarios by `--case` in 34 s, and
+`test/manual_runtime.py` (15) in 89 s, none killing a process.
+
+### Tier 2, merges and judgment calls
 
 | Rank | Test | Why | Saves | Proposal |
 | --- | --- | --- | --- | --- |
-| 1 | `test/e2e.py` default scenarios `command-edges`, `confirmation-pages`, `source-ancestor`, `visual-selection` | the same functions as `test/runtime.py` with fewer assertions; E1, E2 and E5 failed in both at the same line; only the missing wrapper is new | 34 s of every full E2E run | take them out of `DEFAULT_CASES`, keep them for `--case`, or run them in CI only, where the runtime suite does not run |
-| 2 | `test/manual_runtime.py` `backend_paths`, `backend_diagnostics`, `resume_execution_guard` | each repeats a broader unit test through a real process | 1.5 s, three functions | keep the unit tests; keep one real-process check if the executable path matters |
-| 3 | `test_manual.test_failed_auto_check_still_requires_visual_verdict` | the same `next` assertion as `test_automatic_checks_never_supply_visual_verdict` | 4 lines | drop |
-| 4 | `test_manual.test_case_preparation_failure_preserves_the_previous_attempt` | `test_case_preparation_cli_failure_preserves_existing_results` asserts the same through the CLI | 7 lines | drop |
-| 5 | `test_manual.test_stale_request_leaves_progress_untouched`, `..._accept_stays_when_file_or_state_checks_fail`, `..._preparation_error_history_retains_fixtures...`, `..._harness_error_is_attributed_to_source_attempt_after_jump` | each asserts what a neighbor also asserts | 60 lines | merge into the neighbor named in the table |
-| 6 | `test_support.test_process_timeout` | tests `subprocess.run`'s timeout through a one-line wrapper | 3 lines | drop |
-| 7 | `test_screen.test_current_rows_require_three_panes` | covers a function nothing calls | 3 lines and 8 of `screen.py` | drop with `current_rows` |
-| 8 | `test/actions.lua` lines 155 and 183 (no query flags, no `--force`) and `test/core.lua` lines 157 and 160 (no empty query, no query without targets) | cannot fail against the code as it is; `check_call` repeats the `--force` and filter guards on real calls | 30 lines | keep as one-line tripwires or drop; they add nothing to the mutation score |
-| 9 | `test/manual_runtime.py` `assert_mode_colors` and the light and dark reports; `test_manual.test_theme_switching_preserves_readable_modes_and_git_context` | they check the fixture theme and Yazi, not the plugin or the guide's logic | 2 s, 25 lines | keep one assertion that the theme loads, or drop |
-| 10 | `test_manual.test_completed_details_show_results_instead_of_old_instructions`, `..._finished_walk_reopens_on_restart_or_jump` | the guide suite checks the same screens | 20 lines | keep, cheap; drop if the guide suite's checks are kept |
-| 11 | `test_readme.py`, twelve of thirteen | parser edge cases of a hand-run tool | 70 lines | keep a few that name a refusal; drop the rest when the tool is simplified |
-| 12 | `test_githooks.py`, `test_format_hook.py`, `test_skills.py` (two of three), `test_all.py` | tooling, not plugin coverage; `test_all.py`'s ordering test is 1.1 s by design | 1.8 s, 360 lines | a policy call: they go with the tooling they protect |
-| 13 | `test_support.test_binary_text_roundtrip`, `test_manual.test_lua_serializer_handles_nested_case_arrays` | one-line wrappers; the serializer test sits in the wrong file | 8 lines | drop the first; move the second to `test_support.py` |
-| 14 | `test/actions.lua` lines 48 and 57, `test/core.lua` line 51 | the same kills as their neighbors | 10 lines | keep as documentation, or drop |
-| 15 | `test/benchmark.py` | a measurement that asserts only line counts | 1 s | keep as a measurement; do not count it as coverage |
+| 1 | `test/manual_runtime.py` `backend_paths`, `backend_diagnostics`, `resume_execution_guard` | each repeats a broader unit test through a real process | 1.5 s, three functions | keep the unit tests; keep one real-process check if the executable path matters |
+| 2 | `test_manual.test_stale_request_leaves_progress_untouched`, `..._accept_stays_when_file_or_state_checks_fail`, `..._preparation_error_history_retains_fixtures...`, `..._harness_error_is_attributed_to_source_attempt_after_jump` | each asserts what a neighbor also asserts | 60 lines | merge into the neighbor named in the table |
+| 3 | `test/actions.lua` lines 155 and 183 (no query flags, no `--force`) and `test/core.lua` lines 157 and 160 (no empty query, no query without targets) | cannot fail against the code as it is; `check_call` repeats the `--force` and filter guards on real calls | 30 lines | keep as one-line tripwires or drop; they add nothing to the mutation score |
+| 4 | `test/manual_runtime.py` `assert_mode_colors` and the light and dark reports; `test_manual.test_theme_switching_preserves_readable_modes_and_git_context` | they check the fixture theme and Yazi, not the plugin or the guide's logic | 2 s, 25 lines | keep one assertion that the theme loads, or drop |
+| 5 | `test_manual.test_completed_details_show_results_instead_of_old_instructions`, `..._finished_walk_reopens_on_restart_or_jump` | the guide suite checks the same screens | 20 lines | keep, cheap; drop if the guide suite's checks are kept |
+| 6 | `test_manual.test_lua_serializer_handles_nested_case_arrays` | the serializer test sits in the wrong file | nothing | move to `test_support.py` |
+| 7 | `test/actions.lua` lines 48 and 57, `test/core.lua` line 51 | the same kills as their neighbors | 10 lines | keep as documentation, or drop |
+
+### Tier 3, policy
+
+| Rank | Test | Why | Saves | Proposal |
+| --- | --- | --- | --- | --- |
+| 1 | `test_readme.py`, twelve of thirteen | parser edge cases of a hand-run tool | 70 lines | keep a few that name a refusal; drop the rest when the tool is simplified |
+| 2 | `test_githooks.py`, `test_format_hook.py`, `test_skills.py` (two of three), `test_all.py` | tooling, not plugin coverage; `test_all.py`'s ordering test is 1.1 s by design | 1.8 s, 360 lines | a policy call: they go with the tooling they protect |
+| 3 | `test/benchmark.py` | a measurement that asserts only line counts | 1 s | keep as a measurement; do not count it as coverage |
 
 Nothing in `test/runtime.py`'s `status` and `action-coordination` cases,
 `test/core.lua`'s and `test/actions.lua`'s parsing and policy blocks,
@@ -486,5 +519,6 @@ suites. The mutation operators are a fixed small set, so a site with no
 unique kills may protect against a change they cannot make; the string
 and template pins are the clearest case. Verdicts on the harness tests
 come from reading `test/manual_backend.py` against each test, not from
-mutating it. No human walk, no macOS run and no `--git-plugin` run was
+mutating it. The Tier 1 removals were checked by one run of every suite,
+recorded above. No human walk, no macOS run and no `--git-plugin` run was
 made for this ledger.

@@ -385,8 +385,10 @@ summaries, manual refresh, directory and tab navigation, template failure and
 recovery, theme/flavor reload, wide-sign alignment, and RGB output. The
 optional git.yazi scenario verifies both linemodes on the same row and their
 order. `--smoke` runs the initial status/refresh scenario and the basic command
-scenario used by CI; the full suite also runs the command-edge and
-confirmation-pages scenarios.
+scenario used by CI; the default run adds navigation, failure recovery and
+theme reload. The command-edge, confirmation-pages, source-ancestor and
+visual-selection scenarios run only by `--case` since the test ledger's Tier
+1 removals below: `test/runtime.py` runs the same functions with more checks.
 
 Test diagnostics live below the isolated state directory so they do not
 themselves change files in Yazi's current or parent list. Cleanup affects only
@@ -1409,6 +1411,24 @@ notification dedupe through. Not run: `test/check.py` as a whole, since
 LuaLS, StyLua and ShellCheck were not installed, though the locked
 markdownlint passed; the pure suites under Lua 5.5; `--git-plugin`; and
 anything on macOS.
+
+Later that day the ledger's Tier 1 was applied: the four action scenarios
+shared with `test/runtime.py` left `test/e2e.py`'s default run and stay
+available by `--case`, and five unit tests went,
+`test_failed_auto_check_still_requires_visual_verdict` and
+`test_case_preparation_failure_preserves_the_previous_attempt` in
+`test/test_manual.py`, `test_process_timeout` and
+`test_binary_text_roundtrip` in `test/test_support.py`, and
+`test_current_rows_require_three_panes` in `test/test_screen.py` with
+`screen.current_rows`, which nothing called. On the same container, with
+lua-language-server 3.19.2, StyLua 2.6.0 and ShellCheck 0.11.0 from their
+releases and `lua` still 5.4.6, `test/check.py` passed in full in 8 s:
+Markdown, LuaLS, StyLua and ShellCheck clean, 63 core, 126 action policy
+and 20 main assertions, and 83 Python tests, five fewer. Then, one run
+each: `test/runtime.py` (16 passes) in 63 s, `test/e2e.py` (5 scenarios)
+in 8 s against 42 s before, the four scenarios by `--case` in 34 s, and
+`test/manual_runtime.py` (15) in 89 s, none killing a process. Not run: the
+pure suites under Lua 5.5, `--git-plugin`, and anything on macOS.
 
 ## Limits of the evidence
 

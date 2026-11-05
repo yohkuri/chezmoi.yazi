@@ -11,16 +11,6 @@ def plain(text):
     return ANSI.sub("", text)
 
 
-def current_rows(capture):
-    """Return current-pane rows without ANSI control sequences."""
-    rows = []
-    for line in plain(capture).splitlines():
-        panes = line.split(BAR, 2)
-        if len(panes) == 3:
-            rows.append(panes[1].translate(DECORATIONS))
-    return rows
-
-
 def _name_pattern(name):
     return re.compile(r"^\s*\S+\s+" + re.escape(name) + r"(?=\s|$)")
 

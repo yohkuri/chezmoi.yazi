@@ -29,10 +29,6 @@ class ScreenTests(unittest.TestCase):
         self.assertEqual(screen.status(capture, "local"), "CMM ")
         self.assertIn("\x1b[33m", screen.row(capture, "local", ansi=True))
 
-    def test_current_rows_require_three_panes(self):
-        capture = "header\nleft│middle│right\nleft│incomplete"
-        self.assertEqual(screen.current_rows(capture), ["middle"])
-
     def test_cell_width_handles_wide_and_combining_text(self):
         self.assertEqual(screen.cell_width("界m e\N{COMBINING ACUTE ACCENT}"), 5)
 

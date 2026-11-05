@@ -15,7 +15,7 @@ import io
 from unittest import mock
 from da1 import QUERY, answer
 from support import (QUERY_FLAGS, REPO, Runtime, check_call, environment, leftover, lua, owned, processes,
-                     read, run, stop, write)
+                     stop, write)
 
 
 class SupportTests(unittest.TestCase):
@@ -24,12 +24,6 @@ class SupportTests(unittest.TestCase):
         result = subprocess.run(["lua", "-e", "io.write(" + lua(value) + ")"],
                                 capture_output=True, check=True, timeout=5)
         self.assertEqual(result.stdout, value.encode())
-
-    def test_binary_text_roundtrip(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "data"
-            write(path, "a\r\nb\0c")
-            self.assertEqual(read(path), "a\r\nb\0c")
 
     def test_owned_marker_and_symlink(self):
         with tempfile.TemporaryDirectory(prefix="chezmoi-yazi-test-") as directory:
@@ -121,10 +115,6 @@ class SupportTests(unittest.TestCase):
                             os.kill(pid, signal.SIGKILL)
                         except ProcessLookupError:
                             pass
-
-    def test_process_timeout(self):
-        with self.assertRaises(subprocess.TimeoutExpired):
-            run([sys.executable, "-c", "import time; time.sleep(5)"], timeout=0.05)
 
     def test_cleanup_retries_transient_nonempty_directory(self):
         root = Path(tempfile.mkdtemp(prefix="chezmoi-yazi-test-")).resolve()
