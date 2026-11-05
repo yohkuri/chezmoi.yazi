@@ -290,8 +290,9 @@ for `PATH` below, not the report directory or an individual attempt directory.
 
 Check the terminal at that point, which no step can reach: no chezmoi output
 and no `Press Enter to return to Yazi` should remain on the screen, and no
-background color should fill it. Only tmux has shown this, so a real terminal
-is worth reporting, along with what its scrollback keeps.
+background color should fill it. Ghostty alone and herdr on Ghostty have shown
+the screen without the output, also in scrollback; only tmux has shown the color
+reset. Another terminal is worth reporting, along with what its scrollback keeps.
 
 ```sh
 test/manual.py open PATH
