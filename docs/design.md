@@ -114,11 +114,12 @@ They have no acquisition timeout. The runner restores the permit after errors
 and waits for Enter so output remains readable. A fixed shell snippet provides
 only this Enter prompt; executable arguments and target paths never enter shell
 source. Raw output is not copied to plugin notifications or logs. After Enter
-the runner resets the attributes and clears the screen before restoring the
-permit: `ui.hide` would otherwise show the finished command's output again at
-the next action, and Yazi would leave it, with the prompt, on the terminal when
-it exits. A prompt that failed never waited, so it keeps the unread output on
-the screen.
+the runner clears the screen before restoring the permit, having reset the
+attributes when the command ended: `ui.hide` would otherwise show the finished
+command's output again at the next action, and Yazi would leave it, with the
+prompt, on the terminal when it exits. Ctrl-C or Ctrl-D at the prompt counts as
+answering it. A prompt that could not start never waited, so that case keeps
+the unread output on the screen.
 
 Acquiring the action lock invalidates the current acquisition epoch and pending
 work. A worker already in a query drains through its existing deadline before

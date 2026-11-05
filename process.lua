@@ -1,8 +1,7 @@
 local core = require(".core")
 local M = {}
 
--- Reset first: a command can leave a color, which a clear would paint the screen with.
-local CLEAR = "\27[0m\27[2J\27[H"
+local CLEAR = "\27[2J\27[H"
 
 -- stderr is deliberately discarded: besides containing secrets, read_line_with
 -- can lose partial stdout when a concurrent stderr read wins (Yazi 26.9.1).
@@ -101,9 +100,13 @@ function M.interactive(opts, name, args, summary)
 		io.flush()
 		local status =
 			Command(opts.command):arg(args):stdin(Command.INHERIT):stdout(Command.INHERIT):stderr(Command.INHERIT):status()
+		-- Reset first: a command can leave a color, which a clear would paint the screen with.
 		io.write(
-			status and ("\nchezmoi exited with code " .. tostring(status.code) .. ".\n")
-				or "\nCould not start or wait for chezmoi.\n"
+			"\27[0m"
+				.. (
+					status and ("\nchezmoi exited with code " .. tostring(status.code) .. ".\n")
+					or "\nCould not start or wait for chezmoi.\n"
+				)
 		)
 		io.flush()
 		local resumed = Command("/bin/sh")
@@ -113,8 +116,9 @@ function M.interactive(opts, name, args, summary)
 			:stderr(Command.INHERIT)
 			:status()
 		-- The next ui.hide shows this screen again, and Yazi leaves it behind on exit.
-		-- A prompt that failed never waited, so the output is still unread: keep it.
-		if resumed and resumed.success then
+		-- Ctrl-C or Ctrl-D answers the prompt as Enter does. A prompt that could not
+		-- start never waited, so the output is still unread: keep it.
+		if resumed then
 			io.write(CLEAR)
 			io.flush()
 		end

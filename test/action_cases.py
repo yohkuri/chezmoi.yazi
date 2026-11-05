@@ -8,6 +8,9 @@ import screen
 from support import REPO, NAMES, lua, read, write
 
 
+COLOR = "\x1b[44m"
+
+
 def configure(t):
     keys = {
         "a": "plugin chezmoi -- add", "r": "plugin chezmoi -- re-add",
@@ -63,6 +66,11 @@ def finish(t, next_confirm=False, success=True, next_command=False):
     else:
         returned(t)
     return capture
+
+
+def assert_cleared(capture):
+    for text in ["Press Enter to return to Yazi", "chezmoi exited with code", "Running (argv):", COLOR]:
+        assert text not in capture, capture
 
 
 def confirm(t, yes=True):
@@ -137,23 +145,28 @@ def commands(t):
     write(t.source / "source.tmpl", "{{ .missing.field }}")
     t.key("3"); t.key("p"); finish(t, success=False)
     assert read(t.dest / "source") == "source edit\n"
-    # A command can leave a color, which the plugin's clear must not paint the
-    # terminal with.
+    # The plugin clears a finished command's screen, whichever key answers the
+    # prompt. Without that the next ui.hide shows the old text, which this file's
+    # waits could take for the new command's, and it stays on the terminal after
+    # Yazi exits. A command can also leave a color, which the clear must not paint
+    # the terminal with.
     write(t.cfg, read(t.cfg) + '[edit]\ncommand=' + json.dumps(sys.executable) + '\nargs='
           + json.dumps([str(REPO / "test/editor.py"), str(t.root)]) + '\n')
     write(t.root / "editor-mode", "color")
-    t.key("1"); t.key("e"); finish(t)
-    # The plugin clears a finished command's screen. Without that the next
-    # ui.hide shows the old prompt, which this file's waits could take for the
-    # new command's, and the prompt stays on the terminal after Yazi exits.
+    for answer in ["Enter", "C-c", "C-d"]:
+        t.key("1"); t.key("e")
+        t.wait_screen(lambda s: "Press Enter to return to Yazi" in s, "command exit prompt")
+        assert COLOR in t.capture(ansi=True), t.last_capture_ansi
+        t.tmux("send-keys", "-t", "test", answer)
+        returned(t)
+        released(t)
+        assert_cleared(t.main_screen())
     t.tmux("set-option", "-w", "remain-on-exit", "on")
     t.key("q", settle=0)
-    capture = t.wait_exit("Yazi exit")
-    assert "Press Enter to return to Yazi" not in capture, capture
-    colored = t.capture(ansi=True)
-    assert "\x1b[44m" not in colored, colored
+    t.wait_exit("Yazi exit")
+    assert_cleared(t.capture(ansi=True))
     assert "runtime error:" not in t.logs(), t.logs()
-    print("PASS terminal actions: add, re-add, menu, forget, destroy, apply/cancel/conflict, failed diff")
+    print("PASS terminal actions: add, re-add, menu, forget, destroy, apply/cancel/conflict, failed diff, the clear")
 
 
 def bind_targets(t, names):

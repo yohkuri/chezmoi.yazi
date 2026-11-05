@@ -321,10 +321,14 @@ class Runtime:
             time.sleep(0.05)
         raise AssertionError(f"Timed out waiting for {description}\n{capture}\n{self.logs()}")
 
+    def main_screen(self):
+        """The main screen behind Yazi's alternate one, with colors, as the next ui.hide would show it."""
+        return self.tmux("capture-pane", "-a", "-e", "-p", "-t", "test")
+
     def wait_exit(self, description):
         """Wait for a pane kept by remain-on-exit to die; return its screen, and fail unless it exited 0."""
         capture = self.wait_screen(lambda s: "Pane is dead" in s, description)
-        assert "Pane is dead (status 0," in capture, capture
+        assert "Pane is dead (status 0," in capture, capture + "\n" + self.logs()
         return capture
 
     def alive(self):

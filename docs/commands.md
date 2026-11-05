@@ -73,5 +73,6 @@ file-list/status refresh. Failures may leave partial changes; there is no
 automatic retry or rollback. Cancelling apply after edit keeps the source edit.
 Completion means the command finished, not that every entry was changed.
 Raw command output goes only to the terminal and is not copied to plugin logs
-or notifications. Pressing Enter clears it from the screen; whether any of it
+or notifications. Pressing Enter clears it from the screen, after a failure too,
+and the failure's notification does not repeat the reason; whether any of it
 stays in scrollback depends on your terminal.
