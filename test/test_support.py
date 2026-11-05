@@ -25,6 +25,9 @@ class SupportTests(unittest.TestCase):
                                 capture_output=True, check=True, timeout=5)
         self.assertEqual(result.stdout, value.encode())
 
+    def test_lua_serializer_handles_nested_arrays(self):
+        self.assertEqual(lua([{"x": [True, 2, None]}]), '{{["\\120"]={true,2,nil}}}')
+
     def test_owned_marker_and_symlink(self):
         with tempfile.TemporaryDirectory(prefix="chezmoi-yazi-test-") as directory:
             root = Path(directory).resolve()

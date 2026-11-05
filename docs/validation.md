@@ -1430,6 +1430,37 @@ in 8 s against 42 s before, the four scenarios by `--case` in 34 s, and
 `test/manual_runtime.py` (15) in 89 s, none killing a process. Not run: the
 pure suites under Lua 5.5, `--git-plugin`, and anything on macOS.
 
+Tier 2 followed in the next commit, each row by the first option the
+ledger names. `backend_paths` and `resume_execution_guard` left
+`test/manual_runtime.py`, whose `backend_diagnostics` stays as the one
+check of the backend through real processes, and its `test` keeps one
+status-bar color check of the fixture theme in place of the light and dark
+terminal reports, the select and unset mode colors and the Theme case's two
+color checks. In `test/test_manual.py`,
+`test_accept_stays_when_file_or_state_checks_fail` merged into
+`test_internal_state_mismatch_cannot_be_overridden_by_visual_pass`,
+`test_preparation_error_history_retains_fixtures_without_changing_verdicts`
+into `test_accept_preserves_verdict_if_preparing_next_step_fails` and
+`test_harness_error_is_attributed_to_source_attempt_after_jump` into
+`test_multiple_guide_errors_preserve_origin_results_and_complete_history`;
+`test_stale_request_leaves_progress_untouched`,
+`test_finished_walk_reopens_on_restart_or_jump` and
+`test_theme_switching_preserves_readable_modes_and_git_context` went, and
+`test_lua_serializer_handles_nested_case_arrays` moved to
+`test/test_support.py`. The pure tripwires and the two documentation
+assertions the ledger's Tier 2 lists stay. `test/check.py` passed in full
+in 9 s with 77 Python tests; `test/runtime.py` (16 passes) passed in 64 s
+and `test/e2e.py` (5 scenarios) in 7 s. `test/manual_runtime.py` failed
+its first run at `foreground_launcher`'s check that the launcher's session
+directory was gone: the test left its fixture, and so stopped the tmux
+server, as soon as the launcher printed `Results:`, which `finalize` prints
+before it removes the fixtures, so the launcher died mid-removal with one
+attempt's directory half gone and no error recorded; the earlier runs had
+won that race. The test now waits for tmux's `Pane is dead` line, which
+shows the launcher has exited. Run alone after that, the suite passed, 13
+passes in 89 s, none killing a process. The half-removed session and
+attempt directories of the failed run were removed by hand.
+
 ## Limits of the evidence
 
 The Ubuntu 24.04 E2E smoke scenario is validated in CI. The full runtime, E2E

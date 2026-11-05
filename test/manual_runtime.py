@@ -87,23 +87,11 @@ def test(t):
         return root
 
     t.wait_screen(lambda s: "P: PASS/check/next" in s and "S: SKIP/next" in s and "CMM" in s, "initial guide and rows")
-    for light, report in [(True, 2), (False, 1)]:
-        t.tmux("send-keys", "-t", "test", "-l", f"\x1b[?997;{report}n")
-        t.wait(lambda s: s.get("light") is light)
-        t.key("Y")
-        assert_mode_colors(t, "NOR", "137;180;250")
+    # The fixture theme loaded: its normal-mode status bar color. The other mode
+    # colors and the terminal's light and dark reports tested Yazi and the
+    # fixture rather than the guide (test/LEDGER.md).
     assert_mode_colors(t, "NOR", "137;180;250")
-    t.key("v")
-    assert_mode_colors(t, "SEL", "148;226;213")
-    t.tmux("send-keys", "-t", "test", "Escape")
-    assert_mode_colors(t, "NOR", "137;180;250")
-    t.key("V")
-    assert_mode_colors(t, "UNS", "242;205;205")
-    t.tmux("send-keys", "-t", "test", "Escape")
-    assert_mode_colors(t, "NOR", "137;180;250")
-    t.tmux("send-keys", "-t", "test", "Escape")
-    time.sleep(0.3)  # Decode the final Escape before the following guide key.
-    print("PASS manual status colors: dark/light terminal reports, normal/select/unset modes")
+    print("PASS manual status bar in the fixture theme")
     control(t, "n")
     assert state()["attempts"][0]["step"] == 0, "Unanswered observation advanced"
     t.tmux("send-keys", "-t", "test", "P", "P", "P")
@@ -195,11 +183,8 @@ def test(t):
     control(t, "h")
     print("PASS guide controls preserve visual unset selection for real actions")
     jump("theme")
-    accept(); t.key("Y")
-    assert_mode_colors(t, "NOR", "137;180;250")
-    accept()
+    accept(); t.key("Y"); accept()
     t.key("Y"); accept()
-    assert_mode_colors(t, "NOR", "137;180;250")
     root = jump("add")
     for key in ["a", "C", "t", "r", "z"]:
         t.key("7"); t.key(key)
@@ -342,7 +327,11 @@ def foreground_launcher():
         t.key("q")
         t.wait_screen(lambda s: "Save and exit; clean fixtures" in s, "launcher finish menu")
         t.key("c")
-        t.wait_screen(lambda s: "Results:" in s, "archived launcher report")
+        # The launcher removes its fixtures after it prints the report path, so
+        # wait for it to exit, which remain-on-exit shows, before this fixture's
+        # tmux server goes and takes it down mid-removal.
+        capture = t.wait_screen(lambda s: "Pane is dead" in s, "launcher exit after the report")
+        assert "Results:" in capture, capture
     reports = set((REPO / ".dev/manual-runs").glob("*/results.json")) - before
     assert len(reports) == 1, reports
     report = json.loads(read(next(iter(reports))))
@@ -399,38 +388,12 @@ def resumed_theme():
     print("PASS resumed theme: steps 2 and 3 replace the old epoch and advance after Y")
 
 
-def backend_paths():
-    """Exercise real fixture setup and separate CLI processes, without git UI."""
-    import sys
-    from support import run
-    with fixture(probe=False, instrument=False) as t:
-        write(t.root / "manual.json", json.dumps(dict(version=1, root=str(t.root), repo=str(REPO))))
-        write(t.root / "baseline-theme.toml", "")
-        plugin = t.root / "git.yazi"
-        plugin.mkdir()
-        write(plugin / "main.lua", "return { setup = function() end }\n")
-        code = ('import sys; from pathlib import Path; sys.path.insert(0, sys.argv[1]); '
-                'from manual_backend import initialize; initialize(Path(sys.argv[2]), sys.argv[3])')
-        try:
-            run([sys.executable, "-c", code, str(REPO / "test"), str(t.root), "git.yazi"], cwd=t.root, env=t.env)
-            value = load(t.root)[1]
-            assert value["git_plugin"] == str(plugin), value["git_plugin"]
-            token = "0:0"
-            for operation in ["restart", "jump"]:
-                # Yazi's backend cwd differs from the original invocation cwd.
-                result = json.loads(run([sys.executable, str(REPO / "test/manual_backend.py"), str(t.root), operation,
-                                         json.dumps(dict(token=token, index=1))], cwd=t.dest, env=t.env))
-                assert result["result"]["status"] == "NOT RUN", result
-                assert (Path(result["root"]) / "config/plugins/git.yazi").resolve() == plugin
-                token = result["token"]
-        finally:
-            if (t.root / "walk.json").exists():
-                remove_attempts(load(t.root)[1])
-    print("PASS backend CLI: relative git plugin persists across cwd changes, restart and jump")
-
-
 def backend_diagnostics():
-    """Keep JSON parseable when real preparation fails and retains evidence."""
+    """Keep JSON parseable when real preparation fails and retains evidence.
+
+    The one check of the backend through real processes: the unit tests in
+    test/test_manual.py cover the git plugin path and the resume guard, which
+    separate functions here used to run again (test/LEDGER.md)."""
     with fixture(probe=False, keep=False) as t:
         retained = []
         try:
@@ -470,32 +433,8 @@ def backend_diagnostics():
     print("PASS backend CLI: preparation failures keep JSON stdout, stderr evidence and saved PASS with/without KEEP_FIXTURE")
 
 
-def resume_execution_guard():
-    """Compare actual code/tool metadata before touching a retained session."""
-    with fixture(probe=False) as t:
-        try:
-            write(t.root / "manual.json", json.dumps(dict(version=1, root=str(t.root), repo=str(REPO))))
-            configure_guide(t, None)
-            original = load(t.root)[1]
-            code = 'import sys; from pathlib import Path; from manual import open_fixture; open_fixture(Path(sys.argv[1]))'
-            for name in ["head", "diff_sha256", "source_hashes", "versions"]:
-                state = dict(original, **{name: "previous execution"})
-                save(t.root, state)
-                before = (t.root / "walk.json").read_bytes()
-                process = subprocess.run([sys.executable, "-c", code, str(t.root)], cwd=REPO / "test", env=t.env,
-                                         capture_output=True, text=True, timeout=20)
-                assert process.returncode != 0 and f"execution information differs ({name})" in process.stderr, process.stderr
-                assert (t.root / "walk.json").read_bytes() == before
-        finally:
-            if (t.root / "walk.json").exists():
-                remove_attempts(load(t.root)[1])
-    print("PASS resume guard: actual HEAD/diff/source/tool metadata mismatches preserve saved bytes before launch")
-
-
 def main():
-    backend_paths()
     backend_diagnostics()
-    resume_execution_guard()
     with fixture() as t:
         try:
             test(t)
