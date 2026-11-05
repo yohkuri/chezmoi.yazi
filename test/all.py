@@ -23,11 +23,11 @@ from support import REPO
 SUITES = ["check.py", "runtime.py", "e2e.py", "manual_runtime.py"]
 
 
-def run(root, name):
+def run(name):
     start = time.monotonic()
     try:
         # Unbuffered, a suite's stdout and stderr keep their order in the one pipe.
-        result = subprocess.run([root / "test" / name], cwd=root, stdin=subprocess.DEVNULL,
+        result = subprocess.run([REPO / "test" / name], cwd=REPO, stdin=subprocess.DEVNULL,
                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 env={**os.environ, "PYTHONUNBUFFERED": "1"})
         # Decoded here rather than by text=True, which follows the locale and turns a lone \r into \n.
@@ -44,10 +44,10 @@ def report(future):
     print(f"<== test/{name}: {'PASS' if code == 0 else f'FAIL ({code})'} in {seconds:.0f} s\n", flush=True)
 
 
-def main(root=REPO, suites=SUITES):
+def main():
     interrupted = False
-    with ThreadPoolExecutor(len(suites)) as pool:
-        futures = [pool.submit(run, root, name) for name in suites]
+    with ThreadPoolExecutor(len(SUITES)) as pool:
+        futures = [pool.submit(run, name) for name in SUITES]
         pending = set(futures)
         try:
             for future in as_completed(futures):
@@ -60,7 +60,7 @@ def main(root=REPO, suites=SUITES):
             for future in as_completed(pending):
                 report(future)
     codes = [future.result()[1] for future in futures]
-    for name, code in zip(suites, codes):
+    for name, code in zip(SUITES, codes):
         print(f"{'PASS' if code == 0 else 'FAIL'} test/{name}")
     # 130 is what uv returns for a suite that Ctrl-C ended, so an interrupted run does not look like a failure.
     return 130 if interrupted else 1 if any(codes) else 0

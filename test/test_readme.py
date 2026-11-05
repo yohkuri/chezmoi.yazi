@@ -15,8 +15,8 @@ def section(*blocks, after=""):
     return "# chezmoi.yazi\n\n## Quick start\n\n" + "\nProse.\n\n".join(blocks) + after
 
 
-def blocks(*parts, after=""):
-    return readme.setup_blocks(section(*parts, after=after), "## Quick start", FILES)
+def blocks(*parts):
+    return readme.setup_blocks(section(*parts), "## Quick start", FILES)
 
 
 def readme_text(quick, theme):

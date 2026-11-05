@@ -86,7 +86,7 @@ check, run that suite alone too.
 - **CI** runs `test/e2e.py --smoke` (status-refresh and commands) on Ubuntu
   24.04 with pinned Yazi and chezmoi. The full runtime, E2E and guide suites
   run only where someone runs them by hand, which so far means macOS and,
-  for `test/LEDGER.md`, one Ubuntu 24.04 container.
+  once, one Ubuntu 24.04 container.
 
 Nothing here establishes Linux beyond the smoke run and that container's
 runs, other Yazi versions, git.yazi in the guided walk, a real editor, or a

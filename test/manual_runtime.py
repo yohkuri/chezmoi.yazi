@@ -89,7 +89,7 @@ def test(t):
     t.wait_screen(lambda s: "P: PASS/check/next" in s and "S: SKIP/next" in s and "CMM" in s, "initial guide and rows")
     # The fixture theme loaded: its normal-mode status bar color. The other mode
     # colors and the terminal's light and dark reports tested Yazi and the
-    # fixture rather than the guide (test/LEDGER.md).
+    # fixture rather than the guide.
     assert_mode_colors(t, "NOR", "137;180;250")
     print("PASS manual status bar in the fixture theme")
     control(t, "n")

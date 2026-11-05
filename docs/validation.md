@@ -387,9 +387,8 @@ optional git.yazi scenario verifies both linemodes on the same row and their
 order. `--smoke` runs the initial status/refresh scenario and the basic command
 scenario used by CI; the default run adds navigation, failure recovery, theme
 reload and the command-edge scenario. The confirmation-pages, source-ancestor
-and visual-selection scenarios run only by `--case` since the test ledger's
-Tier 1 removals below: `test/runtime.py` runs the same functions with more
-checks.
+and visual-selection scenarios run only by `--case` since the test pruning
+below: `test/runtime.py` runs the same functions with more checks.
 
 Test diagnostics live below the isolated state directory so they do not
 themselves change files in Yazi's current or parent list. Cleanup affects only
@@ -1392,264 +1391,75 @@ judged by eye and checked by nothing. `test/check.py` passed: 63 core, 126
 action policy and 20 main assertions, and 88 Python tests, 13 of them the
 new `test/test_readme.py`.
 
-## Test ledger
+## Test pruning
 
-On 2026-11-05, `test/LEDGER.md` was written from one run of every suite on
-Ubuntu 24.04 in a container with four cores, with the Yazi 26.9.1 and
-chezmoi 2.72.2 binaries `check.yml` pins, tmux 3.4, Lua 5.4.6 for the pure
-suites, uv 0.11.32 and Python 3.14.6: 63 core, 126 action policy and 20
-main assertions, 88 Python tests, `test/e2e.py --smoke` in 6 s,
-`test/runtime.py` (16 passes) in 62 s, `test/e2e.py` (14) in 42 s,
-`test/manual_runtime.py` (15) in 89 s and `test/benchmark.py`, all passing
-and none killing a process: the first recorded run of the full runtime, E2E
-and guide suites on Linux. The ledger also records a mutation analysis of
-the pure suites, 1,122 single-line mutants of the root Lua, of which the
-suites kill 79% of `core.lua`'s, 78% of `actions.lua`'s, 25% of `main.lua`'s
-and none of `render.lua`'s, and five plugin mutations run against the
-Yazi-driven suites in a copy of the checkout: the guide alone caught a
-`partial` flag that stays set after a repair, and a removed notification
-dedupe passed the two it ran against, the pure suites and the runtime
-`status` case. Not run: `test/check.py` as a whole, since
-LuaLS, StyLua and ShellCheck were not installed, though the locked
-markdownlint passed; the pure suites under Lua 5.5; `--git-plugin`; and
-anything on macOS.
+On 2026-11-05 every test was audited from one run of each suite on Ubuntu 24.04
+in a four-core container, with Yazi 26.9.1, chezmoi 2.72.2, tmux 3.4 and Lua
+5.4.6, all passing: 88 Python tests, `test/runtime.py` (16 passes),
+`test/e2e.py` (14), `test/manual_runtime.py` (15) and `test/benchmark.py`. It was
+the first recorded full run on Linux. Of 1,122 single-line mutants of the root
+Lua, the pure suites killed 79% of `core.lua`'s, 78% of `actions.lua`'s, 25% of
+`main.lua`'s and none of `render.lua`'s.
 
-Later that day the ledger's Tier 1 was applied: the four action scenarios
-shared with `test/runtime.py` left `test/e2e.py`'s default run and stay
-available by `--case`, and five unit tests went,
-`test_failed_auto_check_still_requires_visual_verdict` and
-`test_case_preparation_failure_preserves_the_previous_attempt` in
-`test/test_manual.py`, `test_process_timeout` and
-`test_binary_text_roundtrip` in `test/test_support.py`, and
-`test_current_rows_require_three_panes` in `test/test_screen.py` with
-`screen.current_rows`, which nothing called. On the same container, with
-lua-language-server 3.19.2, StyLua 2.6.0 and ShellCheck 0.11.0 from their
-releases and `lua` still 5.4.6, `test/check.py` passed in full in 8 s:
-Markdown, LuaLS, StyLua and ShellCheck clean, 63 core, 126 action policy
-and 20 main assertions, and 83 Python tests, five fewer. Then, one run
-each: `test/runtime.py` (16 passes) in 63 s, `test/e2e.py` (5 scenarios)
-in 8 s against 42 s before, the four scenarios by `--case` in 34 s, and
-`test/manual_runtime.py` (15) in 89 s, none killing a process. Not run: the
-pure suites under Lua 5.5, `--git-plugin`, and anything on macOS.
+Test code then went from 5743 lines to 5417, without Markdown and
+`test/.luarc.json`. `test/test_githooks.py`, `test/test_format_hook.py`,
+`test/test_all.py` and two tests of `test/test_skills.py` went at the
+maintainer's call, so the hooks, the format hook, the link checker and
+`test/all.py` keep no tests, and earlier entries are the evidence for them.
+A review found that other removals rested on a wrong reading. Eight mutations,
+seven of the guide's backend and one of `Runtime.setup`, passed every remaining
+unit test; with the tests restored, seven fail them and the eighth fails
+`backend_paths`. With `head` left out of `execution_info`, the Python tests pass
+and `resume_execution_guard` fails. `command-edges` stayed in `test/e2e.py`'s
+default run, since `test/command.py` exits non-zero on Ctrl-C whatever chezmoi
+returns.
 
-Tier 2 followed in the next commit, each row by the first option the
-ledger names. `backend_paths` and `resume_execution_guard` left
-`test/manual_runtime.py`, whose `backend_diagnostics` stays as the one
-check of the backend through real processes, and its `test` keeps one
-status-bar color check of the fixture theme in place of the light and dark
-terminal reports, the select and unset mode colors and the Theme case's two
-color checks. In `test/test_manual.py`,
-`test_accept_stays_when_file_or_state_checks_fail` merged into
-`test_internal_state_mismatch_cannot_be_overridden_by_visual_pass`,
-`test_preparation_error_history_retains_fixtures_without_changing_verdicts`
-into `test_accept_preserves_verdict_if_preparing_next_step_fails` and
-`test_harness_error_is_attributed_to_source_attempt_after_jump` into
-`test_multiple_guide_errors_preserve_origin_results_and_complete_history`;
-`test_stale_request_leaves_progress_untouched`,
-`test_finished_walk_reopens_on_restart_or_jump` and
-`test_theme_switching_preserves_readable_modes_and_git_context` went, and
-`test_lua_serializer_handles_nested_case_arrays` moved to
-`test/test_support.py`. The pure tripwires and the two documentation
-assertions the ledger's Tier 2 lists stay. `test/check.py` passed in full
-in 9 s with 77 Python tests; `test/runtime.py` (16 passes) passed in 64 s
-and `test/e2e.py` (5 scenarios) in 7 s. `test/manual_runtime.py` failed
-its first run at `foreground_launcher`'s check that the launcher's session
-directory was gone: the test left its fixture, and so stopped the tmux
-server, as soon as the launcher printed `Results:`, which `finalize` prints
-before it removes the fixtures, so the launcher died mid-removal with one
-attempt's directory half gone and no error recorded; the earlier runs had
-won that race. The test now waits for tmux's `Pane is dead` line, which
-shows the launcher has exited. Run alone after that, the suite passed, 13
-passes in 89 s, none killing a process. The half-removed session and
-attempt directories of the failed run were removed by hand.
+`M.interactive` now clears the screen after the Enter prompt. `finish` had
+matched the previous command's prompt, which `ui.hide` shows until the new
+command clears it: once in five runtime runs on Linux, and in `test/runtime.py`,
+`test/e2e.py` and `test/manual_runtime.py` with `ya.sleep(0.7)` after `ui.hide`,
+which all three pass now. With no delay, `commands` fails under both
+`test/runtime.py` and `test/e2e.py` when the clear runs only on success, when it
+is gone, without the attribute reset, and when the editor prints no color.
+`/bin/sh` replaced by a missing path keeps the output, which no suite covers.
+`Runtime.wait_exit` refused a pane exiting 3.
 
-Tier 3 followed in the next commit: seven of `test/test_readme.py`'s
-thirteen tests went, those that tested the block parser's mechanics,
-keeping the README self-check and the five that name a refusal; the
-tooling tests and `test/benchmark.py` stay, as the ledger's policy rows say
-while the tooling they protect stays. `test/check.py` passed in full in 9 s
-with 70 Python tests, and `test/e2e.py` (5 scenarios) in 8 s and
-`test/manual_runtime.py` (13 passes) in 87 s. `test/runtime.py` failed its
-first run after 21 s at the `commands` case's last `finish`: the wait for
-`Press Enter to return to Yazi` matched the previous `apply` command's
-screen, which `ui.hide` shows from the main screen buffer, with that prompt
-still on it, until the new command writes its clear sequence; the 0.1 s
-settle after each key had kept every earlier run out of that window. The
-first capture of `finish` that equals the prompt capture before it now
-gets half a second to change, and the prompt that follows is taken when it
-does; a screen that stays is the new command's own, identical, prompt, as
-after two re-adds of the same file. With that, one run each passed:
-`test/check.py` in 8 s, `test/runtime.py` (16 passes) in 65 s,
-`test/e2e.py` in 9 s and `test/manual_runtime.py` in 87 s, none killing a
-process. How often the window is caught without the grace was not
-measured beyond the one failure in five runtime runs.
-
-The tooling tests went in the commit after that, at the maintainer's call
-and against the ledger's policy row: `test/test_githooks.py`,
-`test/test_format_hook.py`, `test/test_all.py` and the two tests of
-`test/test_skills.py` that exercised the link checker on fixture
-repositories; `test_skills.test_repository` stays. The hooks, the format
-hook, the link checker and `test/all.py` keep no tests from here on, and
-the entries above are the evidence for them. `test/check.py` passed in
-full in 7 s with 52 Python tests; `test/runtime.py` (16 passes) passed in
-65 s, `test/e2e.py` (5 scenarios) in 9 s and `test/manual_runtime.py` (13
-passes) in 80 s, none killing a process.
-
-A review of those commits the same day found that some of the removals had
-rested on a wrong reading of the tests, and the commit after them took those
-back; the ledger's "Taken back after review" gives the reasons. Eight
-mutations, seven of `test/manual.py` and `test/manual_backend.py` and one of
-`Runtime.setup`, each applied alone to a copy of the tree at `bde464b`, passed
-`test_manual`, `test_support`, `test_screen` and `test_readme`. With
-`test_theme_switching_preserves_readable_modes_and_git_context`,
-`test_accept_stays_when_file_or_state_checks_fail`,
-`test_failed_auto_check_still_requires_visual_verdict`,
-`test_case_preparation_failure_preserves_the_previous_attempt` and
-`test_finished_walk_reopens_on_restart_or_jump` restored, the seven fail those
-modules; the eighth still passes them, and fails the restored `backend_paths`
-in a copy that is a Git repository, as it must be for that function to run.
-The Theme case's two color checks came back, and `command-edges` returned to
-`test/e2e.py`'s default run, since `test/command.py` exits non-zero on Ctrl-C
-whatever chezmoi returns, and only that scenario shows the interrupt without
-it. The ledger no longer says that `screen.DECORATIONS` is empty, that the
-7-second notification default runs only for people, or that the dedupe mutation
-passed everywhere, and its records of the runs after the first now live only
-here.
+The maintainer looked at the clear on real terminals, running `test/manual.py`
+and Case 4's Add on macOS. This was not a walk: no verdict was recorded, and
+each report says `NOT RUN`. With Enter, and `seq -f 'mark-%g' 1 300` beforehand,
+scrollback held `mark-1` to `mark-240` in Ghostty 1.4.0, whose window was the
+shorter, and to `mark-227` in herdr 0.9.5 on Ghostty, then `Results:` on the next
+line. With Ctrl-D at the prompt, on the last plugin change, only `Results:` and
+the shell prompt stayed. The rows on the screen at the first action go, as that
+action's clear always did: in a herdr tab, `main` kept 225 of the 300 lines and
+the clear's commit 227, and `script` logs of both held no `\033[3J` or full
+reset. An earlier report of the whole scrollback going did not recur with the
+`seq`. The color reset was seen only in tmux's `commands`.
 
 On macOS 26.6.2 with Yazi 26.9.1, chezmoi 2.74.0, tmux 3.8 and Lua 5.5.1, each
-alone and each passing its one run: `test/check.py` in 5 s, with Markdown,
-LuaLS, StyLua and ShellCheck clean, 63 core, 126 action policy and 20 main
-assertions and 57 Python tests, five more; `test/runtime.py` (16 passes) in
-59 s; `test/e2e.py` (6 scenarios) in 24 s; `confirmation-pages`,
-`source-ancestor` and `visual-selection` by `--case` in 21 s; and
-`test/manual_runtime.py` (14 passes) in 98 s, none killing a process. These are
-the first full runs with chezmoi 2.74.0, and the first on macOS since the
-ledger. Not run: `test/benchmark.py`, `--git-plugin`, `test/readme.py`,
-`test/manual.py`, and these fixes on Linux beyond CI's smoke run. The review's
-argument that `finish`'s half-second grace and the waits like it can still
-match an earlier command's prompt under load was not tested, and those waits
-stay as they are.
+alone, one run each, none killing a process: `test/check.py` with 63 core, 126
+action policy and 20 main assertions and 57 Python tests, `test/runtime.py`
+(16 passes) in 61 s, `test/e2e.py` (6 scenarios) in 24 s, the three by
+`--case` in 20 s and `test/manual_runtime.py` (15 passes) in 94 s.
+`test/all.py` passed all four in 91 s, and `test/benchmark.py` timed 5000 files
+at 0.159 s.
 
-The next commit tested that argument and closed the window. In a scratch copy,
-`ya.sleep(0.7)` after `ui.hide` failed `test/runtime.py`, `test/e2e.py`
-(`commands` and `command-edges`) and `test/manual_runtime.py` on those waits. A
-Ctrl-C sent on the previous editor's text failed at once, on the old prompt's
-exit code, not after the 30-second wait the review expected. These failures
-were injected; without a delay the only one seen is the Linux run above.
-`M.interactive` now clears the screen after the Enter prompt, before the permit
-drops, so `ui.hide` has no finished command to show, and `finish` lost its
-grace. Yazi therefore no longer leaves the last command's output and prompt on
-the terminal when it exits, as seen in tmux; a real terminal and its scrollback
-were not checked. The clear also leaves the screen blank until Yazi redraws:
-with `ya.sleep(0.7)` after the clear, `test/runtime.py` and `test/e2e.py` timed
-out waiting for what the next keys should have opened, until `returned` also
-required a non-blank screen. On that commit's code, one run of each suite
-passed with either delay. `commands` now ends by quitting Yazi and checking that
-no prompt is left, and with the clear removed that check fails under both
-runners, with no delay; it is the guard at normal speed, CI's smoke run
-included.
+One failure stays open. With `ya.sleep(0.7)` after the clear, `command-edges` in
+`test/e2e.py` lost the `v` after Ctrl-C in 7 of 20 runs, the wait timing out with
+Yazi on the screen. Samples every 0.1 s for 3 s never showed `Another chezmoi
+action is already running`, and the cause is unknown. Once, with no delay, a `q`
+sent through `herdr pane send-text` right after the redraw did nothing. No suite
+run without an injected delay has failed this way.
 
-`foreground_launcher` needed a change too: the clear puts the launcher's
-`Results:` line on the top row, and tmux's `Pane is dead` line scrolls it away.
-A first fix waited for `Results:` before `Pane is dead`. It passed in three
-scratch copies and failed in the checkout and a fourth copy, where the line had
-already gone from the screen by the capture that saw the exit. The check now
-reads the pane's history.
-
-On the same versions, each alone: `test/check.py` passed in 4 s with the same
-counts, `test/runtime.py` (16 passes) in 59 s, `test/e2e.py` (6 scenarios) in
-23 s and the three by `--case` in 21 s, and `test/manual_runtime.py` (14 passes)
-passed its three runs in 91 to 92 s after that fix, none killing a process. The
-first three suites ran before the fix, which touched only
-`test/manual_runtime.py`. Not run: `test/benchmark.py`, `--git-plugin`,
-`test/readme.py`, `test/manual.py`, and the clear on Linux beyond CI's smoke
-run.
-
-A review of that commit and the one before it found more, which the commit
-after it fixes. The clear did not reset the attributes, so a command that left
-a color could paint the terminal: `commands` now ends on an edit that leaves a
-blue background, and without the reset its check of the ANSI capture fails
-under both runners, with no delay. A failed Enter prompt also cleared output
-nobody had read: with `/bin/sh` replaced by a missing path in a scratch copy,
-the output now stays on the screen, and an unconditional clear removes it; no
-suite covers that path. `commands` looked only for the dead pane, so
-`Runtime.wait_exit` now requires status 0, which a pane exiting 3 failed in a
-copy, and its log check moved after Yazi exits. `resume_execution_guard` came
-back: with `head` left out of `execution_info`, the 57 Python tests passed and
-the guard failed, as the ledger's "Taken back after review" says.
-
-On the same versions, each alone, one run each, none killing a process:
-`test/check.py` in 5 s with the same counts, `test/runtime.py` (16 passes) in
-60 s, `test/e2e.py` (6 scenarios) in 23 s, the three by `--case` in 21 s, and
-`test/manual_runtime.py` (15 passes) in 92 s. With `ya.sleep(0.7)` after
-`ui.hide`, the three suites that drive Yazi by default passed. With it after the
-clear, `test/runtime.py` and `test/manual_runtime.py` passed and `test/e2e.py`
-failed in `command-edges`: the `v` after the Ctrl-C started nothing, and the
-wait for its prompt timed out with Yazi on the screen. This is a
-timing-sensitive failure whose cause was not found. Repeating
-`test/e2e.py --case command-edges`, the checkout passed 10 of 10; the delayed
-copy passed 7 of 10, the three failures all at that key, then 10 of 10 with
-screen samples added after the key. `returned` and its 0.15-second settle are the
-only wait before that key, and a key sent before Yazi is ready or the action
-lock is released would look like this; that was not tested. A copy of
-`fab5ca1` with the same delay fails earlier every run, so it cannot say whether
-the clear is involved. No run without an injected delay has failed this way.
-Not run: `test/benchmark.py`, `--git-plugin`, `test/readme.py`,
-`test/manual.py`, and these fixes on Linux beyond CI's smoke run.
-
-The maintainer then looked at the clear on real terminals, at that commit, with
-Yazi 26.9.1 and chezmoi 2.74.0 on macOS: `test/manual.py`, Case 4's Add, Enter,
-and `c` in the exit menu. This is not a walk of the guide: no verdict was
-recorded, and each report says `NOT RUN`. In Ghostty 1.4.0 and in herdr 0.9.5 on
-Ghostty, only `Results:` and the shell prompt stayed on the screen. After
-`seq -f 'mark-%g' 1 300` beforehand, scrollback held `mark-1` to `mark-240` in
-Ghostty, whose window was the shorter, and to `mark-227` in herdr, each with
-`Results:` on the next line. So in both, Enter leaves nothing of the command's
-output to read back, and what had already scrolled off stays. The rows on the
-screen at the first action go, which that action's own clear has always done:
-in a temporary herdr tab read through `herdr pane read`, `main` kept 225 of the
-300 lines and this commit 227, `script` logs of both held no `\033[3J` or full
-reset, and Yazi alone, or the guide with no command, kept all 300. An earlier
-report of the whole scrollback going, without the `seq`, did not recur with it;
-output that had not yet scrolled off would explain it, which was not checked.
-Neither real terminal has shown the color reset, only `commands` in tmux.
-
-A third review, run on that state, found the clear tied to the wrong condition:
-Ctrl-C or Ctrl-D at the prompt ends the prompt's shell without success, so the
-output and any color stayed, which it reproduced. The clear now runs unless the
-prompt could not start, and the reset moved to the moment the command ends.
-`commands` now runs its colored edit three times, answering with Enter, Ctrl-C
-and Ctrl-D, and after each one reads the main screen behind Yazi through
-`capture-pane -a`, for the command's output as well as the prompt, and it checks
-that the color was on the screen before. With no delay, `test/runtime.py` and
-`test/e2e.py` both fail that case when the clear runs only on success, when it is
-gone, or without the reset, and when the editor prints no color; `/bin/sh`
-replaced by a missing path still keeps the output. Enter clears a failed
-command's output too, with no other copy, which `docs/commands.md` now says:
-keeping it would bring the old screen back at the next action.
-
-The same versions passed, each alone, one run each, none killing a process:
-`test/runtime.py` (16 passes) in 63 s, `test/e2e.py` (6 scenarios) in 24 s, the
-three by `--case` in 21 s and `test/manual_runtime.py` (15 passes) in 91 s.
-`test/check.py` failed first on a long line in `docs/design.md`, and passed after
-it was rewrapped, with the same counts; only Markdown changed after those runs.
-With `ya.sleep(0.7)` after `ui.hide`, all three suites passed. With it after the
-clear, `test/runtime.py` and `test/manual_runtime.py` passed, and the lost `v` of
-`command-edges` recurred in `test/e2e.py`: 13 of 20 runs passed. Screen samples
-every 0.1 s for 3 s after the key never showed `Another chezmoi action is already
-running`, which counts against the action lock as its cause, and that cause
-stays unknown. Separately, driving the guide through `herdr pane send-text`, a
-`q` sent as soon as Yazi had redrawn after Enter did nothing once, with no delay
-injected, and worked after a 2-second pause. Not run: `test/benchmark.py`,
-`--git-plugin`, `test/readme.py`, a full walk of `test/manual.py`, and these
-fixes on Linux beyond CI's smoke run, or on a real terminal at this commit.
+Not run: `--git-plugin`, `test/readme.py`, a full walk of `test/manual.py`, and,
+after the removals' last commit, anything on Linux beyond CI's smoke run.
 
 ## Limits of the evidence
 
 The Ubuntu 24.04 E2E smoke scenario is validated in CI. The full runtime, E2E
-and guide suites ran on Linux only in one container, on the day of the test
-ledger above and before its review's fixes; the manual workflow, unusual
-terminal configurations, and git.yazi coexistence remain unverified on Linux.
+and guide suites ran on Linux only in one container, during the test pruning
+above and before its review's fixes; the manual workflow, unusual terminal
+configurations, and git.yazi coexistence remain unverified on Linux.
 Windows, older versions, interactive
 secret providers, and arbitrary external hooks are not validated. Windows is
 explicitly rejected by setup. Source-state browsing is outside this release.

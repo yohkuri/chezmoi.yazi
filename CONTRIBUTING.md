@@ -179,10 +179,7 @@ Which of them your change needs, in short:
 `.agents/skills/verify-chezmoi-yazi/SKILL.md` maps each file under `test/`
 to its suites, says when a `test/all.py` run is not enough on its own, and
 holds the rules for writing a test: how a fixture stays isolated, what it
-may clean up, and how to wait on the screen. `test/LEDGER.md` is the audit
-of 2026-11-05: what each test protected then, where tests overlapped and
-which were worth little, with the measurements behind each verdict. Nothing
-keeps it up to date, so read a verdict against the code before acting on it.
+may clean up, and how to wait on the screen.
 
 ### `test/runtime.py`
 
@@ -218,9 +215,8 @@ wrapper. By default it runs the four status scenarios, `commands` and
 `command-edges`; the other action scenarios it shares with
 `test/runtime.py`, `confirmation-pages`, `source-ancestor` and
 `visual-selection`, run only by `--case`, since the runtime suite runs the
-same functions with more checks (`test/LEDGER.md`). `--case NAME` runs one
-scenario, `--keep` keeps the fixtures, and `--artifacts DIR` saves failure
-captures and logs.
+same functions with more checks. `--case NAME` runs one scenario, `--keep`
+keeps the fixtures, and `--artifacts DIR` saves failure captures and logs.
 
 ### `test/manual.py`
 
