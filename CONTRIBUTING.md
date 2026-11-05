@@ -103,7 +103,6 @@ The links follow whatever the main worktree has checked out, so the hooks
 stop running while it is at a commit without `.githooks/`. A
 `core.hooksPath` setting replaces `.git/hooks`, so with one set, these hooks
 run only if the hooks in that path pass control on to `.git/hooks`.
-`test/test_githooks.py` checks which remotes and refs they refuse.
 
 ## Run the checks
 
@@ -421,9 +420,8 @@ Git-ignored paths. It needs jq, Git, and the StyLua version that
 formatting failure leaves the file unchanged and is reported back to the
 agent. It runs StyLua from the file's checkout, so mise's shims pick the
 version that checkout pins; a `PATH` set by `mise activate` does not follow
-it, and the version check then refuses. `test/test_format_hook.py` checks
-that it reads the version from `mise.toml` and how it calls StyLua. The
-settings also ask before common merge commands and pushes that name `main`.
+it, and the version check then refuses. The settings also ask before
+common merge commands and pushes that name `main`.
 
 Other agents and editors do not run this hook, so `test/check.py` remains
 the formatting check. Rules under `.claude/rules/` attach when Claude Code

@@ -108,10 +108,7 @@ case.
 | `test/test_screen.py` | Python unit, 8 tests | `test/screen.py`, the parser E2E and the action cases read the screen with | `test/check.py`, CI | 0.01 s |
 | `test/test_manual.py` | Python unit, 30 tests | `test/manual_backend.py` and `test/manual.py`: the guide's state machine, archive and launcher | `test/check.py`, CI | 0.3 s |
 | `test/test_readme.py` | Python unit, 6 tests | `test/readme.py`'s reading of the README's blocks | `test/check.py`, CI | 0.01 s |
-| `test/test_skills.py` | Python unit, 3 tests | the symlinks from `.claude/skills` to `.agents/skills` | `test/check.py`, CI | 0.04 s |
-| `test/test_githooks.py` | Python unit, 10 tests | `.githooks/pre-commit` and `pre-push` | `test/check.py`, CI | 0.4 s |
-| `test/test_format_hook.py` | Python unit, 3 tests; skipped without jq | `scripts/format-lua-hook.sh` | `test/check.py`, CI | 0.3 s |
-| `test/test_all.py` | Python unit, 3 tests | `test/all.py`'s output ordering and exit codes | `test/check.py`, CI | 1.2 s |
+| `test/test_skills.py` | Python unit, 1 test | the symlinks from `.claude/skills` to `.agents/skills` in this checkout | `test/check.py`, CI | 0.02 s |
 | `test/runtime.py` | Yazi in tmux, probe and command wrapper, 7 cases | the plugin's records, calls, rendering and actions | by hand | 62 s |
 | `test/e2e.py` | Yazi in tmux, screen only, 5 default scenarios, 4 more by `--case`, plus `git-coexistence` | rendering and actions as a user sees them | `--smoke` in CI; the rest by hand | 8 s; 34 s for the four by `--case` |
 | `test/manual_runtime.py` | Yazi in tmux, 4 functions | the guide that `test/manual.py` runs, and the plugin flows it drives | by hand | 89 s |
@@ -295,18 +292,19 @@ block kept as it stands, blocks skipped for naming no file or another
 file, a heading ending the section and a subheading not, the
 `show_hidden` addition, and the flavor slots.
 
-### test_skills.py, test_githooks.py, test_format_hook.py and test_all.py
+### test_skills.py and the tooling tests
 
-Nineteen tests, 360 lines, 1.8 s, protecting the repository's own
+Nineteen tests, 360 lines, 1.8 s, protected the repository's own
 workflow: the skill symlinks Claude Code needs, the hooks that refuse
 `main`, the Lua format hook, and the runner that prints suites whole.
-None touches the plugin. `test_skills.test_repository` is a
-repository-consistency check and earns its place in `test/check.py`; the
-other two in that file test the checker. `test_all.py`'s ordering test
-holds 1.1 s of the 4.5 s the unit tests take, by its own design. Policy:
-keep them as long as the hooks, the runner and the Claude Code setup are
-kept, and let them go with those; judge them as tooling, not as plugin
-coverage.
+None touched the plugin. The ledger's policy was to keep them as long as
+the tooling they protect is kept; the maintainer chose to remove them
+after Tier 3, and `test_githooks.py`, `test_format_hook.py`, `test_all.py`
+and the two tests of `test_skills.py` that exercised the link checker on
+fixture repositories went. `test_skills.test_repository` stays: it checks
+this checkout's own skill links, which `test/check.py` is the place for.
+The hooks, the format hook, the checker and `test/all.py` now have no
+tests; `docs/validation.md` keeps the hand-run evidence for them.
 
 ## Yazi-driven suites
 
@@ -468,7 +466,8 @@ Ranked by what dropping or merging them would save against what they
 could still catch, in three tiers: the unconditional removals, the merges
 and judgment calls, and the policy calls. All three were applied on
 2026-11-05, each in its own commit after the ledger's, each row by the
-first option its proposal names.
+first option its proposal names, except Tier 3's tooling row, which the
+maintainer then decided the other way in a commit of its own.
 
 ### Tier 1, applied
 
@@ -515,7 +514,7 @@ alone, 13 passes in 89 s, none killing a process.
 | Rank | Test | Why | Proposal | Done |
 | --- | --- | --- | --- | --- |
 | 1 | `test_readme.py`, twelve of thirteen | parser edge cases of a hand-run tool | keep a few that name a refusal; drop the rest when the tool is simplified | the five that name a refusal kept with the README self-check; the other seven removed |
-| 2 | `test_githooks.py`, `test_format_hook.py`, `test_skills.py` (two of three), `test_all.py` | tooling, not plugin coverage; `test_all.py`'s ordering test is 1.1 s by design | a policy call: they go with the tooling they protect | kept: the hooks, the format hook, the skill links and `test/all.py` stay, so their tests stay with them |
+| 2 | `test_githooks.py`, `test_format_hook.py`, `test_skills.py` (two of three), `test_all.py` | tooling, not plugin coverage; `test_all.py`'s ordering test is 1.1 s by design | a policy call: they go with the tooling they protect | kept at first, since the tooling stays; then removed at the maintainer's call in the following commit, `test_skills.test_repository` alone staying |
 | 3 | `test/benchmark.py` | a measurement that asserts only line counts | keep as a measurement; do not count it as coverage | kept |
 
 After Tier 3, on the same container: `test/check.py` passed in full in 9 s
@@ -526,7 +525,10 @@ prompt wait matched the previous `apply` screen, the race item 8 of the
 divergence section describes; with the half-second grace in `finish`,
 every suite passed again in one run each: `test/check.py` in 8 s,
 `test/runtime.py` (16 passes) in 65 s, `test/e2e.py` in 9 s and
-`test/manual_runtime.py` in 87 s, none killing a process.
+`test/manual_runtime.py` in 87 s, none killing a process. After the
+tooling tests went, one run each again: `test/check.py` in 7 s with 52
+Python tests, `test/runtime.py` (16 passes) in 65 s, `test/e2e.py` in 9 s
+and `test/manual_runtime.py` (13 passes) in 80 s, none killing a process.
 
 Nothing in `test/runtime.py`'s `status` and `action-coordination` cases,
 `test/core.lua`'s and `test/actions.lua`'s parsing and policy blocks,
