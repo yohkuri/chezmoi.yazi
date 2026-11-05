@@ -1597,6 +1597,23 @@ the clear is involved. No run without an injected delay has failed this way.
 Not run: `test/benchmark.py`, `--git-plugin`, `test/readme.py`,
 `test/manual.py`, and these fixes on Linux beyond CI's smoke run.
 
+The maintainer then looked at the clear on real terminals, at that commit, with
+Yazi 26.9.1 and chezmoi 2.74.0 on macOS: `test/manual.py`, Case 4's Add, Enter,
+and `c` in the exit menu. This is not a walk of the guide: no verdict was
+recorded, and each report says `NOT RUN`. In Ghostty 1.4.0 and in herdr 0.9.5 on
+Ghostty, only `Results:` and the shell prompt stayed on the screen. After
+`seq -f 'mark-%g' 1 300` beforehand, scrollback held `mark-1` to `mark-240` in
+Ghostty, whose window was the shorter, and to `mark-227` in herdr, each with
+`Results:` on the next line. So in both, Enter leaves nothing of the command's
+output to read back, and what had already scrolled off stays. The rows on the
+screen at the first action go, which that action's own clear has always done:
+in a temporary herdr tab read through `herdr pane read`, `main` kept 225 of the
+300 lines and this commit 227, `script` logs of both held no `\033[3J` or full
+reset, and Yazi alone, or the guide with no command, kept all 300. An earlier
+report of the whole scrollback going, without the `seq`, did not recur with it;
+output that had not yet scrolled off would explain it, which was not checked.
+Neither real terminal has shown the color reset, only `commands` in tmux.
+
 ## Limits of the evidence
 
 The Ubuntu 24.04 E2E smoke scenario is validated in CI. The full runtime, E2E
