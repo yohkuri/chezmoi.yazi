@@ -14,6 +14,9 @@ if mode == "manual":
         print(f"{json.dumps(target.name, ensure_ascii=False)}: {read(target)!r}")
     print("Type one line and Enter to save to all selected source files; Ctrl-C cancels.", flush=True)
     value = input("New source content > ")
+elif mode == "color":
+    print("\033[44m", end="", flush=True)
+    value = "edited by fixture"
 elif mode == "wait":
     print("Fixture editor input:", flush=True)
     value = input()

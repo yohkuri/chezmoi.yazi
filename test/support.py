@@ -321,6 +321,12 @@ class Runtime:
             time.sleep(0.05)
         raise AssertionError(f"Timed out waiting for {description}\n{capture}\n{self.logs()}")
 
+    def wait_exit(self, description):
+        """Wait for a pane kept by remain-on-exit to die; return its screen, and fail unless it exited 0."""
+        capture = self.wait_screen(lambda s: "Pane is dead" in s, description)
+        assert "Pane is dead (status 0," in capture, capture
+        return capture
+
     def alive(self):
         result = subprocess.run(
             ["tmux", "-S", str(self.socket), "-f", "/dev/null", "has-session", "-t", "test"],

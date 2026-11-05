@@ -1543,8 +1543,8 @@ the terminal when it exits, as seen in tmux; a real terminal and its scrollback
 were not checked. The clear also leaves the screen blank until Yazi redraws:
 with `ya.sleep(0.7)` after the clear, `test/runtime.py` and `test/e2e.py` timed
 out waiting for what the next keys should have opened, until `returned` also
-required a non-blank screen. On the final code either delay
-passes all three suites. `commands` now ends by quitting Yazi and checking that
+required a non-blank screen. On that commit's code, one run of each suite
+passed with either delay. `commands` now ends by quitting Yazi and checking that
 no prompt is left, and with the clear removed that check fails under both
 runners, with no delay; it is the guard at normal speed, CI's smoke run
 included.
@@ -1564,6 +1564,38 @@ first three suites ran before the fix, which touched only
 `test/manual_runtime.py`. Not run: `test/benchmark.py`, `--git-plugin`,
 `test/readme.py`, `test/manual.py`, and the clear on Linux beyond CI's smoke
 run.
+
+A review of that commit and the one before it found more, which the commit
+after it fixes. The clear did not reset the attributes, so a command that left
+a color could paint the terminal: `commands` now ends on an edit that leaves a
+blue background, and without the reset its check of the ANSI capture fails
+under both runners, with no delay. A failed Enter prompt also cleared output
+nobody had read: with `/bin/sh` replaced by a missing path in a scratch copy,
+the output now stays on the screen, and an unconditional clear removes it; no
+suite covers that path. `commands` looked only for the dead pane, so
+`Runtime.wait_exit` now requires status 0, which a pane exiting 3 failed in a
+copy, and its log check moved after Yazi exits. `resume_execution_guard` came
+back: with `head` left out of `execution_info`, the 57 Python tests passed and
+the guard failed, as the ledger's "Taken back after review" says.
+
+On the same versions, each alone, one run each, none killing a process:
+`test/check.py` in 5 s with the same counts, `test/runtime.py` (16 passes) in
+60 s, `test/e2e.py` (6 scenarios) in 23 s, the three by `--case` in 21 s, and
+`test/manual_runtime.py` (15 passes) in 92 s. With `ya.sleep(0.7)` after
+`ui.hide`, the three suites that drive Yazi by default passed. With it after the
+clear, `test/runtime.py` and `test/manual_runtime.py` passed and `test/e2e.py`
+failed in `command-edges`: the `v` after the Ctrl-C started nothing, and the
+wait for its prompt timed out with Yazi on the screen. This is a
+timing-sensitive failure whose cause was not found. Repeating
+`test/e2e.py --case command-edges`, the checkout passed 10 of 10; the delayed
+copy passed 7 of 10, the three failures all at that key, then 10 of 10 with
+screen samples added after the key. `returned` and its 0.15-second settle are the
+only wait before that key, and a key sent before Yazi is ready or the action
+lock is released would look like this; that was not tested. A copy of
+`fab5ca1` with the same delay fails earlier every run, so it cannot say whether
+the clear is involved. No run without an injected delay has failed this way.
+Not run: `test/benchmark.py`, `--git-plugin`, `test/readme.py`,
+`test/manual.py`, and these fixes on Linux beyond CI's smoke run.
 
 ## Limits of the evidence
 

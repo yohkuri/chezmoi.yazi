@@ -96,7 +96,7 @@ CASES = [
          ),
          step(
               "The fixture has changed the template's destination. With \"unmanaged\" under the cursor, press r for chezmoi re-add --recursive=true.",
-              "Read the effect text explaining that templates are skipped, the argv and command result. Press Enter and check that returning to Yazi is clear; preservation of the template is checked automatically.",
+              "Read the effect text explaining that templates are skipped, the argv and command result. Press Enter and check that the output leaves the screen and that returning to Yazi is clear; preservation of the template is checked automatically.",
               prep=[("write", "dest/unmanaged", "new destination\n")],
               files={"source/unmanaged.tmpl": "other\n"},
          ),
