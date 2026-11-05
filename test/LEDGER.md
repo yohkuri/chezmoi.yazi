@@ -4,7 +4,7 @@ Every test in this repository, what it protects, where tests repeat each
 other or depart from the paths the plugin really takes, and which ones are
 worth little. Measured on 2026-11-05 on the checkout at `a52116c`; the
 numbers below are from that run, and the verdicts are a reading of the
-code against them. The verdicts were proposals; Tiers 1 and 2 of
+code against them. The verdicts were proposals; the three tiers of
 [Low-value tests](#low-value-tests) were applied the same day, as that
 section records, and the inventory and the tables below describe the
 tree after that.
@@ -107,7 +107,7 @@ case.
 | `test/test_support.py` | Python unit, 7 tests | harness helpers: Lua serializer, `owned`, `stop`, `da1.answer`, `check_call`, cleanup retry | `test/check.py`, CI | 2.6 s |
 | `test/test_screen.py` | Python unit, 8 tests | `test/screen.py`, the parser E2E and the action cases read the screen with | `test/check.py`, CI | 0.01 s |
 | `test/test_manual.py` | Python unit, 30 tests | `test/manual_backend.py` and `test/manual.py`: the guide's state machine, archive and launcher | `test/check.py`, CI | 0.3 s |
-| `test/test_readme.py` | Python unit, 13 tests | `test/readme.py`'s reading of the README's blocks | `test/check.py`, CI | 0.01 s |
+| `test/test_readme.py` | Python unit, 6 tests | `test/readme.py`'s reading of the README's blocks | `test/check.py`, CI | 0.01 s |
 | `test/test_skills.py` | Python unit, 3 tests | the symlinks from `.claude/skills` to `.agents/skills` | `test/check.py`, CI | 0.04 s |
 | `test/test_githooks.py` | Python unit, 10 tests | `.githooks/pre-commit` and `pre-push` | `test/check.py`, CI | 0.4 s |
 | `test/test_format_hook.py` | Python unit, 3 tests; skipped without jq | `scripts/format-lua-hook.sh` | `test/check.py`, CI | 0.3 s |
@@ -286,13 +286,14 @@ tested the fixture theme, and moved the serializer test to
 ### test_readme.py
 
 `test_reads_the_readme_itself` keeps the README's four configuration
-blocks readable and the flavor named, and is worth keeping. The other
-twelve test the block parser of a tool run by hand before a screenshot:
-headings, subheadings, a missing, repeated or ill-formed block, the
-`show_hidden` addition, the flavor slots. They are cheap and correct, and
-protect the parsing half of a tool nothing else calls. Policy: keep them
-if the tool stays; they are the first to go when `test/readme.py` is
-simplified.
+blocks readable and the flavor named. The five beside it each name a
+refusal of the parser of a tool run by hand before a screenshot: a missing
+block, a second block for one file, a TOML block that does not parse, a
+README without the section, and a `yazi.toml` that already has `[mgr]`.
+Tier 3 removed the other seven, which tested the parser's mechanics: a
+block kept as it stands, blocks skipped for naming no file or another
+file, a heading ending the section and a subheading not, the
+`show_hidden` addition, and the flavor slots.
 
 ### test_skills.py, test_githooks.py, test_format_hook.py and test_all.py
 
@@ -444,10 +445,17 @@ failed its own check that the session was gone. It now waits for tmux's
    pin which query gets which pair.
 7. **Lua versions.** CI runs `test/core.lua` and `test/actions.lua` under
    Lua 5.1 and 5.4 and `test/main.lua` under neither; Yazi embeds 5.5.1.
-8. **Waits that cannot fail.** The two guide waits named above, and the
-   negative checks that sleep a fixed time, 0.7 s for no polling and
-   0.25 s for no subprocess under the lock, which the verify skill
-   already warns can pass under load without seeing anything.
+8. **Weak waits.** The two guide waits named above; the negative checks
+   that sleep a fixed time, 0.7 s for no polling and 0.25 s for no
+   subprocess under the lock, which the verify skill already warns can
+   pass under load without seeing anything; and two that the tier runs
+   caught and fixed: `foreground_launcher` left its fixture as soon as the
+   launcher printed `Results:`, before the launcher had removed its own
+   fixtures, and `action_cases.finish` matched the previous command's
+   exit prompt, which `ui.hide` shows from the main screen until the new
+   command clears it, a window the 0.1-second key settle had hidden until
+   one runtime run. `finish` now gives a prompt capture equal to the last
+   one half a second to change.
 9. **Tests of the fixture.** `assert_mode_colors` and
    `test_theme_switching_preserves_readable_modes_and_git_context` checked
    that Yazi draws `test/manual-theme.toml`, a file that exists for the
@@ -457,10 +465,10 @@ failed its own check that the session was gone. It now waits for tmux's
 ## Low-value tests
 
 Ranked by what dropping or merging them would save against what they
-could still catch, in three tiers. Tier 1, the unconditional removals,
-and Tier 2, the merges and judgment calls, were applied on 2026-11-05 in
-the two commits after the ledger's, each row by the first option its
-proposal names; Tier 3 remains a proposal.
+could still catch, in three tiers: the unconditional removals, the merges
+and judgment calls, and the policy calls. All three were applied on
+2026-11-05, each in its own commit after the ledger's, each row by the
+first option its proposal names.
 
 ### Tier 1, applied
 
@@ -502,13 +510,23 @@ was gone, the race the previous section describes, which the removals
 had not touched; with the wait for the launcher's exit added, it passed
 alone, 13 passes in 89 s, none killing a process.
 
-### Tier 3, policy
+### Tier 3, policy, applied
 
-| Rank | Test | Why | Saves | Proposal |
+| Rank | Test | Why | Proposal | Done |
 | --- | --- | --- | --- | --- |
-| 1 | `test_readme.py`, twelve of thirteen | parser edge cases of a hand-run tool | 70 lines | keep a few that name a refusal; drop the rest when the tool is simplified |
-| 2 | `test_githooks.py`, `test_format_hook.py`, `test_skills.py` (two of three), `test_all.py` | tooling, not plugin coverage; `test_all.py`'s ordering test is 1.1 s by design | 1.8 s, 360 lines | a policy call: they go with the tooling they protect |
-| 3 | `test/benchmark.py` | a measurement that asserts only line counts | 1 s | keep as a measurement; do not count it as coverage |
+| 1 | `test_readme.py`, twelve of thirteen | parser edge cases of a hand-run tool | keep a few that name a refusal; drop the rest when the tool is simplified | the five that name a refusal kept with the README self-check; the other seven removed |
+| 2 | `test_githooks.py`, `test_format_hook.py`, `test_skills.py` (two of three), `test_all.py` | tooling, not plugin coverage; `test_all.py`'s ordering test is 1.1 s by design | a policy call: they go with the tooling they protect | kept: the hooks, the format hook, the skill links and `test/all.py` stay, so their tests stay with them |
+| 3 | `test/benchmark.py` | a measurement that asserts only line counts | keep as a measurement; do not count it as coverage | kept |
+
+After Tier 3, on the same container: `test/check.py` passed in full in 9 s
+with 70 Python tests, seven fewer, and `test/e2e.py` (5 scenarios) in 8 s
+and `test/manual_runtime.py` (13 passes) in 87 s. `test/runtime.py`
+failed its first run in 21 s at the `commands` case's last `finish`, whose
+prompt wait matched the previous `apply` screen, the race item 8 of the
+divergence section describes; with the half-second grace in `finish`,
+every suite passed again in one run each: `test/check.py` in 8 s,
+`test/runtime.py` (16 passes) in 65 s, `test/e2e.py` in 9 s and
+`test/manual_runtime.py` in 87 s, none killing a process.
 
 Nothing in `test/runtime.py`'s `status` and `action-coordination` cases,
 `test/core.lua`'s and `test/actions.lua`'s parsing and policy blocks,
@@ -538,7 +556,8 @@ suites. The mutation operators are a fixed small set, so a site with no
 unique kills may protect against a change they cannot make; the string
 and template pins are the clearest case. Verdicts on the harness tests
 come from reading `test/manual_backend.py` against each test, not from
-mutating it. The Tier 1 and Tier 2 changes were each checked by one run
-of every suite, the guide suite twice for Tier 2, recorded above. No
-human walk, no macOS run and no `--git-plugin` run was made for this
-ledger.
+mutating it. Each tier's changes were checked by one run of every suite,
+recorded above, with a second run of the guide suite for Tier 2 and of
+every suite for Tier 3 after the harness race each first run found was
+fixed. No human walk, no macOS run and no `--git-plugin` run was made
+for this ledger.

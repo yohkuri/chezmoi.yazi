@@ -24,28 +24,9 @@ def readme_text(quick, theme):
 
 
 class SetupBlockTests(unittest.TestCase):
-    def test_keeps_each_block_as_it_stands(self):
-        found = blocks(INIT, YAZI, KEYMAP)
-        self.assertEqual(found["init.lua"], '-- ~/.config/yazi/init.lua\nrequire("chezmoi"):setup()\n')
-
-    def test_skips_a_block_that_names_no_file(self):
-        found = blocks("```toml\n[chezmoi]\nmanaged_sign = \"M\"\n```\n", INIT, YAZI, KEYMAP)
-        self.assertEqual(sorted(found), sorted(FILES))
-
-    def test_skips_a_block_named_for_another_file(self):
-        other = "```toml\n# ~/.config/yazi/flavors/catppuccin-mocha.yazi/flavor.toml\n[mgr]\n```\n"
-        self.assertEqual(sorted(blocks(other, INIT, YAZI, KEYMAP)), sorted(FILES))
-
     def test_refuses_a_missing_block(self):
         with self.assertRaisesRegex(ValueError, "no `keymap.toml` block"):
             blocks(INIT, YAZI)
-
-    def test_a_heading_ends_the_section(self):
-        with self.assertRaisesRegex(ValueError, "no `keymap.toml` block"):
-            blocks(INIT, YAZI, after="\n## Next\n\n" + KEYMAP)
-
-    def test_a_subheading_does_not(self):
-        self.assertIn("keymap.toml", blocks(INIT, YAZI, "### Keys\n\n" + KEYMAP))
 
     def test_refuses_a_second_block_for_one_file(self):
         with self.assertRaisesRegex(ValueError, "a second `init.lua` block"):
@@ -68,19 +49,10 @@ class PictureTests(unittest.TestCase):
         self.assertTrue(found["yazi.toml"].endswith(readme.HIDDEN))
         self.assertTrue(readme.flavors(found["theme.toml"]))
 
-    def test_shows_hidden_files(self):
-        found = readme.picture_blocks(readme_text([INIT, YAZI, KEYMAP], [THEME]))
-        self.assertEqual(found["yazi.toml"], YAZI[len("```toml\n"):-len("```\n")] + "\n[mgr]\nshow_hidden = true\n")
-
     def test_refuses_a_yazi_toml_that_already_has_mgr(self):
         yazi = YAZI.replace("[[plugin", "[mgr]\nratio = [1, 4, 3]\n\n[[plugin")
         with self.assertRaisesRegex(ValueError, "with `show_hidden` added is not TOML"):
             readme.picture_blocks(readme_text([INIT, yazi, KEYMAP], [THEME]))
-
-    def test_reads_the_flavors_in_either_slot(self):
-        theme = '[flavor]\ndark = "catppuccin-mocha"\nlight = "catppuccin-latte"\n'
-        self.assertEqual(readme.flavors(theme), {"catppuccin-mocha", "catppuccin-latte"})
-        self.assertEqual(readme.flavors('[chezmoi]\nmanaged = { fg = "blue" }\n'), set())
 
 
 if __name__ == "__main__":

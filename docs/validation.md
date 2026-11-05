@@ -1461,6 +1461,27 @@ shows the launcher has exited. Run alone after that, the suite passed, 13
 passes in 89 s, none killing a process. The half-removed session and
 attempt directories of the failed run were removed by hand.
 
+Tier 3 followed in the next commit: seven of `test/test_readme.py`'s
+thirteen tests went, those that tested the block parser's mechanics,
+keeping the README self-check and the five that name a refusal; the
+tooling tests and `test/benchmark.py` stay, as the ledger's policy rows say
+while the tooling they protect stays. `test/check.py` passed in full in 9 s
+with 70 Python tests, and `test/e2e.py` (5 scenarios) in 8 s and
+`test/manual_runtime.py` (13 passes) in 87 s. `test/runtime.py` failed its
+first run after 21 s at the `commands` case's last `finish`: the wait for
+`Press Enter to return to Yazi` matched the previous `apply` command's
+screen, which `ui.hide` shows from the main screen buffer, with that prompt
+still on it, until the new command writes its clear sequence; the 0.1 s
+settle after each key had kept every earlier run out of that window. The
+first capture of `finish` that equals the prompt capture before it now
+gets half a second to change, and the prompt that follows is taken when it
+does; a screen that stays is the new command's own, identical, prompt, as
+after two re-adds of the same file. With that, one run each passed:
+`test/check.py` in 8 s, `test/runtime.py` (16 passes) in 65 s,
+`test/e2e.py` in 9 s and `test/manual_runtime.py` in 87 s, none killing a
+process. How often the window is caught without the grace was not
+measured beyond the one failure in five runtime runs.
+
 ## Limits of the evidence
 
 The Ubuntu 24.04 E2E smoke scenario is validated in CI. The full runtime, E2E

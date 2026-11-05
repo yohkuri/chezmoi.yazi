@@ -47,7 +47,21 @@ def released(t):
 
 
 def finish(t, next_confirm=False, success=True, next_command=False):
-    capture = t.wait_screen(lambda s: "Press Enter to return to Yazi" in s, "command exit prompt")
+    prompt = "Press Enter to return to Yazi"
+    capture = t.wait_screen(lambda s: prompt in s, "command exit prompt")
+    # ui.hide shows the main screen, and on it the previous command's prompt,
+    # until the new command clears it. A capture equal to the last prompt may
+    # be that window, so give the clear a moment and take the prompt that
+    # follows if the screen changes; one that stays is the new command's own
+    # prompt, identical to the last.
+    if capture == getattr(t, "last_prompt", None):
+        deadline = time.monotonic() + 0.5
+        while time.monotonic() < deadline:
+            time.sleep(0.05)
+            if t.capture() != capture:
+                capture = t.wait_screen(lambda s: prompt in s, "command exit prompt after the previous one")
+                break
+    t.last_prompt = capture
     assert ("chezmoi exited with code 0." in capture) == success, capture
     enter(t)
     if next_confirm:
