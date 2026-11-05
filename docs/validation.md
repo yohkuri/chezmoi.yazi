@@ -1389,10 +1389,32 @@ judged by eye and checked by nothing. `test/check.py` passed: 63 core, 126
 action policy and 20 main assertions, and 88 Python tests, 13 of them the
 new `test/test_readme.py`.
 
+## Test ledger
+
+On 2026-11-05, `test/LEDGER.md` was written from one run of every suite on
+Ubuntu 24.04 in a container with four cores, with the Yazi 26.9.1 and
+chezmoi 2.72.2 binaries `check.yml` pins, tmux 3.4, Lua 5.4.6 for the pure
+suites, uv 0.11.32 and Python 3.14.6: 63 core, 126 action policy and 20
+main assertions, 88 Python tests, `test/e2e.py --smoke` in 6 s,
+`test/runtime.py` (16 passes) in 62 s, `test/e2e.py` (14) in 42 s,
+`test/manual_runtime.py` (15) in 89 s and `test/benchmark.py`, all passing
+and none killing a process: the first recorded run of the full runtime, E2E
+and guide suites on Linux. The ledger also records a mutation analysis of
+the pure suites, 1,122 single-line mutants of the root Lua, of which the
+suites kill 79% of `core.lua`'s, 78% of `actions.lua`'s, 25% of `main.lua`'s
+and none of `render.lua`'s, and five plugin mutations run against the
+Yazi-driven suites in a copy of the checkout: the guide alone caught a
+`partial` flag that stays set after a repair, and every suite let a removed
+notification dedupe through. Not run: `test/check.py` as a whole, since
+LuaLS, StyLua and ShellCheck were not installed, though the locked
+markdownlint passed; the pure suites under Lua 5.5; `--git-plugin`; and
+anything on macOS.
+
 ## Limits of the evidence
 
-The Ubuntu 24.04 E2E smoke scenario is validated in CI. The full runtime and E2E
-suites, manual workflow, unusual terminal configurations, and git.yazi
+The Ubuntu 24.04 E2E smoke scenario is validated in CI. The full runtime, E2E
+and guide suites have one Linux run, in a container for the test ledger
+above; the manual workflow, unusual terminal configurations, and git.yazi
 coexistence remain unverified on Linux. Windows, older versions, interactive
 secret providers, and arbitrary external hooks are not validated. Windows is
 explicitly rejected by setup. Source-state browsing is outside this release.
