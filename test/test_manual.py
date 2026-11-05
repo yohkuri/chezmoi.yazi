@@ -5,9 +5,10 @@ from io import StringIO
 from pathlib import Path
 import shutil
 import tempfile
+import tomllib
 import unittest
 from unittest.mock import Mock, patch
-from manual_backend import check, details, finalize, initialize, load, main, save, transition
+from manual_backend import check, details, finalize, initialize, load, main, prepare, save, start_case, transition
 from manual_cases import CASES
 from support import REPO, read, write
 
@@ -73,18 +74,26 @@ class ManualTests(unittest.TestCase):
         self.assertEqual(self.request("next")["step"], 1)
         self.assertEqual(self.request("pass")["result"]["status"], "PASS")
 
+    def test_theme_switching_preserves_readable_modes_and_git_context(self):
+        from manual import configure_guide
+        for git_plugin in [None, "git.yazi"]:
+            with self.subTest(git_plugin=git_plugin), patch("manual_backend.initialize"):
+                configure_guide(Mock(root=self.session), git_plugin)
+                for theme in ["custom", "base"]:
+                    prepare(None, [("theme", theme)], self.session)
+                    actual = tomllib.loads(read(self.session / "config/theme.toml"))
+                    for mode in ["normal", "select", "unset"]:
+                        self.assertEqual(actual["mode"][mode + "_main"]["fg"], "#1e1e2e")
+                        self.assertNotEqual(actual["mode"][mode + "_main"]["bg"], "#1e1e2e")
+                    self.assertEqual(actual.get("git"), {"untracked_sign": "G "} if git_plugin else None)
+                    self.assertEqual(actual.get("flavor"), {"dark": "manual", "light": "manual"} if theme == "custom" else None)
+
     def test_internal_state_mismatch_cannot_be_overridden_by_visual_pass(self):
         self.snapshot["records"] = {}
         value = self.request("pass")
         self.assertEqual(value["result"]["files"], "PASS")
         self.assertEqual(value["result"]["diagnostic"], "FAIL")
         self.assertEqual(value["result"]["status"], "FAIL")
-        # Accepting with the same failure keeps the step and says so.
-        value = self.request("accept")
-        self.assertEqual(value["step"], 1)
-        self.assertEqual(value["result"]["visual"], "PASS")
-        self.assertEqual(value["result"]["status"], "FAIL")
-        self.assertIn("staying", value["result"]["message"])
 
     def test_accept_saves_pass_and_advances_without_answering_the_next_step(self):
         with patch("manual_backend.prepare_step"):
@@ -97,6 +106,14 @@ class ManualTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Stale"):
             self.request("accept")
         self.assertEqual(before, (self.session / "walk.json").read_bytes())
+
+    def test_accept_stays_when_file_or_state_checks_fail(self):
+        self.snapshot["records"] = {}
+        value = self.request("accept")
+        self.assertEqual(value["step"], 1)
+        self.assertEqual(value["result"]["visual"], "PASS")
+        self.assertEqual(value["result"]["status"], "FAIL")
+        self.assertIn("staying", value["result"]["message"])
 
     def test_accept_preserves_verdict_if_preparing_next_step_fails(self):
         write(self.fixture / "attempt.json", json.dumps(dict(opts=dict(source=str(self.fixture / "source")))))
@@ -198,6 +215,14 @@ class ManualTests(unittest.TestCase):
                     self.assertIn(str(retained), value["result"]["message"])
                     self.assertIn(str(retained), report["preparation_errors"][0]["error"])
 
+    def test_case_preparation_failure_preserves_the_previous_attempt(self):
+        previous = list(self.state["attempts"])
+        with self.fresh_cases(), patch("manual_backend.prepare_step", side_effect=RuntimeError("Preparation failed")):
+            with self.assertRaisesRegex(RuntimeError, "Preparation failed"):
+                start_case(self.session, self.state, 0)
+        self.assertEqual(self.state["attempts"], previous)
+        self.assertEqual(self.state["active"], 0)
+
     def test_theme_reload_requires_the_same_acquisition_epoch(self):
         attempt = self.state["attempts"][0]
         attempt.update(step=1, epoch_before=3)
@@ -216,6 +241,11 @@ class ManualTests(unittest.TestCase):
         self.assertIn("Walk complete", output.getvalue())
         self.assertIn("CASES", output.getvalue())
         self.assertNotIn(CASES[2]["steps"][0]["instruction"].splitlines()[0], output.getvalue())
+
+    def test_failed_auto_check_still_requires_visual_verdict(self):
+        self.snapshot["records"] = {}
+        self.request("check")
+        self.assertEqual(self.request("next")["step"], 1)
 
     def test_stale_cli_request_returns_latest_view_without_changing_results(self):
         for status in ["PASS", "FAIL", "ERROR"]:
@@ -335,6 +365,19 @@ class ManualTests(unittest.TestCase):
                         self.assertNotIn("notify_timeout", value["opts"])
                     else:
                         self.assertEqual(value["opts"]["notify_timeout"], notify_timeout)
+
+    def test_finished_walk_reopens_on_restart_or_jump(self):
+        for operation in ["restart", "jump"]:
+            with self.subTest(operation=operation):
+                attempt = self.state["attempts"][0]
+                attempt.update(case=len(CASES) - 1, step=0, steps=[dict(status="SKIP", visual="SKIP")])
+                save(self.session, self.state)
+                completed = self.request("next")
+                self.assertTrue(completed["finished"])
+                with self.fresh_cases():
+                    reopened = self.request(operation, index=0)
+                self.assertFalse(reopened["finished"])
+                self.assertNotEqual(reopened["root"], str(self.fixture))
 
     def test_failed_attempt_retained_even_after_clean_exit_choice(self):
         self.state["attempts"][0]["steps"][0]["status"] = "FAIL"

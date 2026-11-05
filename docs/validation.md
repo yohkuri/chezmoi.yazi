@@ -385,10 +385,11 @@ summaries, manual refresh, directory and tab navigation, template failure and
 recovery, theme/flavor reload, wide-sign alignment, and RGB output. The
 optional git.yazi scenario verifies both linemodes on the same row and their
 order. `--smoke` runs the initial status/refresh scenario and the basic command
-scenario used by CI; the default run adds navigation, failure recovery and
-theme reload. The command-edge, confirmation-pages, source-ancestor and
-visual-selection scenarios run only by `--case` since the test ledger's Tier
-1 removals below: `test/runtime.py` runs the same functions with more checks.
+scenario used by CI; the default run adds navigation, failure recovery, theme
+reload and the command-edge scenario. The confirmation-pages, source-ancestor
+and visual-selection scenarios run only by `--case` since the test ledger's
+Tier 1 removals below: `test/runtime.py` runs the same functions with more
+checks.
 
 Test diagnostics live below the isolated state directory so they do not
 themselves change files in Yazi's current or parent list. Cleanup affects only
@@ -1406,8 +1407,9 @@ the pure suites, 1,122 single-line mutants of the root Lua, of which the
 suites kill 79% of `core.lua`'s, 78% of `actions.lua`'s, 25% of `main.lua`'s
 and none of `render.lua`'s, and five plugin mutations run against the
 Yazi-driven suites in a copy of the checkout: the guide alone caught a
-`partial` flag that stays set after a repair, and every suite let a removed
-notification dedupe through. Not run: `test/check.py` as a whole, since
+`partial` flag that stays set after a repair, and a removed notification
+dedupe passed the two it ran against, the pure suites and the runtime
+`status` case. Not run: `test/check.py` as a whole, since
 LuaLS, StyLua and ShellCheck were not installed, though the locked
 markdownlint passed; the pure suites under Lua 5.5; `--git-plugin`; and
 anything on macOS.
@@ -1493,12 +1495,48 @@ full in 7 s with 52 Python tests; `test/runtime.py` (16 passes) passed in
 65 s, `test/e2e.py` (5 scenarios) in 9 s and `test/manual_runtime.py` (13
 passes) in 80 s, none killing a process.
 
+A review of those commits the same day found that some of the removals had
+rested on a wrong reading of the tests, and the commit after them took those
+back; the ledger's "Taken back after review" gives the reasons. Eight
+mutations, seven of `test/manual.py` and `test/manual_backend.py` and one of
+`Runtime.setup`, each applied alone to a copy of the tree at `bde464b`, passed
+`test_manual`, `test_support`, `test_screen` and `test_readme`. With
+`test_theme_switching_preserves_readable_modes_and_git_context`,
+`test_accept_stays_when_file_or_state_checks_fail`,
+`test_failed_auto_check_still_requires_visual_verdict`,
+`test_case_preparation_failure_preserves_the_previous_attempt` and
+`test_finished_walk_reopens_on_restart_or_jump` restored, the seven fail those
+modules; the eighth still passes them, and fails the restored `backend_paths`
+in a copy that is a Git repository, as it must be for that function to run.
+The Theme case's two color checks came back, and `command-edges` returned to
+`test/e2e.py`'s default run, since `test/command.py` exits non-zero on Ctrl-C
+whatever chezmoi returns, and only that scenario shows the interrupt without
+it. The ledger no longer says that `screen.DECORATIONS` is empty, that the
+7-second notification default runs only for people, or that the dedupe mutation
+passed everywhere, and its records of the runs after the first now live only
+here.
+
+On macOS 26.6.2 with Yazi 26.9.1, chezmoi 2.74.0, tmux 3.8 and Lua 5.5.1, each
+alone and each passing its one run: `test/check.py` in 5 s, with Markdown,
+LuaLS, StyLua and ShellCheck clean, 63 core, 126 action policy and 20 main
+assertions and 57 Python tests, five more; `test/runtime.py` (16 passes) in
+59 s; `test/e2e.py` (6 scenarios) in 24 s; `confirmation-pages`,
+`source-ancestor` and `visual-selection` by `--case` in 21 s; and
+`test/manual_runtime.py` (14 passes) in 98 s, none killing a process. These are
+the first full runs with chezmoi 2.74.0, and the first on macOS since the
+ledger. Not run: `test/benchmark.py`, `--git-plugin`, `test/readme.py`,
+`test/manual.py`, and these fixes on Linux beyond CI's smoke run. The review's
+argument that `finish`'s half-second grace and the waits like it can still
+match an earlier command's prompt under load was not tested, and those waits
+stay as they are.
+
 ## Limits of the evidence
 
 The Ubuntu 24.04 E2E smoke scenario is validated in CI. The full runtime, E2E
-and guide suites have one Linux run, in a container for the test ledger
-above; the manual workflow, unusual terminal configurations, and git.yazi
-coexistence remain unverified on Linux. Windows, older versions, interactive
+and guide suites ran on Linux only in one container, on the day of the test
+ledger above and before its review's fixes; the manual workflow, unusual
+terminal configurations, and git.yazi coexistence remain unverified on Linux.
+Windows, older versions, interactive
 secret providers, and arbitrary external hooks are not validated. Windows is
 explicitly rejected by setup. Source-state browsing is outside this release.
 The direct-child deadline does not promise grandchild termination or cleanup

@@ -30,9 +30,10 @@ Yazi **26.9.1**. Older releases refuse to load the plugin, and newer ones are
 untested: Yazi changes its plugin API between releases.
 
 chezmoi, found as `chezmoi` on your `PATH` or wherever `setup`'s `command`
-points. The test suites last ran in full on macOS with chezmoi 2.73.3, and CI
-runs a short end-to-end check with 2.72.2 on Ubuntu 24.04;
-[Validation](docs/validation.md) has the earlier runs. Destination paths must
+points. The test suites last ran in full on macOS with chezmoi 2.74.0, and
+before that in an Ubuntu 24.04 container with 2.72.2; CI runs a short
+end-to-end check with 2.72.2 on Ubuntu 24.04. [Validation](docs/validation.md)
+has the earlier runs. Destination paths must
 be local Unix paths: Windows and source-tree display are unsupported.
 
 ## Installation

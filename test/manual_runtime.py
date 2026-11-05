@@ -183,8 +183,11 @@ def test(t):
     control(t, "h")
     print("PASS guide controls preserve visual unset selection for real actions")
     jump("theme")
-    accept(); t.key("Y"); accept()
+    accept(); t.key("Y")
+    assert_mode_colors(t, "NOR", "137;180;250")
+    accept()
     t.key("Y"); accept()
+    assert_mode_colors(t, "NOR", "137;180;250")
     root = jump("add")
     for key in ["a", "C", "t", "r", "z"]:
         t.key("7"); t.key(key)
@@ -388,12 +391,38 @@ def resumed_theme():
     print("PASS resumed theme: steps 2 and 3 replace the old epoch and advance after Y")
 
 
-def backend_diagnostics():
-    """Keep JSON parseable when real preparation fails and retains evidence.
+def backend_paths():
+    """Exercise real fixture setup and separate CLI processes, without git UI."""
+    import sys
+    from support import run
+    with fixture(probe=False, instrument=False) as t:
+        write(t.root / "manual.json", json.dumps(dict(version=1, root=str(t.root), repo=str(REPO))))
+        write(t.root / "baseline-theme.toml", "")
+        plugin = t.root / "git.yazi"
+        plugin.mkdir()
+        write(plugin / "main.lua", "return { setup = function() end }\n")
+        code = ('import sys; from pathlib import Path; sys.path.insert(0, sys.argv[1]); '
+                'from manual_backend import initialize; initialize(Path(sys.argv[2]), sys.argv[3])')
+        try:
+            run([sys.executable, "-c", code, str(REPO / "test"), str(t.root), "git.yazi"], cwd=t.root, env=t.env)
+            value = load(t.root)[1]
+            assert value["git_plugin"] == str(plugin), value["git_plugin"]
+            token = "0:0"
+            for operation in ["restart", "jump"]:
+                # Yazi's backend cwd differs from the original invocation cwd.
+                result = json.loads(run([sys.executable, str(REPO / "test/manual_backend.py"), str(t.root), operation,
+                                         json.dumps(dict(token=token, index=1))], cwd=t.dest, env=t.env))
+                assert result["result"]["status"] == "NOT RUN", result
+                assert (Path(result["root"]) / "config/plugins/git.yazi").resolve() == plugin
+                token = result["token"]
+        finally:
+            if (t.root / "walk.json").exists():
+                remove_attempts(load(t.root)[1])
+    print("PASS backend CLI: relative git plugin persists across cwd changes, restart and jump")
 
-    The one check of the backend through real processes: the unit tests in
-    test/test_manual.py cover the git plugin path and the resume guard, which
-    separate functions here used to run again (test/LEDGER.md)."""
+
+def backend_diagnostics():
+    """Keep JSON parseable when real preparation fails and retains evidence."""
     with fixture(probe=False, keep=False) as t:
         retained = []
         try:
@@ -434,6 +463,7 @@ def backend_diagnostics():
 
 
 def main():
+    backend_paths()
     backend_diagnostics()
     with fixture() as t:
         try:
