@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 import sys
+import time
 from support import read, write
 
 root = Path(sys.argv[1])
@@ -16,6 +17,11 @@ if mode == "manual":
     value = input("New source content > ")
 elif mode == "color":
     print("\033[44mfixture color", end="", flush=True)
+    value = "edited by fixture"
+elif mode == "typeahead":
+    print("fixture output", flush=True)
+    while not (root / "editor-go").exists():
+        time.sleep(0.01)
     value = "edited by fixture"
 elif mode == "wait":
     print("Fixture editor input:", flush=True)

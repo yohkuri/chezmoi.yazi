@@ -2,6 +2,12 @@ local core = require(".core")
 local M = {}
 
 local CLEAR = "\27[2J\27[H"
+-- Keys pressed while the command ran would answer the prompt before anyone read
+-- the output, which the answer then clears. Reading in non-canonical mode with no
+-- minimum returns what is queued and stops; without stty the prompt only waits.
+local PROMPT = "s=$(stty -g 2>/dev/null) && stty -icanon min 0 time 0 && cat >/dev/null; "
+	.. '[ -n "$s" ] && stty "$s"; '
+	.. 'printf "Press Enter to return to Yazi... "; IFS= read -r reply'
 
 -- stderr is deliberately discarded: besides containing secrets, read_line_with
 -- can lose partial stdout when a concurrent stderr read wins (Yazi 26.9.1).
@@ -110,14 +116,15 @@ function M.interactive(opts, name, args, summary)
 		)
 		io.flush()
 		local resumed = Command("/bin/sh")
-			:arg({ "-c", 'printf "Press Enter to return to Yazi... "; IFS= read -r reply' })
+			:arg({ "-c", PROMPT })
 			:stdin(Command.INHERIT)
 			:stdout(Command.INHERIT)
 			:stderr(Command.INHERIT)
 			:status()
 		-- The next ui.hide shows this screen again, and Yazi leaves it behind on exit.
-		-- Ctrl-C or Ctrl-D answers the prompt as Enter does. A prompt that could not
-		-- start never waited, so the output is still unread: keep it.
+		-- Ctrl-C or Ctrl-D at the prompt clears too, though it reports failure, which
+		-- stops any later stage. A prompt that could not start never waited, so the
+		-- output is still unread: keep it.
 		if resumed then
 			io.write(CLEAR)
 			io.flush()

@@ -69,7 +69,8 @@ def finish(t, next_confirm=False, success=True, next_command=False):
 
 
 def assert_cleared(capture):
-    for text in ["Press Enter to return to Yazi", "chezmoi exited with code", "Running (argv):", COLOR]:
+    for text in ["Press Enter to return to Yazi", "chezmoi exited with code", "Running (argv):", "fixture color",
+                 COLOR]:
         assert text not in capture, capture
 
 
@@ -161,6 +162,21 @@ def commands(t):
         returned(t)
         released(t)
         assert_cleared(t.main_screen())
+    # A key pressed while the command runs must not answer the prompt, which would
+    # clear the output unread. Enter goes first, so seeing the text proves it arrived.
+    write(t.root / "editor-mode", "typeahead")
+    t.key("1"); t.key("e")
+    t.wait_screen(lambda s: "fixture output" in s, "command running")
+    t.tmux("send-keys", "-t", "test", "Enter", "typed")
+    t.wait_screen(lambda s: "typed" in s, "keys while the command runs")
+    write(t.root / "editor-go", "")
+    t.wait_screen(lambda s: "Press Enter to return to Yazi" in s, "command exit prompt")
+    time.sleep(0.5)
+    capture = t.capture()
+    assert "Press Enter to return to Yazi" in capture and "fixture output" in capture, capture
+    enter(t)
+    returned(t)
+    released(t)
     t.tmux("set-option", "-w", "remain-on-exit", "on")
     t.key("q", settle=0)
     t.wait_exit("Yazi exit")
