@@ -132,11 +132,13 @@ imply it.
   `test/manual.py open` resumes it with the value it was started with; a walk
   that `test/manual.py create` starts, as a person or the foreground launcher
   check does, keeps the defaults.
-- The plugin clears the screen after each command's Enter prompt, so a wait on
-  a command's text cannot match an earlier command's. The screen stays blank
-  until Yazi redraws, so a check that Yazi is back asks for more than the
-  prompt's absence, as `returned` does. The guide's details viewer has no such
-  clear.
+- The plugin clears the screen once a command's Enter prompt is answered, so a
+  key that opens a new command cannot find the last one's text. The old text
+  stays until that clear, so a wait straight after Enter can still match it,
+  which is why `finish` waits for a change before the next command. The screen
+  then stays blank until Yazi redraws, so a check that Yazi is back asks for
+  more than the prompt's absence, as `returned` does. The guide's details
+  viewer has no such clear.
 - Text wraps at the terminal width, and the harness resizes to as narrow as
   40 columns. Assert on a phrase that survives wrapping at the narrowest size
   the check runs at, or on `screen.row` for file rows.

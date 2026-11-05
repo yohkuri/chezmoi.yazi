@@ -1,6 +1,9 @@
 local core = require(".core")
 local M = {}
 
+-- Reset first: a command can leave a color, which a clear would paint the screen with.
+local CLEAR = "\27[0m\27[2J\27[H"
+
 -- stderr is deliberately discarded: besides containing secrets, read_line_with
 -- can lose partial stdout when a concurrent stderr read wins (Yazi 26.9.1).
 function M.run(command, args, timeout, limit, cancelled)
@@ -93,7 +96,7 @@ function M.interactive(opts, name, args, summary)
 		end
 		-- JSON quoting preserves argument boundaries and makes control paths readable.
 		io.write(
-			"\27[2J\27[Hchezmoi " .. name .. "\n" .. summary .. "\n\nRunning (argv):\n" .. ya.json_encode(argv) .. "\n\n"
+			CLEAR .. "chezmoi " .. name .. "\n" .. summary .. "\n\nRunning (argv):\n" .. ya.json_encode(argv) .. "\n\n"
 		)
 		io.flush()
 		local status =
@@ -110,8 +113,11 @@ function M.interactive(opts, name, args, summary)
 			:stderr(Command.INHERIT)
 			:status()
 		-- The next ui.hide shows this screen again, and Yazi leaves it behind on exit.
-		io.write("\27[2J\27[H")
-		io.flush()
+		-- A prompt that failed never waited, so the output is still unread: keep it.
+		if resumed and resumed.success then
+			io.write(CLEAR)
+			io.flush()
+		end
 		return status and status.success and resumed and resumed.success or false
 	end)
 	permit:drop()

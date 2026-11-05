@@ -191,9 +191,10 @@ separately from background status queries; this history is included in the saved
 report. A cancelled or
 rejected action may run validation queries, but does not execute the rejected
 interactive command. Edit and Apply runs edit, diff, then apply only after approval.
-Read output and press Enter when the command asks to return to Yazi. For Apply,
-return from the diff first, then answer the plugin confirmation. Destructive
-commands can also have a native chezmoi prompt after plugin confirmation.
+Read output and press Enter when the command asks to return to Yazi; Enter
+clears it from the screen. For Apply, return from the diff first, then answer
+the plugin confirmation. Destructive commands can also have a native chezmoi
+prompt after plugin confirmation.
 
 Edit cases use a disposable terminal editor displaying the current source.
 Type the instructed replacement line and Enter to save; Ctrl-C interrupts it.
@@ -286,6 +287,11 @@ screenshots, actual editor integration and Linux acceptance are not automated.
 After exit, the launcher prints the report path as `Results: ...` and, when
 retained, the session root as `Fixtures retained: ...`. Use that session root
 for `PATH` below, not the report directory or an individual attempt directory.
+
+Check the terminal at that point, which no step can reach: no chezmoi output
+and no `Press Enter to return to Yazi` should remain on the screen, and no
+background color should fill it. Only tmux has shown this, so a real terminal
+is worth reporting, along with what its scrollback keeps.
 
 ```sh
 test/manual.py open PATH

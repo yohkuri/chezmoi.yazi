@@ -335,7 +335,7 @@ def foreground_launcher():
         # tmux server goes and takes it down mid-removal. The plugin's clear
         # puts the report on the top row, which tmux's line scrolls into the
         # history, so read that as well as the screen.
-        t.wait_screen(lambda s: "Pane is dead" in s, "launcher exit after the report")
+        t.wait_exit("launcher exit after the report")
         history = t.tmux("capture-pane", "-p", "-S", "-", "-t", "test")
         assert "Results:" in history, history
     reports = set((REPO / ".dev/manual-runs").glob("*/results.json")) - before
@@ -465,9 +465,32 @@ def backend_diagnostics():
     print("PASS backend CLI: preparation failures keep JSON stdout, stderr evidence and saved PASS with/without KEEP_FIXTURE")
 
 
+def resume_execution_guard():
+    """Compare actual code/tool metadata before touching a retained session."""
+    with fixture(probe=False) as t:
+        try:
+            write(t.root / "manual.json", json.dumps(dict(version=1, root=str(t.root), repo=str(REPO))))
+            configure_guide(t, None)
+            original = load(t.root)[1]
+            code = 'import sys; from pathlib import Path; from manual import open_fixture; open_fixture(Path(sys.argv[1]))'
+            for name in ["head", "diff_sha256", "source_hashes", "versions"]:
+                state = dict(original, **{name: "previous execution"})
+                save(t.root, state)
+                before = (t.root / "walk.json").read_bytes()
+                process = subprocess.run([sys.executable, "-c", code, str(t.root)], cwd=REPO / "test", env=t.env,
+                                         capture_output=True, text=True, timeout=20)
+                assert process.returncode != 0 and f"execution information differs ({name})" in process.stderr, process.stderr
+                assert (t.root / "walk.json").read_bytes() == before
+        finally:
+            if (t.root / "walk.json").exists():
+                remove_attempts(load(t.root)[1])
+    print("PASS resume guard: actual HEAD/diff/source/tool metadata mismatches preserve saved bytes before launch")
+
+
 def main():
     backend_paths()
     backend_diagnostics()
+    resume_execution_guard()
     with fixture() as t:
         try:
             test(t)

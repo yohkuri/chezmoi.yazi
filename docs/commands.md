@@ -72,5 +72,6 @@ After an executed command, success, failure, and interruption all trigger a
 file-list/status refresh. Failures may leave partial changes; there is no
 automatic retry or rollback. Cancelling apply after edit keeps the source edit.
 Completion means the command finished, not that every entry was changed.
-Raw command output stays in the terminal and is not copied to plugin logs or
-notifications. Terminal scrollback remains subject to your terminal settings.
+Raw command output goes only to the terminal and is not copied to plugin logs
+or notifications. Pressing Enter clears it from the screen; whether any of it
+stays in scrollback depends on your terminal.

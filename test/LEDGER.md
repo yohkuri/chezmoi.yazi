@@ -118,7 +118,7 @@ repair in the Warnings case.
 | `test/test_skills.py` | Python unit, 1 test | the symlinks from `.claude/skills` to `.agents/skills` in this checkout | `test/check.py`, CI | 0.02 s |
 | `test/runtime.py` | Yazi in tmux, probe and command wrapper, 7 cases | the plugin's records, calls, rendering and actions | by hand | 62 s |
 | `test/e2e.py` | Yazi in tmux, screen only, 6 default scenarios, 3 more by `--case`, plus `git-coexistence` | rendering and actions as a user sees them | `--smoke` in CI; the rest by hand | about 22 s; about 20 s for the three by `--case`, the sums of the rows below |
-| `test/manual_runtime.py` | Yazi in tmux, 5 functions | the guide that `test/manual.py` runs, and the plugin flows it drives | by hand | 89 s |
+| `test/manual_runtime.py` | Yazi in tmux, 6 functions | the guide that `test/manual.py` runs, and the plugin flows it drives | by hand | 89 s |
 | `test/benchmark.py` | measurement | timings of the three queries; asserts only output line counts | by hand | 1 s |
 | `test/readme.py`, `test/manual.py` | tools for a person | the README picture; the human walk | by hand | n/a |
 
@@ -270,7 +270,7 @@ with `endswith` before deleting it.
 | `test_failed_attempt_retained_even_after_clean_exit_choice` | `finalize` keeps fixtures after a FAIL | none | keep |
 | `test_launcher_waits_for_interrupted_child_before_archiving` | SIGINT to the launcher waits for Yazi before archiving | none; the guide interrupts the editor, not the launcher | keep |
 | `test_launcher_rejects_an_old_or_reordered_catalog_without_changing_saved_progress` | an old or reordered case list is refused before any write | none | keep |
-| `test_launcher_rejects_changed_or_missing_execution_info_without_writes` | nine metadata mismatches are refused before any write | none since Tier 2 removed the guide's `resume_execution_guard` | keep |
+| `test_launcher_rejects_changed_or_missing_execution_info_without_writes` | nine metadata mismatches are refused before any write | the guide's `resume_execution_guard`, which takes the real `execution_info` where this test has a stub | keep |
 | `test_harness_error_retains_fixtures_and_is_archived` | a legacy error marker marks ERROR, keeps fixtures and is archived | the next two rows | keep |
 | `test_multiple_guide_errors_preserve_origin_results_and_complete_history` | 2026-10-11 defect: the journal keeps every error, and each marker lands on its own attempt and step | none | keep |
 | `test_imported_guide_error_does_not_override_successful_recheck` | 2026-10-11 defect | none | keep |
@@ -366,6 +366,7 @@ when named with `--case`.
 | Function | Time | Protects | Overlap |
 | --- | --- | --- | --- |
 | `backend_paths` | 0.7 s | the git plugin path through real backend processes, the real `Runtime.setup` and its `config/plugins/git.yazi`, across restart and jump | `test_manual.test_relative_git_plugin_survives_backend_cwd_change`, which has a stub for `Runtime.setup` |
+| `resume_execution_guard` | 0.5 s | four metadata mismatches through a real launcher process and the real `execution_info` | `test_manual.test_launcher_rejects_changed_or_missing_execution_info...`, which has a stub for `execution_info` |
 | `backend_diagnostics` | 0.3 s | preparation failures through the real CLI, with and without `KEEP_FIXTURE` | `test_manual.test_retained_preparation_diagnostics...` |
 | `test` | 71 s | one function: a check that the fixture theme loaded, repeated in the Theme case; `P` and `S` guards; wrapping at 80 columns; restart; hide, compact and full layouts; jump; the details viewer; completion and reopening; then every command case of the walk through the guide's keys; a real preparation failure; the finish menu | the command flows repeat `commands` and `command-edges`; its own are the guide controls, the execution screen's `Running (argv):` with `--apply=false --watch=false`, the `actions.jsonl` history and `partial` cleared after repair (E4) |
 | `foreground_launcher` | 12 s | the executable `test/manual.py` under tmux, Ctrl-C in the editor twice, archive and cleanup | none |
@@ -375,8 +376,7 @@ Two of `test`'s waits are met before the plugin answers: `"Not managed"`
 by the Rejections instruction text (E1), and `"Re-add"` in the Add case by
 the case title `4/12 Add, Re-add, template and encryption`, so the `r`
 after it can be sent before the menu opens; the direct `r` binding then
-runs the same re-add, and the step passes either way. Tier 2 removed
-`resume_execution_guard`, whose unit twin is broader, and found a third
+runs the same re-add, and the step passes either way. Tier 2 found a third
 weak wait in `foreground_launcher`: it left
 its fixture, and so stopped the tmux server, as soon as the launcher
 printed `Results:`, which the launcher prints before it removes its
@@ -400,8 +400,9 @@ failed its own check that the session was gone. It now waits for tmux's
 3. Three guide behaviors were tested both as unit tests and as real
    processes: the git plugin path, preparation diagnostics and the resume
    guard. The unit tests are cheaper, the real ones show the executable
-   path; Tier 2 removed the resume guard's, and `backend_paths` stays since
-   its unit test has a stub for `Runtime.setup`.
+   path. Tier 2 removed the resume guard's; reviews restored it, and all
+   three real ones stay, since the unit tests have stubs for what the guard
+   and `backend_paths` run.
 4. Within `test_manual.py`, the stale-token rule was asserted in four
    tests, preparation failure in six, error-marker import in six, and
    "a failed check beats a visual PASS" in two, until Tier 2 merged some of
@@ -473,8 +474,9 @@ failed its own check that the session was gone. It now waits for tmux's
    fixtures, and `action_cases.finish` matched the previous command's
    exit prompt, which `ui.hide` shows from the main screen until the new
    command clears it, a window the 0.1-second key settle had hidden until
-   one runtime run. `finish` now gives a prompt capture equal to the last
-   one half a second to change.
+   one runtime run. `finish` gave a prompt capture equal to the last one half
+   a second to change, until the plugin's clear replaced that
+   ([Validation](../docs/validation.md#test-ledger)).
 9. **Tests of the fixture.** `assert_mode_colors` checks that Yazi draws
    `test/manual-theme.toml`, a file that exists for the walk's readability,
    and the light and dark reports checked Yazi's own detection; since Tier 2
@@ -510,7 +512,7 @@ each step are in [Validation](../docs/validation.md#test-ledger).
 
 | Rank | Test | Why | Proposal | Done |
 | --- | --- | --- | --- | --- |
-| 1 | `test/manual_runtime.py` `backend_paths`, `backend_diagnostics`, `resume_execution_guard` | each repeated a broader unit test through a real process | keep the unit tests; keep one real-process check if the executable path matters | `resume_execution_guard` removed; `backend_diagnostics` kept, since only a real process shows the stdout and stderr protocol; `backend_paths` removed, then restored after review |
+| 1 | `test/manual_runtime.py` `backend_paths`, `backend_diagnostics`, `resume_execution_guard` | each repeated a broader unit test through a real process | keep the unit tests; keep one real-process check if the executable path matters | `backend_diagnostics` kept, since only a real process shows the stdout and stderr protocol; `backend_paths` and `resume_execution_guard` removed, then restored after review |
 | 2 | `test_manual.test_stale_request_leaves_progress_untouched`, `..._accept_stays_when_file_or_state_checks_fail`, `..._preparation_error_history_retains_fixtures...`, `..._harness_error_is_attributed_to_source_attempt_after_jump` | each asserted what a neighbor also asserts | merge into the neighbor named in the table | merged: the history test into `test_accept_preserves_verdict...`, the attribution into `test_multiple_guide_errors...`; the stale test went, its assertion already in the accept test; the accept-stays assertions went into `test_internal_state_mismatch...`, then back into their own test after review |
 | 3 | `test/actions.lua` lines 155 and 183 (no query flags, no `--force`) and `test/core.lua` lines 157 and 160 (no empty query, no query without targets) | cannot fail against the code as it is; `check_call` repeats the `--force` and filter guards on real calls | keep as one-line tripwires or drop; they add nothing to the mutation score | kept: three are one line already, and the `--force` sweep is the only such guard that CI runs, since `check_call` runs only in local runtime fixtures |
 | 4 | `test/manual_runtime.py` `assert_mode_colors` and the light and dark reports; `test_manual.test_theme_switching_preserves_readable_modes_and_git_context` | they checked the fixture theme and Yazi, not the plugin or the guide's logic | keep one assertion that the theme loads, or drop | the normal-mode `assert_mode_colors` kept; the light and dark reports and the select and unset modes removed; the two Theme-case checks and the unit test removed, then restored after review |
@@ -551,7 +553,15 @@ column names.
 | `start_case` leaves a finished walk finished | `test_finished_walk_reopens_on_restart_or_jump` | left to the guide suite, which neither `test/check.py` nor CI runs |
 | `Runtime.setup` links the git plugin under another name | `backend_paths`, and still no unit test | its unit twin was called broader, but has a stub for `Runtime.setup` |
 
-The Theme case's two color checks came back with them, since
+A second review, of the tree with those tests restored, found one more. An
+`execution_info` that leaves out `head` passed every unit test, since
+`test_launcher_rejects_changed_or_missing_execution_info_without_writes` has a
+stub for that function, and `test/MANUAL.md` promises that a session resumes
+only at the recorded HEAD. `resume_execution_guard` refuses it, so it came back
+too, It compares a saved
+value with a fresh one, so a `diff_sha256` made constant would still pass.
+
+The Theme case's two color checks came back with the first group, since
 `test/MANUAL.md` promises that the case keeps the UI colors; no mutation was
 run against those.
 

@@ -137,14 +137,22 @@ def commands(t):
     write(t.source / "source.tmpl", "{{ .missing.field }}")
     t.key("3"); t.key("p"); finish(t, success=False)
     assert read(t.dest / "source") == "source edit\n"
-    assert "runtime error:" not in t.logs(), t.logs()
+    # A command can leave a color, which the plugin's clear must not paint the
+    # terminal with.
+    write(t.cfg, read(t.cfg) + '[edit]\ncommand=' + json.dumps(sys.executable) + '\nargs='
+          + json.dumps([str(REPO / "test/editor.py"), str(t.root)]) + '\n')
+    write(t.root / "editor-mode", "color")
+    t.key("1"); t.key("e"); finish(t)
     # The plugin clears a finished command's screen. Without that the next
     # ui.hide shows the old prompt, which this file's waits could take for the
     # new command's, and the prompt stays on the terminal after Yazi exits.
     t.tmux("set-option", "-w", "remain-on-exit", "on")
     t.key("q", settle=0)
-    capture = t.wait_screen(lambda s: "Pane is dead" in s, "Yazi exit")
+    capture = t.wait_exit("Yazi exit")
     assert "Press Enter to return to Yazi" not in capture, capture
+    colored = t.capture(ansi=True)
+    assert "\x1b[44m" not in colored, colored
+    assert "runtime error:" not in t.logs(), t.logs()
     print("PASS terminal actions: add, re-add, menu, forget, destroy, apply/cancel/conflict, failed diff")
 
 
