@@ -332,9 +332,12 @@ def foreground_launcher():
         t.key("c")
         # The launcher removes its fixtures after it prints the report path, so
         # wait for it to exit, which remain-on-exit shows, before this fixture's
-        # tmux server goes and takes it down mid-removal.
-        capture = t.wait_screen(lambda s: "Pane is dead" in s, "launcher exit after the report")
-        assert "Results:" in capture, capture
+        # tmux server goes and takes it down mid-removal. The plugin's clear
+        # puts the report on the top row, which tmux's line scrolls into the
+        # history, so read that as well as the screen.
+        t.wait_screen(lambda s: "Pane is dead" in s, "launcher exit after the report")
+        history = t.tmux("capture-pane", "-p", "-S", "-", "-t", "test")
+        assert "Results:" in history, history
     reports = set((REPO / ".dev/manual-runs").glob("*/results.json")) - before
     assert len(reports) == 1, reports
     report = json.loads(read(next(iter(reports))))

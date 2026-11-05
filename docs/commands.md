@@ -65,6 +65,7 @@ plugin's separate diff and confirmation stages.
 
 Yazi temporarily hands over the terminal for the editor, pager, credentials,
 and conflict prompts. Press Enter after each command to return or continue.
+Enter also clears the command's output from the screen, so read it first.
 Interactive commands have no status-query timeout. Only one action runs per
 Yazi instance; status queries pause and obsolete results are discarded.
 After an executed command, success, failure, and interruption all trigger a
