@@ -558,8 +558,8 @@ A second review, of the tree with those tests restored, found one more. An
 `test_launcher_rejects_changed_or_missing_execution_info_without_writes` has a
 stub for that function, and `test/MANUAL.md` promises that a session resumes
 only at the recorded HEAD. `resume_execution_guard` refuses it, so it came back
-too, It compares a saved
-value with a fresh one, so a `diff_sha256` made constant would still pass.
+too. It compares a saved value with a fresh one, so a `diff_sha256` made constant
+would still pass.
 
 The Theme case's two color checks came back with the first group, since
 `test/MANUAL.md` promises that the case keeps the UI colors; no mutation was

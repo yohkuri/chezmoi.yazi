@@ -1614,6 +1614,36 @@ report of the whole scrollback going, without the `seq`, did not recur with it;
 output that had not yet scrolled off would explain it, which was not checked.
 Neither real terminal has shown the color reset, only `commands` in tmux.
 
+A third review, run on that state, found the clear tied to the wrong condition:
+Ctrl-C or Ctrl-D at the prompt ends the prompt's shell without success, so the
+output and any color stayed, which it reproduced. The clear now runs unless the
+prompt could not start, and the reset moved to the moment the command ends.
+`commands` now runs its colored edit three times, answering with Enter, Ctrl-C
+and Ctrl-D, and after each one reads the main screen behind Yazi through
+`capture-pane -a`, for the command's output as well as the prompt, and it checks
+that the color was on the screen before. With no delay, `test/runtime.py` and
+`test/e2e.py` both fail that case when the clear runs only on success, when it is
+gone, or without the reset, and when the editor prints no color; `/bin/sh`
+replaced by a missing path still keeps the output. Enter clears a failed
+command's output too, with no other copy, which `docs/commands.md` now says:
+keeping it would bring the old screen back at the next action.
+
+The same versions passed, each alone, one run each, none killing a process:
+`test/runtime.py` (16 passes) in 63 s, `test/e2e.py` (6 scenarios) in 24 s, the
+three by `--case` in 21 s and `test/manual_runtime.py` (15 passes) in 91 s.
+`test/check.py` failed first on a long line in `docs/design.md`, and passed after
+it was rewrapped, with the same counts; only Markdown changed after those runs.
+With `ya.sleep(0.7)` after `ui.hide`, all three suites passed. With it after the
+clear, `test/runtime.py` and `test/manual_runtime.py` passed, and the lost `v` of
+`command-edges` recurred in `test/e2e.py`: 13 of 20 runs passed. Screen samples
+every 0.1 s for 3 s after the key never showed `Another chezmoi action is already
+running`, which counts against the action lock as its cause, and that cause
+stays unknown. Separately, driving the guide through `herdr pane send-text`, a
+`q` sent as soon as Yazi had redrawn after Enter did nothing once, with no delay
+injected, and worked after a 2-second pause. Not run: `test/benchmark.py`,
+`--git-plugin`, `test/readme.py`, a full walk of `test/manual.py`, and these
+fixes on Linux beyond CI's smoke run, or on a real terminal at this commit.
+
 ## Limits of the evidence
 
 The Ubuntu 24.04 E2E smoke scenario is validated in CI. The full runtime, E2E

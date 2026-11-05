@@ -157,8 +157,8 @@ SCENARIOS = {
     "git-coexistence": git_coexistence,
 }
 # confirmation-pages, source-ancestor and visual-selection run only with --case: test/runtime.py runs the same
-# functions with more checks (test/LEDGER.md). command-edges stays: it is the one default run of the editor, its TTY
-# and Ctrl-C without test/command.py, which exits non-zero on an interrupt whatever chezmoi returns.
+# functions with more checks (test/LEDGER.md). command-edges stays: it is the one default run of the editor's TTY and
+# Ctrl-C without test/command.py, which exits non-zero on an interrupt whatever chezmoi returns.
 DEFAULT_CASES = ["status-refresh", "navigation", "failure-recovery", "theme-reload", "commands", "command-edges"]
 
 

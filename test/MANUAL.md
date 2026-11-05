@@ -288,8 +288,9 @@ After exit, the launcher prints the report path as `Results: ...` and, when
 retained, the session root as `Fixtures retained: ...`. Use that session root
 for `PATH` below, not the report directory or an individual attempt directory.
 
-Check the terminal at that point, which no step can reach: no chezmoi output
-and no `Press Enter to return to Yazi` should remain on the screen, and no
+Check the terminal at that point, which no step can reach, unless you opened
+the details viewer last, which leaves its page behind: no chezmoi output and no
+`Press Enter to return to Yazi` should remain on the screen, and no
 background color should fill it. Ghostty alone and herdr on Ghostty have shown
 the screen without the output, also in scrollback; only tmux has shown the color
 reset. Another terminal is worth reporting, along with what its scrollback keeps.
