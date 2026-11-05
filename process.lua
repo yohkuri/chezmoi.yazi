@@ -109,6 +109,9 @@ function M.interactive(opts, name, args, summary)
 			:stdout(Command.INHERIT)
 			:stderr(Command.INHERIT)
 			:status()
+		-- The next ui.hide shows this screen again, and Yazi leaves it behind on exit.
+		io.write("\27[2J\27[H")
+		io.flush()
 		return status and status.success and resumed and resumed.success or false
 	end)
 	permit:drop()

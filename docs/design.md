@@ -113,7 +113,10 @@ Interactive processes inherit stdin/stdout/stderr under a `ui.hide()` permit.
 They have no acquisition timeout. The runner restores the permit after errors
 and waits for Enter so output remains readable. A fixed shell snippet provides
 only this Enter prompt; executable arguments and target paths never enter shell
-source. Raw output is not copied to plugin notifications or logs.
+source. Raw output is not copied to plugin notifications or logs. After Enter
+the runner clears the screen before restoring the permit: `ui.hide` would
+otherwise show the finished command's output again at the next action, and Yazi
+would leave it, with the prompt, on the terminal when it exits.
 
 Acquiring the action lock invalidates the current acquisition epoch and pending
 work. A worker already in a query drains through its existing deadline before

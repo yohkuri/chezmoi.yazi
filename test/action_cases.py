@@ -32,7 +32,9 @@ def enter(t):
 
 
 def returned(t):
-    t.wait_screen(lambda s: "Press Enter to return to Yazi" not in s and "Continue?" not in s,
+    # The plugin's clear leaves the screen blank until Yazi redraws, and a key
+    # sent then can go missing, so the prompt's absence is not enough.
+    t.wait_screen(lambda s: s.strip() and "Press Enter to return to Yazi" not in s and "Continue?" not in s,
                   "Yazi restored")
     time.sleep(0.15)
 
@@ -47,26 +49,18 @@ def released(t):
 
 
 def finish(t, next_confirm=False, success=True, next_command=False):
-    prompt = "Press Enter to return to Yazi"
-    capture = t.wait_screen(lambda s: prompt in s, "command exit prompt")
-    # ui.hide shows the main screen, and on it the previous command's prompt,
-    # until the new command clears it. A capture equal to the last prompt may
-    # be that window, so give the clear a moment and take the prompt that
-    # follows if the screen changes; one that stays is the new command's own
-    # prompt, identical to the last.
-    if capture == getattr(t, "last_prompt", None):
-        deadline = time.monotonic() + 0.5
-        while time.monotonic() < deadline:
-            time.sleep(0.05)
-            if t.capture() != capture:
-                capture = t.wait_screen(lambda s: prompt in s, "command exit prompt after the previous one")
-                break
-    t.last_prompt = capture
+    capture = t.wait_screen(lambda s: "Press Enter to return to Yazi" in s, "command exit prompt")
     assert ("chezmoi exited with code 0." in capture) == success, capture
     enter(t)
     if next_confirm:
         t.wait_screen(lambda s: "Continue?" in s, "confirmation after command")
-    elif not next_command:
+    elif next_command:
+        # The next command's screen can replace this one between two captures,
+        # so wait for a change rather than for the prompt to go. Each caller
+        # goes from edit to diff, whose screens differ, and edit's is too short
+        # for Enter's echo to scroll it.
+        t.wait_screen(lambda s: s != capture, "prompt gone before the next command")
+    else:
         returned(t)
     return capture
 
@@ -144,6 +138,13 @@ def commands(t):
     t.key("3"); t.key("p"); finish(t, success=False)
     assert read(t.dest / "source") == "source edit\n"
     assert "runtime error:" not in t.logs(), t.logs()
+    # The plugin clears a finished command's screen. Without that the next
+    # ui.hide shows the old prompt, which this file's waits could take for the
+    # new command's, and the prompt stays on the terminal after Yazi exits.
+    t.tmux("set-option", "-w", "remain-on-exit", "on")
+    t.key("q", settle=0)
+    capture = t.wait_screen(lambda s: "Pane is dead" in s, "Yazi exit")
+    assert "Press Enter to return to Yazi" not in capture, capture
     print("PASS terminal actions: add, re-add, menu, forget, destroy, apply/cancel/conflict, failed diff")
 
 

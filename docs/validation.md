@@ -1530,6 +1530,41 @@ argument that `finish`'s half-second grace and the waits like it can still
 match an earlier command's prompt under load was not tested, and those waits
 stay as they are.
 
+The next commit tested that argument and closed the window. In a scratch copy,
+`ya.sleep(0.7)` after `ui.hide` failed `test/runtime.py`, `test/e2e.py`
+(`commands` and `command-edges`) and `test/manual_runtime.py` on those waits. A
+Ctrl-C sent on the previous editor's text failed at once, on the old prompt's
+exit code, not after the 30-second wait the review expected. These failures
+were injected; without a delay the only one seen is the Linux run above.
+`M.interactive` now clears the screen after the Enter prompt, before the permit
+drops, so `ui.hide` has no finished command to show, and `finish` lost its
+grace. Yazi therefore no longer leaves the last command's output and prompt on
+the terminal when it exits, as seen in tmux; a real terminal and its scrollback
+were not checked. The clear also leaves the screen blank until Yazi redraws:
+with `ya.sleep(0.7)` after the clear, `test/runtime.py` and `test/e2e.py` timed
+out waiting for what the next keys should have opened, until `returned` also
+required a non-blank screen. On the final code either delay
+passes all three suites. `commands` now ends by quitting Yazi and checking that
+no prompt is left, and with the clear removed that check fails under both
+runners, with no delay; it is the guard at normal speed, CI's smoke run
+included.
+
+`foreground_launcher` needed a change too: the clear puts the launcher's
+`Results:` line on the top row, and tmux's `Pane is dead` line scrolls it away.
+A first fix waited for `Results:` before `Pane is dead`. It passed in three
+scratch copies and failed in the checkout and a fourth copy, where the line had
+already gone from the screen by the capture that saw the exit. The check now
+reads the pane's history.
+
+On the same versions, each alone: `test/check.py` passed in 4 s with the same
+counts, `test/runtime.py` (16 passes) in 59 s, `test/e2e.py` (6 scenarios) in
+23 s and the three by `--case` in 21 s, and `test/manual_runtime.py` (14 passes)
+passed its three runs in 91 to 92 s after that fix, none killing a process. The
+first three suites ran before the fix, which touched only
+`test/manual_runtime.py`. Not run: `test/benchmark.py`, `--git-plugin`,
+`test/readme.py`, `test/manual.py`, and the clear on Linux beyond CI's smoke
+run.
+
 ## Limits of the evidence
 
 The Ubuntu 24.04 E2E smoke scenario is validated in CI. The full runtime, E2E
