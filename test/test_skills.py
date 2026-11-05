@@ -14,28 +14,23 @@ HOW = """Claude Code reads skills from .claude/skills. Give each file under
 ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
 
 
-def git(root, *args, env=ENV):
-    return run(["git", *args], cwd=root, env=env)
-
-
-def listed(root, path, env=ENV):
+def listed(path):
     # Untracked files count, so a new skill is checked before it is committed;
     # ignored ones do not, since a clone would not have them.
-    out = git(root, "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", path, env=env)
+    out = run(["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", path], cwd=REPO, env=ENV)
     return {Path(name) for name in out.split("\0") if name}
 
 
-def problems(root, env=ENV):
-    root = Path(root)
-    sources = listed(root, ".agents/skills", env)
-    links = listed(root, ".claude/skills", env)
+def problems():
+    sources = listed(".agents/skills")
+    links = listed(".claude/skills")
     found, dirs = [], set()
 
     def under_dir_link(link):
         for path in [link, *link.parents]:
             if path.parts[:2] != (".claude", "skills"):
                 break
-            if (root / path).is_symlink() and (root / path).is_dir():
+            if (REPO / path).is_symlink() and (REPO / path).is_dir():
                 if path not in dirs:
                     dirs.add(path)
                     found.append(f"{path}: a symlink to a directory; remove it and link each file")
@@ -47,7 +42,7 @@ def problems(root, env=ENV):
         target = os.path.relpath(source, link.parent)
         if under_dir_link(link):
             continue
-        actual = os.readlink(root / link) if (root / link).is_symlink() else None
+        actual = os.readlink(REPO / link) if (REPO / link).is_symlink() else None
         if actual != target:
             found.append(f"{link}: must be a symlink to {target}, not {actual or 'missing or a copy'}")
         elif link not in links:
@@ -61,7 +56,7 @@ def problems(root, env=ENV):
 
 class SkillLinkTests(unittest.TestCase):
     def test_repository(self):
-        sources, found = problems(REPO)
+        sources, found = problems()
         self.assertTrue(sources, "No skill files listed under .agents/skills")
         self.assertEqual(found, [], HOW + "\n".join(found))
 
