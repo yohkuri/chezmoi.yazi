@@ -1228,6 +1228,29 @@ is 82 columns and fails. No Dependabot pull request has run here yet. Its
 cooldown covers only Dependabot: this change took commitlint 21.2.4 and
 `fast-uri` 3.1.9 by hand, within four days of their releases.
 
+On 2026-11-06, Dependabot alert 8 (GHSA-gg6h-894w-4m9c) reported `re2js` 2.8.6,
+which `markdownlint` 0.42.0 pins and which `markdownlint-cli2` 0.24.0 brings
+through its own pin, so `package.json` overrides it with 2.8.7. `markdownlint`
+passes no `LOOKBEHINDS` flag, read off its code, so the flaw was not reachable
+here. The advisory's reproduction took 1510 ms at 8000 characters on 2.8.6 and
+2 ms on 2.8.7, one run each on macOS 26.6.2 with Node.js 24.22.2.
+
+`test/check.py` would miss a lint rule that stops reporting on clean documents,
+so two more checks cover the swapped engine. A file with planted violations
+reported MD011, MD013 and MD039 on 2.8.7, and its front matter was recognized.
+The expressions behind those rules and the front matter, called the way
+`markdownlint` calls them, gave the same results on 2.8.6 and 2.8.7 over 5,576
+inputs: English and Japanese Markdown, whole and by line, plus edge cases. That
+compares the expressions once, not a whole lint. `test/check.py` passed with 63
+core, 126 action policy and 20 main assertions and 58 Python tests.
+
+The override's key names `markdownlint@0.42.0`. With a key naming another
+version, standing in for a later `markdownlint`,
+`npm install --package-lock-only` resolved `re2js` 2.8.6, so the override
+stopped applying. Removing `overrides` without relocking made `npm ci` fail with
+`EUSAGE`. No real `markdownlint` update has run through this, whether by hand
+or by Dependabot.
+
 ## Acquisition measurement
 
 ```sh
