@@ -112,16 +112,8 @@ view. Preview and application evaluate separately; they are not an atomic plan.
 Interactive processes inherit stdin/stdout/stderr under a `ui.hide()` permit.
 They have no acquisition timeout. The runner restores the permit after errors
 and waits for Enter so output remains readable. A fixed shell snippet provides
-only this Enter prompt, first dropping keys queued while the command ran, which
-would answer it unread; executable arguments and target paths never enter shell
-source. Raw output is not copied to plugin notifications or logs. After Enter
-the runner clears the screen before restoring the permit, having reset the
-attributes when the command ended: `ui.hide` would otherwise show the finished
-command's output again at the next action, and Yazi would leave it, with the
-prompt, on the terminal when it exits. Ctrl-C or Ctrl-D at the prompt clears
-the screen too, and returns failure, which stops any later stage. A prompt that
-could not start never waited, so that case keeps the unread output on the
-screen.
+only this Enter prompt; executable arguments and target paths never enter shell
+source. Raw output is not copied to plugin notifications or logs.
 
 Acquiring the action lock invalidates the current acquisition epoch and pending
 work. A worker already in a query drains through its existing deadline before

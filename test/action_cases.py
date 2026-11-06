@@ -8,9 +8,6 @@ import screen
 from support import REPO, NAMES, lua, read, write
 
 
-COLOR = "\x1b[44m"
-
-
 def configure(t):
     keys = {
         "a": "plugin chezmoi -- add", "r": "plugin chezmoi -- re-add",
@@ -35,9 +32,7 @@ def enter(t):
 
 
 def returned(t):
-    # The plugin's clear leaves the screen blank until Yazi redraws, and a key
-    # sent then can go missing, so the prompt's absence is not enough.
-    t.wait_screen(lambda s: s.strip() and "Press Enter to return to Yazi" not in s and "Continue?" not in s,
+    t.wait_screen(lambda s: "Press Enter to return to Yazi" not in s and "Continue?" not in s,
                   "Yazi restored")
     time.sleep(0.15)
 
@@ -52,26 +47,28 @@ def released(t):
 
 
 def finish(t, next_confirm=False, success=True, next_command=False):
-    capture = t.wait_screen(lambda s: "Press Enter to return to Yazi" in s, "command exit prompt")
+    prompt = "Press Enter to return to Yazi"
+    capture = t.wait_screen(lambda s: prompt in s, "command exit prompt")
+    # ui.hide shows the main screen, and on it the previous command's prompt,
+    # until the new command clears it. A capture equal to the last prompt may
+    # be that window, so give the clear a moment and take the prompt that
+    # follows if the screen changes; one that stays is the new command's own
+    # prompt, identical to the last.
+    if capture == getattr(t, "last_prompt", None):
+        deadline = time.monotonic() + 0.5
+        while time.monotonic() < deadline:
+            time.sleep(0.05)
+            if t.capture() != capture:
+                capture = t.wait_screen(lambda s: prompt in s, "command exit prompt after the previous one")
+                break
+    t.last_prompt = capture
     assert ("chezmoi exited with code 0." in capture) == success, capture
     enter(t)
     if next_confirm:
         t.wait_screen(lambda s: "Continue?" in s, "confirmation after command")
-    elif next_command:
-        # The next command's screen can replace this one between two captures,
-        # so wait for a change rather than for the prompt to go. Each caller
-        # goes from edit to diff, whose screens differ, and edit's is too short
-        # for Enter's echo to scroll it.
-        t.wait_screen(lambda s: s != capture, "prompt gone before the next command")
-    else:
+    elif not next_command:
         returned(t)
     return capture
-
-
-def assert_cleared(capture):
-    for text in ["Press Enter to return to Yazi", "chezmoi exited with code", "Running (argv):", "fixture color",
-                 COLOR]:
-        assert text not in capture, capture
 
 
 def confirm(t, yes=True):
@@ -146,43 +143,8 @@ def commands(t):
     write(t.source / "source.tmpl", "{{ .missing.field }}")
     t.key("3"); t.key("p"); finish(t, success=False)
     assert read(t.dest / "source") == "source edit\n"
-    # The plugin clears a finished command's screen, whichever key answers the
-    # prompt. Without that the next ui.hide shows the old text, which this file's
-    # waits could take for the new command's, and it stays on the terminal after
-    # Yazi exits. A command can also leave a color, which the clear must not paint
-    # the terminal with.
-    write(t.cfg, read(t.cfg) + '[edit]\ncommand=' + json.dumps(sys.executable) + '\nargs='
-          + json.dumps([str(REPO / "test/editor.py"), str(t.root)]) + '\n')
-    write(t.root / "editor-mode", "color")
-    for answer in ["Enter", "C-c", "C-d"]:
-        t.key("1"); t.key("e")
-        t.wait_screen(lambda s: "Press Enter to return to Yazi" in s, "command exit prompt")
-        assert COLOR in t.capture(ansi=True), t.last_capture_ansi
-        t.tmux("send-keys", "-t", "test", answer)
-        returned(t)
-        released(t)
-        assert_cleared(t.main_screen())
-    # A key pressed while the command runs must not answer the prompt, which would
-    # clear the output unread. Enter goes first, so seeing the text proves it arrived.
-    write(t.root / "editor-mode", "typeahead")
-    t.key("1"); t.key("e")
-    t.wait_screen(lambda s: "fixture output" in s, "command running")
-    t.tmux("send-keys", "-t", "test", "Enter", "typed")
-    t.wait_screen(lambda s: "typed" in s, "keys while the command runs")
-    write(t.root / "editor-go", "")
-    t.wait_screen(lambda s: "Press Enter to return to Yazi" in s, "command exit prompt")
-    time.sleep(0.5)
-    capture = t.capture()
-    assert "Press Enter to return to Yazi" in capture and "fixture output" in capture, capture
-    enter(t)
-    returned(t)
-    released(t)
-    t.tmux("set-option", "-w", "remain-on-exit", "on")
-    t.key("q", settle=0)
-    t.wait_exit("Yazi exit")
-    assert_cleared(t.capture(ansi=True))
     assert "runtime error:" not in t.logs(), t.logs()
-    print("PASS terminal actions: add, re-add, menu, forget, destroy, apply/cancel/conflict, failed diff, the clear")
+    print("PASS terminal actions: add, re-add, menu, forget, destroy, apply/cancel/conflict, failed diff")
 
 
 def bind_targets(t, names):

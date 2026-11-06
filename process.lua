@@ -1,14 +1,6 @@
 local core = require(".core")
 local M = {}
 
-local CLEAR = "\27[2J\27[H"
--- Keys pressed while the command ran would answer the prompt before anyone read
--- the output, which the answer then clears. Reading in non-canonical mode with no
--- minimum returns what is queued and stops; without stty the prompt only waits.
-local PROMPT = "s=$(stty -g 2>/dev/null) && stty -icanon min 0 time 0 && cat >/dev/null; "
-	.. '[ -n "$s" ] && stty "$s"; '
-	.. 'printf "Press Enter to return to Yazi... "; IFS= read -r reply'
-
 -- stderr is deliberately discarded: besides containing secrets, read_line_with
 -- can lose partial stdout when a concurrent stderr read wins (Yazi 26.9.1).
 function M.run(command, args, timeout, limit, cancelled)
@@ -101,34 +93,22 @@ function M.interactive(opts, name, args, summary)
 		end
 		-- JSON quoting preserves argument boundaries and makes control paths readable.
 		io.write(
-			CLEAR .. "chezmoi " .. name .. "\n" .. summary .. "\n\nRunning (argv):\n" .. ya.json_encode(argv) .. "\n\n"
+			"\27[2J\27[Hchezmoi " .. name .. "\n" .. summary .. "\n\nRunning (argv):\n" .. ya.json_encode(argv) .. "\n\n"
 		)
 		io.flush()
 		local status =
 			Command(opts.command):arg(args):stdin(Command.INHERIT):stdout(Command.INHERIT):stderr(Command.INHERIT):status()
-		-- Reset first: a command can leave a color, which a clear would paint the screen with.
 		io.write(
-			"\27[0m"
-				.. (
-					status and ("\nchezmoi exited with code " .. tostring(status.code) .. ".\n")
-					or "\nCould not start or wait for chezmoi.\n"
-				)
+			status and ("\nchezmoi exited with code " .. tostring(status.code) .. ".\n")
+				or "\nCould not start or wait for chezmoi.\n"
 		)
 		io.flush()
 		local resumed = Command("/bin/sh")
-			:arg({ "-c", PROMPT })
+			:arg({ "-c", 'printf "Press Enter to return to Yazi... "; IFS= read -r reply' })
 			:stdin(Command.INHERIT)
 			:stdout(Command.INHERIT)
 			:stderr(Command.INHERIT)
 			:status()
-		-- The next ui.hide shows this screen again, and Yazi leaves it behind on exit.
-		-- Ctrl-C or Ctrl-D at the prompt clears too, though it reports failure, which
-		-- stops any later stage. A prompt that could not start never waited, so the
-		-- output is still unread: keep it.
-		if resumed then
-			io.write(CLEAR)
-			io.flush()
-		end
 		return status and status.success and resumed and resumed.success or false
 	end)
 	permit:drop()
