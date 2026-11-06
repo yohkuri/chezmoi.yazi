@@ -1401,7 +1401,7 @@ the first recorded full run on Linux. Of 1,122 single-line mutants of the root
 Lua, the pure suites killed 79% of `core.lua`'s, 78% of `actions.lua`'s, 25% of
 `main.lua`'s and none of `render.lua`'s.
 
-Test code then went from 5743 lines to 5444, without Markdown and
+Test code then went from 5743 lines to 5380, without Markdown and
 `test/.luarc.json`. `test/test_githooks.py`, `test/test_format_hook.py`,
 `test/test_all.py` and two tests of `test/test_skills.py` went at the
 maintainer's call, so the hooks, the format hook, the link checker and
@@ -1416,48 +1416,52 @@ returns. `test_skips_a_block_named_for_another_file` came back too: `if named:`
 in `setup_blocks` passes every other test, and such a block would be written
 through the links to the checkout or a flavor.
 
-`M.interactive` now clears the screen after the Enter prompt. `finish` had
-matched the previous command's prompt, which `ui.hide` shows until the new
-command clears it: once in five runtime runs on Linux, and in `test/runtime.py`,
-`test/e2e.py` and `test/manual_runtime.py` with `ya.sleep(0.7)` after `ui.hide`,
-which all three pass now. With no delay, `commands` fails under both
-`test/runtime.py` and `test/e2e.py` when the clear runs only on success, when it
-is gone, without the attribute reset, and when the editor prints no color.
-`/bin/sh` replaced by a missing path keeps the output, which no suite covers.
-`Runtime.wait_exit` refused a pane exiting 3. A later review found that keys
-pressed while a command ran answered the prompt, which then cleared the output
-unread: with Enter sent during a failing editor, Yazi came back after 2.00 s with
-an empty main screen. The prompt's shell now drops such keys first; without that,
-`commands` fails under both runners with no delay. In a pty, the prompt still
-waits with no `stty` on `PATH`, and with stdin not a terminal it reads its line.
-On Linux this has run only in CI's smoke run, and no real terminal has shown it.
+`finish` could match the previous command's prompt, which `ui.hide` shows until
+the new command clears it: once in five runtime runs on Linux, and in
+`test/runtime.py`, `test/e2e.py` and `test/manual_runtime.py` with
+`ya.sleep(0.7)` after `ui.hide`. It now gives a prompt capture equal to the last
+one half a second to change, which narrows that window and does not close it.
+Other waits have no such grace. With `ya.sleep(0.3)` after `ui.hide` in a scratch
+copy, `command-edges` and `foreground_launcher` matched the last command's text
+and sent Ctrl-C before the new one started, and both failed. The wait before
+`Native edit applied before preview` has the same window, by reading the code.
 
-The maintainer looked at the clear on real terminals, running `test/manual.py`
-and Case 4's Add on macOS. This was not a walk: no verdict was recorded, and
-each report says `NOT RUN`. With Enter, and `seq -f 'mark-%g' 1 300` beforehand,
-scrollback held `mark-1` to `mark-240` in Ghostty 1.4.0, whose window was the
-shorter, and to `mark-227` in herdr 0.9.5 on Ghostty, then `Results:` on the next
-line. With Ctrl-D at the prompt, on the last plugin change, only `Results:` and
-the shell prompt stayed. The rows on the screen at the first action go, as that
-action's clear always did: in a herdr tab, `main` kept 225 of the 300 lines and
-the clear's commit 227, and `script` logs of both held no `\033[3J` or full
-reset. An earlier report of the whole scrollback going did not recur with the
-`seq`. The color reset was seen only in tmux's `commands`.
+This pull request first closed the window by clearing the screen after the
+prompt in `M.interactive`, then took the clear out, so `process.lua` is as on
+`main`. The clear removed the only copy of a command's output, and each review
+found another way for that to happen unread. In the last, in scratch clones on
+macOS and not repeated, a command leaving its terminal in `min 0 time 0` or
+`O_NONBLOCK`, or Yazi running with stdin from `/dev/null`, lost the output with
+no prompt shown; a command leaving the alternate screen kept its output on the
+main screen, which the clear missed.
+
+With `process.lua` as on `main`, a further review measured what stays, each once
+in a scratch copy on macOS, left for a change of its own and covered by no suite.
+After a command leaves raw mode, Enter, Ctrl-C and Ctrl-D do nothing at the prompt
+and only Ctrl-J answers it. A color a command leaves fills the next action's screen
+and stays after Yazi exits. Enter typed during a diff answers its prompt, and the
+answered prompt stays on the terminal after Yazi exits.
+
+The maintainer saw the clear on Ghostty 1.4.0 and herdr 0.9.5 on Ghostty, in
+`test/manual.py` and Case 4's Add, which was not a walk: no verdict was recorded.
+`main`'s own clear at the first action takes the rows then on the screen: with
+`seq -f 'mark-%g' 1 300` beforehand, a herdr tab kept 225 of the 300 lines.
 
 On macOS 26.6.2 with Yazi 26.9.1, chezmoi 2.74.0, tmux 3.8 and Lua 5.5.1, each
 alone, one run each, none killing a process: `test/check.py` with 63 core, 126
 action policy and 20 main assertions and 58 Python tests, `test/runtime.py`
-(16 passes) in 63 s, `test/e2e.py` (6 scenarios) in 26 s, the three by
-`--case` in 21 s and `test/manual_runtime.py` (15 passes) in 90 s.
-`test/all.py` passed all four in 91 s, and `test/benchmark.py` timed 5000 files
-at 0.166 s.
+(16 passes) in 60 s, `test/e2e.py` (6 scenarios) in 24 s, the three by
+`--case` in 20 s and `test/manual_runtime.py` (15 passes) in 93 s.
+`test/all.py` passed all four in 89 s, and `test/benchmark.py` timed 5000 files
+at 0.160 s.
 
-One failure stays open. With `ya.sleep(0.7)` after the clear, `command-edges` in
-`test/e2e.py` lost the `v` after Ctrl-C in 7 of 20 runs, the wait timing out with
-Yazi on the screen. Samples every 0.1 s for 3 s never showed `Another chezmoi
-action is already running`, and the cause is unknown. Once, with no delay, a `q`
-sent through `herdr pane send-text` right after the redraw did nothing. No suite
-run without an injected delay has failed this way.
+One failure stays unexplained. While the clear was in, with `ya.sleep(0.7)` after
+it, `command-edges` in `test/e2e.py` lost the `v` after Ctrl-C in 7 of 20 runs,
+the wait timing out with Yazi on the screen. Samples every 0.1 s for 3 s never
+showed `Another chezmoi action is already running`, and the cause is unknown.
+Once, with no delay, a `q` sent through `herdr pane send-text` right after the
+redraw did nothing. Neither was tried after the clear went, and no suite run
+without an injected delay has failed this way.
 
 Not run: `--git-plugin`, `test/readme.py`, a full walk of `test/manual.py`, and,
 after the removals' last commit, anything on Linux beyond CI's smoke run.

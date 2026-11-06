@@ -11,16 +11,12 @@ KEYMAP = "```toml\n# ~/.config/yazi/keymap.toml\n[[mgr.prepend_keymap]]\non = \"
 THEME = "```toml\n# ~/.config/yazi/theme.toml\n[flavor]\ndark = \"catppuccin-mocha\"\n```\n"
 
 
-def section(*blocks, after=""):
-    return "# chezmoi.yazi\n\n## Quick start\n\n" + "\nProse.\n\n".join(blocks) + after
+def section(*blocks):
+    return "# chezmoi.yazi\n\n## Quick start\n\n" + "\nProse.\n\n".join(blocks)
 
 
 def blocks(*parts):
     return readme.setup_blocks(section(*parts), "## Quick start", FILES)
-
-
-def readme_text(quick, theme):
-    return section(*quick, after="\n## Theme and flavor\n\n" + "\n".join(theme))
 
 
 class SetupBlockTests(unittest.TestCase):
@@ -57,7 +53,7 @@ class PictureTests(unittest.TestCase):
     def test_refuses_a_yazi_toml_that_already_has_mgr(self):
         yazi = YAZI.replace("[[plugin", "[mgr]\nratio = [1, 4, 3]\n\n[[plugin")
         with self.assertRaisesRegex(ValueError, "with `show_hidden` added is not TOML"):
-            readme.picture_blocks(readme_text([INIT, yazi, KEYMAP], [THEME]))
+            readme.picture_blocks(section(INIT, yazi, KEYMAP) + "\n## Theme and flavor\n\n" + THEME)
 
 
 if __name__ == "__main__":
