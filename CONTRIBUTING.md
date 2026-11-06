@@ -348,6 +348,11 @@ type annotations' revision, the workflows' runner labels, or the
 SHA-256-pinned Yazi and chezmoi downloads. Its commits go through the same
 commit check.
 
+`overrides` in `package.json` holds `markdownlint`'s `re2js` at 2.8.7, because
+`markdownlint` 0.42.0 pins the vulnerable 2.8.6
+([GHSA-gg6h-894w-4m9c](https://github.com/advisories/GHSA-gg6h-894w-4m9c)).
+Remove the override once a `markdownlint` release requires 2.8.7 or later.
+
 ## How the code is laid out
 
 The layout follows [Yazi's plugin overview][plugin-overview]: `main.lua` is
