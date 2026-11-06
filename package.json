@@ -16,7 +16,7 @@
     "markdownlint-cli2": "0.24.0"
   },
   "overrides": {
-    "markdownlint": {
+    "markdownlint@0.42.0": {
       "re2js": "2.8.7"
     }
   },
