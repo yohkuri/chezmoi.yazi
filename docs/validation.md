@@ -1006,9 +1006,10 @@ The erase makes `finish`'s half-second grace for a capture equal to the last
 prompt unnecessary: the main screen that `ui.hide` shows keeps the previous
 output but not its prompt. The grace is gone. Until the shell reads Enter,
 though, the prompt is still there, so a `finish` that leads to another command
-now waits for the screen to change. `returned` also waits for the exit line to
-go, since the prompt now disappears before Yazi draws again. Mutants on macOS,
-one run each:
+now waits for the screen to change. Since the prompt now disappears before Yazi
+draws again, `returned` waits for tmux's `alternate_on`, which `ui.hide` turns
+off and Yazi's return turns back on, instead of for the prompt to go. Mutants on
+macOS, one run each:
 
 - With `ya.sleep(0.7)` after `ui.hide`, `commands` passed. With the erase also
   removed, it failed waiting for the action menu, after `finish` had answered a
@@ -1039,6 +1040,20 @@ a process:
   - `test/manual_runtime.py` passed 15 in 85 s.
 
 CI's smoke run uses the x86_64 assets.
+
+A `/simplify` pass then moved the fixture editor's `[edit]` keys into
+`support.editor_config`, which the guide's backend uses too. It also gave
+`Runtime.capture` a `saved` argument for `capture-pane -a`, put the prompt text
+in one constant, and changed `returned` to `alternate_on`. Afterwards, each suite
+alone, one run each, none killing a process:
+
+- On macOS: `test/check.py` with the same counts, `test/runtime.py` 16 in
+  61 s, `test/e2e.py` 6 in 23 s, and `test/manual_runtime.py` 15 in 91 s.
+  `test/benchmark.py` timed 5000 files at 0.158 s.
+- In the container: `test/runtime.py` 16 in 55 s, `test/e2e.py` 6 in 23 s, and
+  `test/manual_runtime.py` 15 in 85 s.
+
+The mutant runs above predate the pass.
 
 Not run:
 

@@ -34,6 +34,12 @@ def run(args, *, cwd=None, env=None, timeout=10):
     return result.stdout.decode()
 
 
+def editor_config(root):
+    """chezmoi's [edit] keys that run the fixture editor, test/editor.py."""
+    return ('command=' + json.dumps(sys.executable) + '\nargs='
+            + json.dumps([str(REPO / "test/editor.py"), str(root)]) + '\n')
+
+
 def lua(value):
     """Serialize fixture values to Lua without JSON-only Unicode escapes."""
     if value is None:
@@ -297,10 +303,14 @@ class Runtime:
         if settle:
             time.sleep(settle)
 
-    def capture(self, ansi=False):
+    def capture(self, ansi=False, saved=False):
+        """With saved, capture the main screen that an alternate screen, such as
+        Yazi's, keeps aside."""
         args = ["capture-pane"]
         if ansi:
             args.append("-e")
+        if saved:
+            args.append("-a")
         capture = self.tmux(*args, "-p", "-t", "test")
         if ansi:
             self.last_capture_ansi = capture
