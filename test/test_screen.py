@@ -77,5 +77,14 @@ class ScreenTests(unittest.TestCase):
         self.assertEqual(screen.box_texts("\n".join(covered), "chezmoi"), ["Right"])
         self.assertIsNone(screen.box_rows("\n".join(covered), "other"))
 
+    def test_background_carries_across_lines(self):
+        # As tmux 3.8 printed `printf '\033[41maaa\033[K\nbbb\033[0m'`.
+        capture = "\x1b[41maaa\nbbb\x1b[49m\nccc"
+        self.assertEqual(screen.background(capture, "bbb"), "41")
+        self.assertIsNone(screen.background(capture, "ccc"))
+        self.assertIsNone(screen.background("\x1b[38;5;41mfg\x1b[38;2;1;41;3mrgb", "rgb"))
+        self.assertEqual(screen.background("\x1b[1;48;5;41mx", "x"), "48;5;41")
+        self.assertIsNone(screen.background("\x1b[41ma\x1b[mb", "b"))
+
 if __name__ == "__main__":
     unittest.main()

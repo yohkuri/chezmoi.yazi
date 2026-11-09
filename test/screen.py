@@ -84,6 +84,34 @@ def compact(text):
     return "".join(text.split())
 
 
+SGR = re.compile(r"\x1b\[([0-9;:]*)m")
+
+
+def background(capture, text):
+    """Return the SGR background in effect where text first shows in an ansi
+    capture, or None for the default. capture-pane -e carries attributes from
+    one line to the next, so read every change before text."""
+    found = None
+    for match in SGR.finditer(capture[:capture.index(text)]):
+        params = (match.group(1) or "0").split(";")
+        i = 0
+        while i < len(params):
+            code = params[i] or "0"
+            if code in ("38", "48", "58"):
+                # Extended colors take two (5;N) or four (2;R;G;B) more fields.
+                width = 3 if params[i + 1:i + 2] == ["5"] else 5
+                if code == "48":
+                    found = ";".join(params[i:i + width])
+                i += width
+                continue
+            if code in ("0", "49"):
+                found = None
+            elif code.isdigit() and (40 <= int(code) <= 47 or 100 <= int(code) <= 107):
+                found = code
+            i += 1
+    return found
+
+
 def _tops(lines, title):
     """Yield the line and the indexes of both top corners of each box whose top
     border, not the rest of its line, holds title."""

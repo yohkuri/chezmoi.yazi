@@ -8,6 +8,12 @@ import screen
 from support import REPO, NAMES, lua, read, write
 
 
+def editor(t):
+    """chezmoi's [edit] keys that run the fixture editor."""
+    return ('command=' + json.dumps(sys.executable) + '\nargs='
+            + json.dumps([str(REPO / "test/editor.py"), str(t.root)]) + '\n')
+
+
 def configure(t):
     keys = {
         "a": "plugin chezmoi -- add", "r": "plugin chezmoi -- re-add",
@@ -57,7 +63,12 @@ def finish(t, next_confirm=False, success=True, next_command=False):
     enter(t)
     if next_confirm:
         t.wait_screen(lambda s: "Continue?" in s, "confirmation after command")
-    elif not next_command:
+    elif next_command:
+        # Until the shell reads Enter and erases it, the prompt would answer the
+        # next finish's wait. Then the screen changes, to the erased line or the
+        # next command's own header, however soon that command prompts.
+        t.wait_screen(lambda s: s != capture, "command exit prompt answered")
+    else:
         returned(t)
     return capture
 
@@ -141,35 +152,31 @@ def commands(t):
 
 
 def terminal_left(t):
-    """A command that leaves a color, a raw terminal and a queued Enter, which
-    the smoke run checks on Linux too; it ends Yazi."""
-    write(t.cfg, read(t.cfg) + '[edit]\ncommand=' + json.dumps(sys.executable) + '\nargs='
-          + json.dumps([str(REPO / "test/editor.py"), str(t.root)]) + '\n')
+    """A command that leaves a color, a hidden cursor, mouse reports, a raw
+    terminal and a queued line; the smoke run checks it on Linux too."""
+    write(t.cfg, read(t.cfg) + '[edit]\n' + editor(t))
     write(t.root / "editor-mode", "terminal")
     t.key("1"); t.key("e")
-    t.wait_screen(lambda s: "Fixture editor left the terminal raw." in s, "editor leaving raw mode")
+    t.wait_screen(lambda s: "Fixture editor waits for a line." in s, "editor waiting")
     enter(t)
     prompt = "Press Enter to return to Yazi..."
     t.wait_screen(lambda s: prompt in s, "prompt after raw mode")
-    # Only a prompt still reading echoes the key, so the queued Enter was dropped
+    # Only a prompt still reading echoes the key, so the queued line was dropped
     # and the echo is back.
     t.key("x")
-    capture = t.wait_screen(lambda s: prompt + " x" in s, "prompt reading after the queued Enter")
-    assert "chezmoi exited with code 0." in capture, capture
-    # tmux starts each captured line with that line's own attributes.
-    colored = re.compile(r"\x1b\[(?:[0-9]*;)*41[;m]")
-    lines = t.capture(ansi=True).splitlines()
-    exit_line = next(i for i, line in enumerate(lines) if "chezmoi exited with code 0." in line)
-    assert not any(colored.search(line) for line in lines[exit_line:]), lines[exit_line:]
+    capture = t.wait_screen(lambda s: prompt + " x" in s, "prompt reading after the queued line")
+    assert "Fixture editor left the terminal raw." in capture and "chezmoi exited with code 0." in capture, capture
+    ansi = t.capture(ansi=True)
+    for text in ["chezmoi exited with code 0.", prompt]:
+        assert text in ansi and screen.background(ansi, text) is None, ansi
+    flags = t.tmux("display-message", "-p", "-t", "test", "#{cursor_flag} #{mouse_any_flag}").split()
+    assert flags == ["1", "0"], flags
     enter(t)
     returned(t)
     assert read(t.source / "clean") == "edited by fixture\n"
-    # On exit Yazi shows the terminal it took over: the output stays, the prompt goes.
-    t.tmux("set-option", "-w", "remain-on-exit", "on")
-    t.key("q", settle=0)
-    capture = t.wait_screen(lambda s: "Pane is dead" in s, "Yazi exit")
-    assert "chezmoi exited with code 0." in capture and "Fixture editor left" in capture, capture
-    assert "Press Enter" not in capture, capture
+    # The main screen, saved while Yazi shows its own, keeps the output, not the prompt.
+    saved = t.tmux("capture-pane", "-a", "-p", "-t", "test")
+    assert "chezmoi exited with code 0." in saved and "Press Enter" not in saved, saved
 
 
 def bind_targets(t, names):
@@ -291,8 +298,7 @@ def extended(t):
     identity.chmod(0o600)
     cfg = ('encryption="age"\nuseBuiltinAge=true\n[age]\nidentity=' + json.dumps(str(identity))
            + '\nrecipient="age1gde3ncmahlqd9gg50tanl99r960llztrhfapnmx853s4tjum03uqfssgdh"\n'
-           + '[edit]\napply=true\nwatch=true\ncommand=' + json.dumps(sys.executable) + '\nargs='
-           + json.dumps([str(REPO / "test/editor.py"), str(t.root)]) + '\n'
+           + '[edit]\napply=true\nwatch=true\n' + editor(t)
            + '[diff]\nexclude=["scripts"]\n')
     write(t.cfg, cfg)
     write(t.root / "editor-mode", "edit")

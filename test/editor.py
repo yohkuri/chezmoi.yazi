@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import select
 import sys
+import termios
 import tty
 from support import read, write
 
@@ -17,12 +18,14 @@ if mode == "manual":
     print("Type one line and Enter to save to all selected source files; Ctrl-C cancels.", flush=True)
     value = input("New source content > ")
 elif mode == "terminal":
-    # Leave what a careless command can: a color, a raw terminal, and a key
-    # typed while it ran, still queued. Raw mode is set first, since setting
-    # it drops what is queued; then wait for the test's key without reading it.
-    tty.setraw(sys.stdin.fileno())
-    print("\x1b[41mFixture editor left the terminal raw.", end="\r\n", flush=True)
+    # Leave what a careless command can: a color, a hidden cursor, mouse reports,
+    # a raw terminal, and a line typed while it ran, still queued. Wait for the
+    # test's Enter to complete a line, as one typed during a diff does, then go
+    # raw without dropping it (TCSANOW) and exit without reading it.
+    print("\x1b[41mFixture editor waits for a line.\x1b[?25l\x1b[?1000h", flush=True)
     select.select([sys.stdin], [], [])
+    tty.setraw(sys.stdin.fileno(), termios.TCSANOW)
+    print("Fixture editor left the terminal raw.", end="\r\n", flush=True)
     value = "edited by fixture"
 elif mode == "wait":
     print("Fixture editor input:", flush=True)

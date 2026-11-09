@@ -82,20 +82,28 @@ function M.client(opts, cancelled)
 	end
 end
 
-local PROMPT = 'printf "Press Enter to return to Yazi... "; IFS= read -r reply'
 -- A command can leave the terminal raw, where Enter no longer ends a line and
 -- a newline no longer returns the cursor, and keys typed while it ran stay
 -- queued and would answer the prompt unread. RESTORE drops what is queued and
 -- puts back the mode saved before the command, which reaches the shell as "$1"
--- and never as source.
-local RESTORE = 'stty -icanon min 0 time 0 && cat >/dev/null; stty "$1"'
--- With the mode restored, Enter's echo moves the cursor below the prompt, so
--- step back and erase only the prompt's own line; the output stays. Without it
--- the echo is unknown, and the prompt stays rather than erase a line of output.
-local ERASE = ' && printf "\\r\\033[A\\033[J"'
+-- and never as source; if that fails, it at least ends the read without minimum.
+local RESTORE = 'stty -icanon min 0 time 0 && cat >/dev/null; stty "$1" || stty icanon'
+-- A command can also leave modes that the terminal, not stty, keeps: a color,
+-- which would fill the next action's cleared screen and stay after Yazi exits, a
+-- hidden cursor, mouse reports or bracketed paste echoed into the prompt, keys
+-- encoded so that Enter or Ctrl-C no longer reach it (kitty flags,
+-- modifyOtherKeys), and a line-drawing character set.
+local RESET = "\27[0m\27[?25h\27[?1000l\27[?1002l\27[?1003l\27[?1006l\27[?2004l\27[<99u\27[>4;0m\27(B"
+-- After Enter, an echoed newline has moved the cursor below the prompt, so step
+-- back and erase only the prompt's own line; the output stays. With echo off, or
+-- no stty to tell, the prompt stays rather than erase a line of output.
+local PROMPT = 'printf "Press Enter to return to Yazi... "; IFS= read -r reply || exit; '
+	.. "s=$(stty -a 2>/dev/null) || exit 0; "
+	.. 'case " $s " in *[[:space:]]-echo[[:space:]]*) ;; *) printf "\\r\\033[A\\033[J" ;; esac'
 
 -- Interactive commands own the terminal until the user has read their output.
--- The shell only implements the fixed Enter prompt; target paths never enter it.
+-- Fixed shell snippets only restore the terminal and implement the Enter prompt;
+-- executable arguments and target paths never enter them.
 function M.interactive(opts, name, args, summary)
 	local permit = ui.hide()
 	local ok, success = pcall(function()
@@ -113,17 +121,16 @@ function M.interactive(opts, name, args, summary)
 		io.flush()
 		local status =
 			Command(opts.command):arg(args):stdin(Command.INHERIT):stdout(Command.INHERIT):stderr(Command.INHERIT):status()
-		local restored = mode
-			and Command("/bin/sh")
+		if mode then
+			Command("/bin/sh")
 				:arg({ "-c", RESTORE, "sh", mode })
 				:stdin(Command.INHERIT)
 				:stdout(Command.NULL)
 				:stderr(Command.NULL)
 				:status()
-		-- A color the command left would otherwise fill the next action's screen,
-		-- and the terminal after Yazi exits.
+		end
 		io.write(
-			"\27[0m"
+			RESET
 				.. (
 					status and ("\nchezmoi exited with code " .. tostring(status.code) .. ".\n")
 					or "\nCould not start or wait for chezmoi.\n"
@@ -131,7 +138,7 @@ function M.interactive(opts, name, args, summary)
 		)
 		io.flush()
 		local resumed = Command("/bin/sh")
-			:arg({ "-c", restored and restored.success and PROMPT .. ERASE or PROMPT })
+			:arg({ "-c", PROMPT })
 			:stdin(Command.INHERIT)
 			:stdout(Command.INHERIT)
 			:stderr(Command.INHERIT)
