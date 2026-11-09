@@ -1,7 +1,9 @@
 """Disposable interactive editor double; never used outside a test fixture."""
 import json
 from pathlib import Path
+import select
 import sys
+import tty
 from support import read, write
 
 root = Path(sys.argv[1])
@@ -14,6 +16,14 @@ if mode == "manual":
         print(f"{json.dumps(target.name, ensure_ascii=False)}: {read(target)!r}")
     print("Type one line and Enter to save to all selected source files; Ctrl-C cancels.", flush=True)
     value = input("New source content > ")
+elif mode == "terminal":
+    # Leave what a careless command can: a color, a raw terminal, and a key
+    # typed while it ran, still queued. Raw mode is set first, since setting
+    # it drops what is queued; then wait for the test's key without reading it.
+    tty.setraw(sys.stdin.fileno())
+    print("\x1b[41mFixture editor left the terminal raw.", end="\r\n", flush=True)
+    select.select([sys.stdin], [], [])
+    value = "edited by fixture"
 elif mode == "wait":
     print("Fixture editor input:", flush=True)
     value = input()

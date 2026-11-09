@@ -65,6 +65,13 @@ plugin's separate diff and confirmation stages.
 
 Yazi temporarily hands over the terminal for the editor, pager, credentials,
 and conflict prompts. Press Enter after each command to return or continue.
+Before that prompt the plugin resets colors, drops keys pressed while the
+command ran, which would otherwise answer it unread, and puts back the terminal
+mode the command started with, so Enter works even after a command left the
+terminal raw. Enter then erases only the prompt; the command's output stays.
+Ctrl-C or Ctrl-D at the prompt returns too, but counts as a failure: it stops
+the stages still to come, such as apply after a diff, and reports that the
+command failed or was interrupted.
 Interactive commands have no status-query timeout. Only one action runs per
 Yazi instance; status queries pause and obsolete results are discarded.
 After an executed command, success, failure, and interruption all trigger a
