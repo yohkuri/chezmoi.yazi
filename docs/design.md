@@ -120,19 +120,30 @@ The runner saves the terminal mode with `stty -g` before the command. After it,
 a fixed snippet, given that mode as a positional argument, drops queued keys by
 reading in non-canonical mode with no minimum and then restores the mode, so
 neither a raw terminal nor a key typed during the command answers the prompt for
-the user. If the restore fails, it turns canonical mode back on, so the prompt
-still waits. Before its exit line the runner resets what the terminal rather
-than `stty` keeps: attributes, since a color would fill the next action's
-cleared screen and stay after Yazi exits; the cursor's visibility; mouse
-reporting and bracketed paste, which would echo into the prompt; kitty keyboard
-flags and modifyOtherKeys, under which Enter or Ctrl-C no longer reach it; and
-the character set. After Enter, the prompt's snippet erases the prompt's line
-only when `stty -a` shows echo on, since only then has the echoed newline moved
-the cursor below it; the command's output stays on the main screen. A prompt
-that wraps, in a pane narrower than the prompt or under a long typed line,
-keeps its upper rows. Ctrl-C or Ctrl-D at the prompt leaves it and returns
-failure, which stops any later stage. Without `stty`, or with Yazi's stdin not a
-terminal, nothing is dropped or restored. The runner never
+the user. If the restore fails, it turns back on what raw mode turns off
+(`icanon icrnl isig echo opost onlcr`), so Enter and Ctrl-C still reach the
+prompt, without `stty sane`, which could undo settings the terminal had.
+
+Before the drain, so that reports sent until then are dropped too, the runner
+resets what the terminal rather than `stty` keeps: attributes, since a color
+would fill the next action's cleared screen and stay after Yazi exits; the
+cursor's visibility; mouse, focus and bracketed paste reports, which would type
+into the prompt; kitty keyboard flags and modifyOtherKeys, under which Enter or
+Ctrl-C no longer reach it, the latter back to the terminal's default; the
+character set, both G0 and the shift to G1; and the scroll region, whose reset
+moves the cursor and so sits between a cursor save and restore.
+
+The prompt reads with echo off, so Enter leaves the cursor on the prompt's line,
+which the snippet then erases; the command's output stays on the main screen.
+An earlier version kept echo on and stepped up a line after Enter, which erased
+the wrong line whenever its guess failed: a key typed just before the prompt, a
+scroll, a scroll region, a typed line that wrapped. The snippet restores the
+mode after the read, and a trap does it on Ctrl-C, without relying on what Yazi
+does on resume. Only a pane narrower than the prompt keeps the prompt's upper
+rows.
+Ctrl-C or Ctrl-D at the prompt leaves it and returns failure, which stops any
+later stage. Without `stty`, or with Yazi's stdin not a terminal, nothing is
+dropped or restored, and the prompt stays. The runner never
 clears the screen after the prompt: a clear removed the only copy of the
 output, and output went unread whenever the prompt did not wait, such as after
 a command left `O_NONBLOCK` set, which `stty` does not restore, or with Yazi's

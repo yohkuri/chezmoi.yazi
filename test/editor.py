@@ -18,14 +18,16 @@ if mode == "manual":
     print("Type one line and Enter to save to all selected source files; Ctrl-C cancels.", flush=True)
     value = input("New source content > ")
 elif mode == "terminal":
-    # Leave what a careless command can: a color, a hidden cursor, mouse reports,
-    # a raw terminal, and a line typed while it ran, still queued. Wait for the
-    # test's Enter to complete a line, as one typed during a diff does, then go
-    # raw without dropping it (TCSANOW) and exit without reading it.
-    print("\x1b[41mFixture editor waits for a line.\x1b[?25l\x1b[?1000h", flush=True)
+    # Leave what a careless command can: a color, a hidden cursor, mouse and
+    # focus reports, a raw terminal, and a line typed while it ran, still queued.
+    # Wait for the test's Enter to complete a line, as one typed during a diff
+    # does, then go raw without dropping it (TCSANOW) and exit without reading it,
+    # leaving line drawing on and a scroll region set, the cursor kept in place.
+    print("\x1b[41mFixture editor waits for a line.\x1b[?25l\x1b[?1000h\x1b[?1004h", flush=True)
     select.select([sys.stdin], [], [])
     tty.setraw(sys.stdin.fileno(), termios.TCSANOW)
-    print("Fixture editor left the terminal raw.", end="\r\n", flush=True)
+    print("Fixture editor left the terminal raw.", end="\r\n")
+    print("\x1b)0\x0e\x1b7\x1b[2;5r\x1b8", end="", flush=True)
     value = "edited by fixture"
 elif mode == "wait":
     print("Fixture editor input:", flush=True)

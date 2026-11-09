@@ -312,11 +312,17 @@ class Runtime:
         if saved:
             args.append("-a")
         capture = self.tmux(*args, "-p", "-t", "test")
+        if saved:
+            return capture  # Not what the pane shows, so not the capture a failure reports.
         if ansi:
             self.last_capture_ansi = capture
         else:
             self.last_capture = capture
         return capture
+
+    def pane_format(self, text):
+        """Expand a tmux format, such as #{alternate_on}, for the test pane."""
+        return self.tmux("display-message", "-p", "-t", "test", text).strip()
 
     def wait_screen(self, predicate, description, timeout=SCREEN_TIMEOUT, stable=False):
         """Return a capture that satisfies predicate; with stable, only once two

@@ -1055,19 +1055,83 @@ alone, one run each, none killing a process:
 
 The mutant runs above predate the pass.
 
+A second `/code-review xhigh` found more cases, some reproduced by the reviewer
+in a private tmux:
+
+- The fallback `stty icanon` left a raw terminal without `icrnl`, `isig` and
+  `echo`, so neither Enter nor Ctrl-C answered.
+- `\27(B` without SI left a line-drawing G1 shifted in.
+- `\27[>4;0m` forced modifyOtherKeys off instead of restoring the default.
+- Focus reports, X10 mouse reports and a scroll region stayed.
+- Reports sent between the drain and the reset typed into the prompt.
+- The erase guessed where the cursor was, which failed after a key typed just
+  before the prompt, after a scroll, or with a scroll region.
+- A `finish` before another command could take the echo's scroll for the
+  prompt's erase.
+
+So:
+
+- The fallback turns on `icanon icrnl isig echo opost onlcr`.
+- The reset adds SI, `?9l`, `?1004l`, `\27[>4m` and a scroll region reset
+  between a cursor save and restore, and is written before the drain.
+- The prompt reads with echo off and erases its own line with `\r\033[2K`; a
+  trap restores the mode on Ctrl-C.
+
+The fixture editor now also turns on focus reports, leaves line drawing shifted
+in and sets a scroll region. `terminal_left` checks the scroll region through
+`scroll_region_upper` and `scroll_region_lower`, and line drawing through the SO
+and SI marks of `capture-pane -e`: a plain capture prints those cells as their
+letters, so a first run with only the plain text passed with SI removed. With
+echo off the queued line can no longer be seen through an echoed key, so the
+check waits half a second and requires the prompt still showing and
+`alternate_on` still off.
+
+Before the suites, the shell snippets ran by themselves in a private tmux under
+macOS's `/bin/sh` and the container's dash, once each:
+
+- Enter exited 0 with the prompt's line erased and `echo` and `icanon` back.
+- Ctrl-C exited 130 and Ctrl-D exited 1, both with `echo` back. Under dash the
+  wrapper script had to trap SIGINT, or it died with the prompt.
+- After a raw terminal and `stty "$1"` failing on a bad mode, Enter still
+  answered the prompt.
+
+Mutants, in scratch copies, each run once with `test/e2e.py --case commands`, on
+macOS and in the container, with the same result on both:
+
+- With `process.lua` as on `main`, or with the drain removed, the wait for the
+  prompt failed.
+- With no reset, the background check failed.
+- With only `\27[0m`, or without the scroll region reset, the state check
+  failed.
+- Without SI, the SO and SI check failed.
+- With echo left on during the read, the main-screen check failed.
+- With the erase removed, `commands` passed. The main screen lacked the prompt
+  anyway: something on Yazi 26.9.1's resume clears the cursor's line, which with
+  echo off is the prompt's (seen, not traced). The erase stays so as not to rely
+  on that, and no check covers it.
+
+Afterwards, each suite alone, one run each, none killing a process:
+
+- On macOS: `test/check.py` with the same counts, `test/runtime.py` 16 in
+  62 s, `test/e2e.py` 6 in 24 s and `test/manual_runtime.py` 15 in 91 s.
+  `test/benchmark.py` timed 5000 files at 0.153 s.
+- In the container: `test/runtime.py` 16 in 56 s, `test/e2e.py` 6 in 23 s and
+  `test/manual_runtime.py` 15 in 88 s.
+
 Not run:
 
 - a real terminal;
 - Linux on x86_64 beyond CI's smoke run;
-- kitty keyboard flags, modifyOtherKeys, bracketed paste and the character set,
-  which tmux exposes no flag for.
+- the fallback restore inside Yazi; only the snippet ran by itself;
+- kitty keyboard flags, modifyOtherKeys, bracketed paste, focus and X10
+  reports, which tmux exposes no flag for.
 
 Unhandled, by reading the code and not run:
 
 - A command that leaves `O_NONBLOCK` set, which `stty` cannot restore. The
   prompt still returns at once and reports failure.
 - A command left in the alternate screen also stays there for the prompt.
-- A prompt that wraps keeps its upper rows after the erase.
+- In a pane narrower than the prompt, its upper rows stay after the erase.
 
 ## Development tooling checks
 

@@ -86,20 +86,30 @@ end
 -- a newline no longer returns the cursor, and keys typed while it ran stay
 -- queued and would answer the prompt unread. RESTORE drops what is queued and
 -- puts back the mode saved before the command, which reaches the shell as "$1"
--- and never as source; if that fails, it at least ends the read without minimum.
-local RESTORE = 'stty -icanon min 0 time 0 && cat >/dev/null; stty "$1" || stty icanon'
+-- and never as source. If that fails, it turns back on what raw mode turns off,
+-- so Enter and Ctrl-C still reach the prompt.
+local RESTORE = 'stty -icanon min 0 time 0 && cat >/dev/null; stty "$1" || stty icanon icrnl isig echo opost onlcr'
 -- A command can also leave modes that the terminal, not stty, keeps: a color,
 -- which would fill the next action's cleared screen and stay after Yazi exits, a
--- hidden cursor, mouse reports or bracketed paste echoed into the prompt, keys
--- encoded so that Enter or Ctrl-C no longer reach it (kitty flags,
--- modifyOtherKeys), and a line-drawing character set.
-local RESET = "\27[0m\27[?25h\27[?1000l\27[?1002l\27[?1003l\27[?1006l\27[?2004l\27[<99u\27[>4;0m\27(B"
--- After Enter, an echoed newline has moved the cursor below the prompt, so step
--- back and erase only the prompt's own line; the output stays. With echo off, or
--- no stty to tell, the prompt stays rather than erase a line of output.
-local PROMPT = 'printf "Press Enter to return to Yazi... "; IFS= read -r reply || exit; '
-	.. "s=$(stty -a 2>/dev/null) || exit 0; "
-	.. 'case " $s " in *[[:space:]]-echo[[:space:]]*) ;; *) printf "\\r\\033[A\\033[J" ;; esac'
+-- hidden cursor, mouse, focus and bracketed paste reports that would type into
+-- the prompt, keys encoded so that Enter or Ctrl-C no longer reach it (kitty
+-- flags, modifyOtherKeys), a line-drawing character set, and a scroll region,
+-- whose reset moves the cursor and so sits between a cursor save and restore.
+-- It is written before RESTORE, so that reports sent until then are dropped too.
+local RESET = "\27[0m\27[?25h\27[?9l\27[?1000l\27[?1002l\27[?1003l\27[?1006l\27[?1004l\27[?2004l"
+	.. "\27[<99u\27[>4m\27(B\15\0277\27[r\0278"
+-- The prompt reads with echo off, so Enter leaves the cursor on the prompt's own
+-- line, which it then erases; the output stays. Ctrl-C restores the mode too.
+-- Without stty the echo is unknown, and the prompt stays rather than erase a line
+-- of output.
+local PROMPT = [[printf "Press Enter to return to Yazi... "
+e=$(stty -g 2>/dev/null) && stty -echo 2>/dev/null || e=
+trap '[ -n "$e" ] && stty "$e"; exit 130' INT
+IFS= read -r reply
+s=$?
+[ -n "$e" ] && stty "$e"
+[ "$s" = 0 ] && [ -n "$e" ] && printf "\r\033[2K"
+exit "$s"]]
 
 -- Interactive commands own the terminal until the user has read their output.
 -- Fixed shell snippets only restore the terminal and implement the Enter prompt;
@@ -121,6 +131,8 @@ function M.interactive(opts, name, args, summary)
 		io.flush()
 		local status =
 			Command(opts.command):arg(args):stdin(Command.INHERIT):stdout(Command.INHERIT):stderr(Command.INHERIT):status()
+		io.write(RESET)
+		io.flush()
 		if mode then
 			Command("/bin/sh")
 				:arg({ "-c", RESTORE, "sh", mode })
@@ -130,7 +142,6 @@ function M.interactive(opts, name, args, summary)
 				:status()
 		end
 		io.write(
-			RESET,
 			status and ("\nchezmoi exited with code " .. tostring(status.code) .. ".\n")
 				or "\nCould not start or wait for chezmoi.\n"
 		)

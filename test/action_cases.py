@@ -36,8 +36,7 @@ def enter(t):
 def returned(t):
     # ui.hide leaves Yazi's alternate screen, so its return is the screen coming
     # back, whatever the main screen still shows.
-    t.wait_screen(lambda s: "Continue?" not in s and t.tmux(
-        "display-message", "-p", "-t", "test", "#{alternate_on}").strip() == "1", "Yazi restored")
+    t.wait_screen(lambda s: "Continue?" not in s and t.pane_format("#{alternate_on}") == "1", "Yazi restored")
     time.sleep(0.15)
 
 
@@ -51,10 +50,9 @@ def released(t):
 
 
 def finish(t, next_confirm=False, success=True, next_command=False):
-    prompt = PROMPT
     # ui.hide shows the main screen with the previous command's output until the
     # new command clears it, but not that command's prompt, which Enter erased.
-    capture = t.wait_screen(lambda s: prompt in s, "command exit prompt")
+    capture = t.wait_screen(lambda s: PROMPT in s, "command exit prompt")
     assert ("chezmoi exited with code 0." in capture) == success, capture
     enter(t)
     if next_confirm:
@@ -148,29 +146,35 @@ def commands(t):
 
 
 def terminal_left(t):
-    """A command that leaves a color, a hidden cursor, mouse reports, a raw
-    terminal and a queued line; the smoke run checks it on Linux too."""
+    """A command that leaves a color, a hidden cursor, mouse and focus reports, a
+    line-drawing character set, a scroll region, a raw terminal and a queued
+    line; the smoke run checks it on Linux too."""
     write(t.cfg, read(t.cfg) + '[edit]\n' + editor_config(t.root))
     write(t.root / "editor-mode", "terminal")
     t.key("1"); t.key("e")
     t.wait_screen(lambda s: "Fixture editor waits for a line." in s, "editor waiting")
     enter(t)
-    prompt = PROMPT
-    t.wait_screen(lambda s: prompt in s, "prompt after raw mode")
-    # Only a prompt still reading echoes the key, so the queued line was dropped
-    # and the echo is back.
-    t.key("x")
-    capture = t.wait_screen(lambda s: prompt + " x" in s, "prompt reading after the queued line")
+    capture = t.wait_screen(lambda s: PROMPT in s, "prompt after raw mode")
     assert "Fixture editor left the terminal raw." in capture and "chezmoi exited with code 0." in capture, capture
+    # The queued line, if kept, answers the prompt at once, and Yazi's screen comes back.
+    time.sleep(0.5)
+    assert t.pane_format("#{alternate_on}") == "0" and PROMPT in t.capture(), t.last_capture
     ansi = t.capture(ansi=True)
-    for text in ["chezmoi exited with code 0.", prompt]:
+    for text in ["chezmoi exited with code 0.", PROMPT]:
         assert text in ansi and screen.background(ansi, text) is None, ansi
-    flags = t.tmux("display-message", "-p", "-t", "test", "#{cursor_flag} #{mouse_any_flag}").split()
-    assert flags == ["1", "0"], flags
+        # A plain capture prints line-drawing cells as their letters; -e marks
+        # them between SO and SI.
+        before = ansi[:ansi.index(text)]
+        assert before.count("\x0e") == before.count("\x0f"), ansi
+    state = t.pane_format("#{cursor_flag} #{mouse_any_flag} #{scroll_region_upper} #{scroll_region_lower}")
+    assert state.split() == ["1", "0", "0", str(int(t.pane_format("#{pane_height}")) - 1)], state
     enter(t)
     returned(t)
     assert read(t.source / "clean") == "edited by fixture\n"
-    # The main screen, saved while Yazi shows its own, keeps the output, not the prompt.
+    # The main screen, saved while Yazi shows its own, keeps the output, not the
+    # prompt. With the plugin's erase removed this still passed: something on
+    # Yazi 26.9.1's resume clears the cursor's line, the prompt's with echo off
+    # (seen, not traced), so it does not tell that erase apart.
     saved = t.capture(saved=True)
     assert "chezmoi exited with code 0." in saved and PROMPT not in saved, saved
 
