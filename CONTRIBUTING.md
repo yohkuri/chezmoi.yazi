@@ -387,8 +387,8 @@ pull request, so no commit of its own reaches the older Yazi.
 The user docs are the README and the `docs/` pages other than `design.md`
 and `validation.md`, now `docs/commands.md` and `docs/configuration.md`.
 `docs/design.md` records the accepted decisions and their reasons, and
-`docs/validation.md` the evidence behind them and the platforms that remain
-unverified.
+`docs/validation.md` what has been checked as of the code on `main` and what
+remains unverified.
 
 The plugin and its unit suites, and the probes that run inside Yazi, are
 Lua; process control, fixtures and the benchmark are Python. The public age
@@ -403,11 +403,12 @@ reasons behind the code are written, among them
 test that should follow your change from one that guards against it.
 
 A change that alters what the user docs, this page, `test/MANUAL.md`,
-`docs/design.md` or CI describe updates them in the same pull request. A
-change that alters what was validated adds a dated entry to
-`docs/validation.md`: what ran, on which OS, Yazi and chezmoi, the counts
-`test/check.py` printed, what failed first and why, and what stays
-unverified.
+`docs/design.md` or CI describe updates them in the same pull request. The
+pull request's description says what ran for it: the commands, on which OS,
+Yazi and chezmoi, the counts `test/check.py` printed, what failed first and
+why, reruns, and what stays unverified. A change that alters what was
+validated also rewrites the parts of `docs/validation.md` it alters, which
+holds the current state rather than a dated log.
 
 ## Using AI
 

@@ -55,7 +55,8 @@ The selected interaction defaults are:
   destroy because chezmoi still deletes their descendants. Collapse covered
   child selections. Reject destroy targets containing the source directory,
   regardless of recursion, because destination deletion can remove the entire
-  source state.
+  source state
+  ([validation](validation.md#chezmoi-destroying-an-ancestor-of-the-source)).
 - Reject the entire selection on a known invalid target. Edit accepts files
   and symlinks, not directories. Refresh membership before validating; an old
   linemode marker is not authorization or evidence that an entry is editable.
@@ -588,6 +589,8 @@ Isolated CLI probes on chezmoi 2.72.2 confirmed:
   `exact_` directory's extra destination file.
 - Recursive status reports such an extra file as `" D"`; non-recursive status
   of the containing directory alone omits that child operation.
+- `destroy --recursive=false` on a directory still deletes the directory and
+  its descendants, an unmanaged child included.
 
 These initial probes validate CLI behavior. Subsequent real-Yazi integration
 checks are recorded separately in [validation](validation.md).
