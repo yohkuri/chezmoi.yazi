@@ -133,9 +133,12 @@ imply it.
   that `test/manual.py create` starts, as a person or the foreground launcher
   check does, keeps the defaults.
 - `ui.hide` shows the last command's screen until the new command clears it, so
-  a wait right after an action key can match the old text. `finish` gives a
-  repeated prompt half a second, which only narrows that window: wait on text
-  the last command's screen does not hold.
+  a wait right after an action key can match the old text. The plugin erases an
+  answered prompt, so that screen holds the last command's output and exit line
+  but not its prompt; until the shell reads Enter, though, the prompt is still
+  there, which is why `finish` waits for the screen to change before the next
+  command's `finish`. Wait on the new prompt, or on text the last command's
+  screen does not hold.
 - Text wraps at the terminal width, and the harness resizes to as narrow as
   40 columns. Assert on a phrase that survives wrapping at the narrowest size
   the check runs at, or on `screen.row` for file rows.

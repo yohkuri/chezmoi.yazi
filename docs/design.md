@@ -111,21 +111,28 @@ view. Preview and application evaluate separately; they are not an atomic plan.
 
 Interactive processes inherit stdin/stdout/stderr under a `ui.hide()` permit.
 They have no acquisition timeout. The runner restores the permit after errors
-and waits for Enter so output remains readable. A fixed shell snippet provides
-only this Enter prompt; executable arguments and target paths never enter shell
-source. Raw output is not copied to plugin notifications or logs.
+and waits for Enter so output remains readable. Fixed shell snippets only
+restore the terminal and provide this Enter prompt; executable arguments and
+target paths never enter shell source. Raw output is not copied to plugin
+notifications or logs.
 
 The runner saves the terminal mode with `stty -g` before the command. After it,
-a second fixed snippet, given that mode as a positional argument, drops queued
-keys by reading in non-canonical mode with no minimum and then restores the
-mode, so neither a raw terminal nor a key typed during the command answers the
-prompt for the user. The runner resets attributes before its exit line, since a
-color left by the command would fill the next action's cleared screen and stay
-after Yazi exits. After Enter, and only when the mode was restored so that its
-echo moved the cursor below the prompt, the snippet erases the prompt's line;
-the command's output stays on the main screen. Ctrl-C or Ctrl-D at the prompt
-leaves it and returns failure, which stops any later stage. Without `stty`, or
-with Yazi's stdin not a terminal, the prompt runs as before. The runner never
+a fixed snippet, given that mode as a positional argument, drops queued keys by
+reading in non-canonical mode with no minimum and then restores the mode, so
+neither a raw terminal nor a key typed during the command answers the prompt for
+the user. If the restore fails, it turns canonical mode back on, so the prompt
+still waits. Before its exit line the runner resets what the terminal rather
+than `stty` keeps: attributes, since a color would fill the next action's
+cleared screen and stay after Yazi exits; the cursor's visibility; mouse
+reporting and bracketed paste, which would echo into the prompt; kitty keyboard
+flags and modifyOtherKeys, under which Enter or Ctrl-C no longer reach it; and
+the character set. After Enter, the prompt's snippet erases the prompt's line
+only when `stty -a` shows echo on, since only then has the echoed newline moved
+the cursor below it; the command's output stays on the main screen. A prompt
+that wraps, in a pane narrower than the prompt or under a long typed line,
+keeps its upper rows. Ctrl-C or Ctrl-D at the prompt leaves it and returns
+failure, which stops any later stage. Without `stty`, or with Yazi's stdin not a
+terminal, nothing is dropped or restored. The runner never
 clears the screen after the prompt: a clear removed the only copy of the
 output, and output went unread whenever the prompt did not wait, such as after
 a command left `O_NONBLOCK` set, which `stty` does not restore, or with Yazi's
