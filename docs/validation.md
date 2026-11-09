@@ -1118,13 +1118,39 @@ Afterwards, each suite alone, one run each, none killing a process:
 - In the container: `test/runtime.py` 16 in 56 s, `test/e2e.py` 6 in 23 s and
   `test/manual_runtime.py` 15 in 88 s.
 
+On 2026-11-10 the user checked `39e3778` by hand in Ghostty 1.4.0 outside tmux,
+on macOS 26.6.2 with Yazi 26.9.1 and chezmoi 2.74.0, and reported every step
+fine. A throwaway setup outside the checkout isolated Yazi's and chezmoi's
+configuration and state. Its editor left a red background, a hidden cursor,
+mouse (`?1000`, `?1006`), focus and bracketed paste reports, kitty's first flag,
+modifyOtherKeys 2, line drawing, a scroll region and a raw terminal. Its diff
+pager waited 5 s after the diff. The steps:
+
+- After the editor, at the prompt: the exit line and the prompt had no red
+  background, the cursor showed, a drag selected text, switching to another
+  application and back did nothing, and one Enter returned to Yazi.
+- Enter typed two or three times while the pager waited: the prompt stayed
+  until the next Enter.
+- Ctrl-C at the prompt after apply's diff: Yazi came back with a failure
+  notice and no apply confirmation.
+- After quitting Yazi, in the shell: normal colors, a visible cursor, typing
+  echoed and ran, a drag selected text, `echo lqqk` printed letters,
+  `seq 100` scrolled the whole screen, and the diff's output was there without
+  the prompt.
+
+The last step looked only after Yazi's own exit, so it does not tell the
+plugin's line drawing and scroll region resets from Yazi's; tmux checks those.
+No step would have shown kitty's first flag, modifyOtherKeys or a focus report
+left on: neither changes a plain Enter, and the prompt does not echo. Nothing
+was pasted.
+
 Not run:
 
-- a real terminal;
+- a real terminal other than Ghostty 1.4.0 on macOS, and Ghostty inside tmux;
 - Linux on x86_64 beyond CI's smoke run;
 - the fallback restore inside Yazi; only the snippet ran by itself;
 - kitty keyboard flags, modifyOtherKeys, bracketed paste, focus and X10
-  reports, which tmux exposes no flag for.
+  reports, which tmux exposes no flag for and the Ghostty check did not show.
 
 Unhandled, by reading the code and not run:
 
