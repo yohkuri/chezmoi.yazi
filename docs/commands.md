@@ -65,12 +65,13 @@ plugin's separate diff and confirmation stages.
 
 Yazi temporarily hands over the terminal for the editor, pager, credentials,
 and conflict prompts. Press Enter after each command to return or continue.
-Before that prompt the plugin resets colors, the cursor, mouse reporting and
-key encodings a command may have left on. Where `stty` can read Yazi's
-terminal, it also drops keys pressed while the command ran, which would
-otherwise answer the prompt unread, and puts back the terminal mode the command
-started with, so Enter works even after a command left the terminal raw. With
-echo on, Enter then erases only the prompt; the command's output stays.
+Before that prompt the plugin resets colors, the cursor, mouse and focus
+reporting, key encodings, line drawing and scroll regions a command may have
+left on. Where `stty` can read Yazi's terminal, it also drops keys pressed while
+the command ran, which would otherwise answer the prompt unread, and puts back
+the terminal mode the command started with, so Enter works even after a command
+left the terminal raw. The prompt does not show what you type, and Enter then
+erases only the prompt; the command's output stays.
 Ctrl-C or Ctrl-D at the prompt returns too, but counts as a failure: it stops
 the stages still to come, such as apply after a diff, and reports that the
 command failed or was interrupted.

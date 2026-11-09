@@ -5,7 +5,7 @@ import json
 import sys
 import time
 from support import baseline, fixture, read, run, write
-from action_cases import commands, extended, configure, finish, confirm, confirmation_pages, source_ancestor, visual_selection
+from action_cases import PROMPT, commands, extended, configure, finish, confirm, confirmation_pages, source_ancestor, visual_selection
 
 
 def test(t, git_plugin):
@@ -165,7 +165,7 @@ def action_coordination(t):
         time.sleep(0.03)
     assert t.barrier.exists()
     t.key("p")
-    t.wait_screen(lambda s: "Press Enter to return" in s, "diff with action lock held")
+    t.wait_screen(lambda s: PROMPT in s, "diff with action lock held")
     state = t.snapshot(lambda: emit("plugin", "probe"), timeout=3, interval=0.03)
     assert state["action_busy"] and not state["running"]
     before = read(t.calls)
