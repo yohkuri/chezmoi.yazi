@@ -9,7 +9,7 @@ from pathlib import Path
 import shutil
 import sys
 from manual_cases import CASES
-from support import REPO, Runtime, baseline, environment, owned, read, run, write
+from support import REPO, Runtime, baseline, editor_config, environment, owned, read, run, write
 
 
 class StaleRequest(ValueError):
@@ -64,8 +64,7 @@ def prepare(t, operations, session):
             write(t.source / args[0], read(t.dest / args[0]))
         elif name == "editor":
             write(t.root / "editor-mode", args[0])
-            editor_args = [str(REPO / "test/editor.py"), str(t.root)]
-            write(t.cfg, '[edit]\ncommand=' + json.dumps(sys.executable) + '\nargs=' + json.dumps(editor_args) + '\napply=true\nwatch=true\n')
+            write(t.cfg, '[edit]\n' + editor_config(t.root) + 'apply=true\nwatch=true\n')
         elif name == "age":
             identity = t.root / "age-identity"
             write(identity, "AGE-SECRET-KEY-1KTYK6RVLN5TAPE7VF6FQQSKZ9HWWCDSKUGXXNUQDWZ7XXT5YK5LSF3UTKQ\n")

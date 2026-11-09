@@ -130,11 +130,9 @@ function M.interactive(opts, name, args, summary)
 				:status()
 		end
 		io.write(
-			RESET
-				.. (
-					status and ("\nchezmoi exited with code " .. tostring(status.code) .. ".\n")
-					or "\nCould not start or wait for chezmoi.\n"
-				)
+			RESET,
+			status and ("\nchezmoi exited with code " .. tostring(status.code) .. ".\n")
+				or "\nCould not start or wait for chezmoi.\n"
 		)
 		io.flush()
 		local resumed = Command("/bin/sh")

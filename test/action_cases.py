@@ -3,15 +3,11 @@ import json
 import re
 import shlex
 import time
-import sys
 import screen
-from support import REPO, NAMES, lua, read, write
+from support import NAMES, editor_config, lua, read, write
 
 
-def editor(t):
-    """chezmoi's [edit] keys that run the fixture editor."""
-    return ('command=' + json.dumps(sys.executable) + '\nargs='
-            + json.dumps([str(REPO / "test/editor.py"), str(t.root)]) + '\n')
+PROMPT = "Press Enter to return to Yazi..."
 
 
 def configure(t):
@@ -38,10 +34,10 @@ def enter(t):
 
 
 def returned(t):
-    # Enter erases the prompt before Yazi draws again, so wait for the exit line
-    # to go too, which only Yazi's own screen hides.
-    t.wait_screen(lambda s: "Press Enter to return to Yazi" not in s and "Continue?" not in s
-                  and "chezmoi exited with code" not in s, "Yazi restored")
+    # ui.hide leaves Yazi's alternate screen, so its return is the screen coming
+    # back, whatever the main screen still shows.
+    t.wait_screen(lambda s: "Continue?" not in s and t.tmux(
+        "display-message", "-p", "-t", "test", "#{alternate_on}").strip() == "1", "Yazi restored")
     time.sleep(0.15)
 
 
@@ -55,7 +51,7 @@ def released(t):
 
 
 def finish(t, next_confirm=False, success=True, next_command=False):
-    prompt = "Press Enter to return to Yazi"
+    prompt = PROMPT
     # ui.hide shows the main screen with the previous command's output until the
     # new command clears it, but not that command's prompt, which Enter erased.
     capture = t.wait_screen(lambda s: prompt in s, "command exit prompt")
@@ -154,12 +150,12 @@ def commands(t):
 def terminal_left(t):
     """A command that leaves a color, a hidden cursor, mouse reports, a raw
     terminal and a queued line; the smoke run checks it on Linux too."""
-    write(t.cfg, read(t.cfg) + '[edit]\n' + editor(t))
+    write(t.cfg, read(t.cfg) + '[edit]\n' + editor_config(t.root))
     write(t.root / "editor-mode", "terminal")
     t.key("1"); t.key("e")
     t.wait_screen(lambda s: "Fixture editor waits for a line." in s, "editor waiting")
     enter(t)
-    prompt = "Press Enter to return to Yazi..."
+    prompt = PROMPT
     t.wait_screen(lambda s: prompt in s, "prompt after raw mode")
     # Only a prompt still reading echoes the key, so the queued line was dropped
     # and the echo is back.
@@ -175,8 +171,8 @@ def terminal_left(t):
     returned(t)
     assert read(t.source / "clean") == "edited by fixture\n"
     # The main screen, saved while Yazi shows its own, keeps the output, not the prompt.
-    saved = t.tmux("capture-pane", "-a", "-p", "-t", "test")
-    assert "chezmoi exited with code 0." in saved and "Press Enter" not in saved, saved
+    saved = t.capture(saved=True)
+    assert "chezmoi exited with code 0." in saved and PROMPT not in saved, saved
 
 
 def bind_targets(t, names):
@@ -298,7 +294,7 @@ def extended(t):
     identity.chmod(0o600)
     cfg = ('encryption="age"\nuseBuiltinAge=true\n[age]\nidentity=' + json.dumps(str(identity))
            + '\nrecipient="age1gde3ncmahlqd9gg50tanl99r960llztrhfapnmx853s4tjum03uqfssgdh"\n'
-           + '[edit]\napply=true\nwatch=true\n' + editor(t)
+           + '[edit]\napply=true\nwatch=true\n' + editor_config(t.root)
            + '[diff]\nexclude=["scripts"]\n')
     write(t.cfg, cfg)
     write(t.root / "editor-mode", "edit")
@@ -376,7 +372,7 @@ def extended(t):
     assert read(t.dest / "unmanaged") == "other\n"
     # Edit-and-apply cancellation retains the source edit.
     t.key("3"); t.key("v")
-    t.wait_screen(lambda s: "Press Enter to return to Yazi" in s, "edit exit before diff")
+    t.wait_screen(lambda s: PROMPT in s, "edit exit before diff")
     assert read(t.dest / "source") == "original\n", "Native edit applied before preview"
     finish(t, next_command=True)
     finish(t, next_confirm=True)
