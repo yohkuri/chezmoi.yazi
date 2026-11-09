@@ -348,12 +348,16 @@ type annotations' revision, the workflows' runner labels, or the
 SHA-256-pinned Yazi and chezmoi downloads. Its commits go through the same
 commit check.
 
-`overrides` in `package.json` holds `re2js` at 2.8.7 for `markdownlint` 0.42.0,
-which pins the vulnerable 2.8.6 ([GHSA-gg6h-894w-4m9c]). `markdownlint-cli2`
-pins `markdownlint` in turn, so only its update can bring another version. The
-key then stops matching and that version's own `re2js` applies. If that is 2.8.7
-or later, delete the override; if not, name the new version in the key. Either
-way, run `npm install --package-lock-only` so that `npm ci` still works.
+A security fix can also arrive as an alert alone. `markdownlint` 0.42.0 pins the
+vulnerable `re2js` 2.8.6 ([GHSA-gg6h-894w-4m9c]), and Dependabot raised an
+alert for it but opened no pull request in the five days that followed. So
+`overrides` in `package.json` holds `re2js` at 2.8.7 for that `markdownlint`.
+`markdownlint-cli2` pins `markdownlint` in turn, so only its update can bring
+another version. The key then stops matching and that version's own `re2js`
+applies. If that is 2.8.7 or later, delete the override; if not, name the new
+version in the key. Either way, run `npm install --package-lock-only` so that
+`npm ci` still works. Do this in a pull request of its own after merging
+Dependabot's: Dependabot stops updating a branch someone else pushed to.
 
 ## How the code is laid out
 

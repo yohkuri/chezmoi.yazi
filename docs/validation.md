@@ -1249,7 +1249,8 @@ version, standing in for a later `markdownlint`,
 `npm install --package-lock-only` resolved `re2js` 2.8.6, so the override
 stopped applying. Removing `overrides` without relocking made `npm ci` fail with
 `EUSAGE`. No real `markdownlint` update has run through this, whether by hand
-or by Dependabot.
+or by Dependabot. Whether the alert closes once this reaches `main` was unseen
+when this entry was written.
 
 ## Acquisition measurement
 
