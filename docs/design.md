@@ -115,6 +115,23 @@ and waits for Enter so output remains readable. A fixed shell snippet provides
 only this Enter prompt; executable arguments and target paths never enter shell
 source. Raw output is not copied to plugin notifications or logs.
 
+The runner saves the terminal mode with `stty -g` before the command. After it,
+a second fixed snippet, given that mode as a positional argument, drops queued
+keys by reading in non-canonical mode with no minimum and then restores the
+mode, so neither a raw terminal nor a key typed during the command answers the
+prompt for the user. The runner resets attributes before its exit line, since a
+color left by the command would fill the next action's cleared screen and stay
+after Yazi exits. After Enter, and only when the mode was restored so that its
+echo moved the cursor below the prompt, the snippet erases the prompt's line;
+the command's output stays on the main screen. Ctrl-C or Ctrl-D at the prompt
+leaves it and returns failure, which stops any later stage. Without `stty`, or
+with Yazi's stdin not a terminal, the prompt runs as before. The runner never
+clears the screen after the prompt: a clear removed the only copy of the
+output, and output went unread whenever the prompt did not wait, such as after
+a command left `O_NONBLOCK` set, which `stty` does not restore, or with Yazi's
+stdin from `/dev/null`, and a command left in the alternate screen kept its
+output on the main screen, which the clear missed.
+
 Acquiring the action lock invalidates the current acquisition epoch and pending
 work. A worker already in a query drains through its existing deadline before
 preflight or interactive execution starts. New fetch/navigation/refresh requests

@@ -32,8 +32,10 @@ def enter(t):
 
 
 def returned(t):
-    t.wait_screen(lambda s: "Press Enter to return to Yazi" not in s and "Continue?" not in s,
-                  "Yazi restored")
+    # Enter erases the prompt before Yazi draws again, so wait for the exit line
+    # to go too, which only Yazi's own screen hides.
+    t.wait_screen(lambda s: "Press Enter to return to Yazi" not in s and "Continue?" not in s
+                  and "chezmoi exited with code" not in s, "Yazi restored")
     time.sleep(0.15)
 
 
@@ -48,20 +50,9 @@ def released(t):
 
 def finish(t, next_confirm=False, success=True, next_command=False):
     prompt = "Press Enter to return to Yazi"
+    # ui.hide shows the main screen with the previous command's output until the
+    # new command clears it, but not that command's prompt, which Enter erased.
     capture = t.wait_screen(lambda s: prompt in s, "command exit prompt")
-    # ui.hide shows the main screen, and on it the previous command's prompt,
-    # until the new command clears it. A capture equal to the last prompt may
-    # be that window, so give the clear a moment and take the prompt that
-    # follows if the screen changes; one that stays is the new command's own
-    # prompt, identical to the last.
-    if capture == getattr(t, "last_prompt", None):
-        deadline = time.monotonic() + 0.5
-        while time.monotonic() < deadline:
-            time.sleep(0.05)
-            if t.capture() != capture:
-                capture = t.wait_screen(lambda s: prompt in s, "command exit prompt after the previous one")
-                break
-    t.last_prompt = capture
     assert ("chezmoi exited with code 0." in capture) == success, capture
     enter(t)
     if next_confirm:
@@ -143,8 +134,42 @@ def commands(t):
     write(t.source / "source.tmpl", "{{ .missing.field }}")
     t.key("3"); t.key("p"); finish(t, success=False)
     assert read(t.dest / "source") == "source edit\n"
+    terminal_left(t)
     assert "runtime error:" not in t.logs(), t.logs()
-    print("PASS terminal actions: add, re-add, menu, forget, destroy, apply/cancel/conflict, failed diff")
+    print("PASS terminal actions: add, re-add, menu, forget, destroy, apply/cancel/conflict, failed diff, "
+          "terminal left raw")
+
+
+def terminal_left(t):
+    """A command that leaves a color, a raw terminal and a queued Enter, which
+    the smoke run checks on Linux too; it ends Yazi."""
+    write(t.cfg, read(t.cfg) + '[edit]\ncommand=' + json.dumps(sys.executable) + '\nargs='
+          + json.dumps([str(REPO / "test/editor.py"), str(t.root)]) + '\n')
+    write(t.root / "editor-mode", "terminal")
+    t.key("1"); t.key("e")
+    t.wait_screen(lambda s: "Fixture editor left the terminal raw." in s, "editor leaving raw mode")
+    enter(t)
+    prompt = "Press Enter to return to Yazi..."
+    t.wait_screen(lambda s: prompt in s, "prompt after raw mode")
+    # Only a prompt still reading echoes the key, so the queued Enter was dropped
+    # and the echo is back.
+    t.key("x")
+    capture = t.wait_screen(lambda s: prompt + " x" in s, "prompt reading after the queued Enter")
+    assert "chezmoi exited with code 0." in capture, capture
+    # tmux starts each captured line with that line's own attributes.
+    colored = re.compile(r"\x1b\[(?:[0-9]*;)*41[;m]")
+    lines = t.capture(ansi=True).splitlines()
+    exit_line = next(i for i, line in enumerate(lines) if "chezmoi exited with code 0." in line)
+    assert not any(colored.search(line) for line in lines[exit_line:]), lines[exit_line:]
+    enter(t)
+    returned(t)
+    assert read(t.source / "clean") == "edited by fixture\n"
+    # On exit Yazi shows the terminal it took over: the output stays, the prompt goes.
+    t.tmux("set-option", "-w", "remain-on-exit", "on")
+    t.key("q", settle=0)
+    capture = t.wait_screen(lambda s: "Pane is dead" in s, "Yazi exit")
+    assert "chezmoi exited with code 0." in capture and "Fixture editor left" in capture, capture
+    assert "Press Enter" not in capture, capture
 
 
 def bind_targets(t, names):

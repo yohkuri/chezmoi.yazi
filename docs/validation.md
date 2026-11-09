@@ -955,6 +955,55 @@ these on Linux or a machine with fewer cores, and `test/all.py` with a real
 suite failing or interrupted; only `test/test_all.py` and the scratch runs
 cover those.
 
+### Terminal state after a command
+
+On 2026-11-09 `M.interactive` began saving the terminal mode with `stty -g`
+before a command and, after it, dropping queued keys and restoring that mode,
+resetting attributes before its exit line, and erasing the answered prompt's
+line. `terminal_left` at the end of `commands` checks all four with the fixture
+editor's `terminal` mode, which sets a red background, puts the terminal in raw
+mode and exits once the test's Enter is queued, without reading it. Since
+`commands` is in the smoke run, CI runs the check on Ubuntu 24.04.
+
+On macOS, in scratch copies of the checkout, each run once, `test/e2e.py --case
+commands` failed as follows:
+
+- With `process.lua` as on `main`, the prompt wrapped across rows, since raw
+  mode left newlines without a carriage return, and it never returned. The check
+  failed waiting for the prompt.
+- With the drain removed, the queued Enter answered the prompt at once and Yazi
+  came back, so the wait for the prompt failed.
+- With the reset removed, the exit line and the prompt carried the red
+  background.
+- With the erase removed, the prompt showed on the terminal after Yazi exited.
+
+With the erase in place, `finish` no longer needs the half-second grace for a
+capture equal to the last prompt, since the main screen that `ui.hide` shows
+keeps the previous output but not its prompt, so the grace is gone. `returned`
+now also waits for the exit line to go, since the prompt disappears before Yazi
+draws again. With `ya.sleep(0.7)` after `ui.hide` in a scratch copy, `commands`
+passed. With the erase also removed, it failed waiting for the action menu, after
+`finish` had answered a stale prompt. The waits on the fixture editor's text in
+`command-edges` and `foreground_launcher` keep the window that the last section
+of "Test pruning" describes; this change does not touch them.
+
+On macOS 26.6.2 with Yazi 26.9.1, chezmoi 2.74.0, tmux 3.8 and Lua 5.5.1, on
+`acd89cb` plus this change, each suite alone, one run each, none killing a
+process:
+
+- `test/check.py` passed with 63 core, 126 action policy and 20 main assertions
+  and 58 Python tests.
+- `test/runtime.py` passed 16 in 61 s.
+- `test/e2e.py` passed 6 scenarios in 24 s.
+- `test/manual_runtime.py` passed 15 in 90 s.
+
+Not run: the full suites on Linux, where only the smoke run covers the check,
+and a real terminal. Unhandled, by reading the code and not run: a command that
+leaves `O_NONBLOCK` set, which
+`stty` cannot restore, so the prompt still returns at once and reports failure.
+A command left in the alternate screen also stays there for the prompt. A line
+typed at the prompt that wraps keeps its upper rows after the erase.
+
 ## Development tooling checks
 
 Locally verified on 2026-09-20:
