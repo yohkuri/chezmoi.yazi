@@ -218,6 +218,8 @@ class Runtime:
         for directory in ["source", "dest", "config/plugins", "state", "cache", "data"]:
             (root / directory).mkdir(parents=True, exist_ok=True)
         self.source, self.dest = root / "source", root / "dest"
+        # Not at the fixture root: chezmoi add protects the directory holding its
+        # config, and there that would take in the destination.
         self.cfg = root / "config/chezmoi.toml"
         write(self.cfg, "")
         self.env = environment(root)
@@ -299,6 +301,10 @@ class Runtime:
             time.sleep(settle)
 
     def key(self, key, settle=0.1):
+        # The settle after the key is kept. Moved before the next key, so that a
+        # screen wait starts at once, it saved nothing: Yazi shows a key's effect
+        # in about 65 ms. Dropped, keys after a g chord or the guide's digit keys
+        # were lost (docs/validation.md, Unexplained).
         self.tmux("send-keys", "-t", "test", "-l", key)
         if settle:
             time.sleep(settle)

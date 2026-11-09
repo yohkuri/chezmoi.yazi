@@ -66,7 +66,9 @@ check, run that suite alone too.
   error, `support.check_call` checks each recorded call. A pass shows the
   plugin's records and rendering agree; it does not show the same behavior
   without the wrapper.
-- **`test/e2e.py`** sees only the screen, process exit and fixture files. It
+- **`test/e2e.py`** reads neither the probe, the plugin's records nor the
+  command history: it sees the screen, process exit, fixture files, Yazi's log
+  and tmux's state, and the answers to Yazi's terminal probe. It
   cannot say why a row is wrong, and it has no view of process counts,
   generations or the action lock; those are runtime-only assertions. Its
   default run leaves out `confirmation-pages`, `source-ancestor` and
@@ -85,10 +87,10 @@ check, run that suite alone too.
   not let Yazi hide between the theme write and the key.
 - **CI** runs `test/e2e.py --smoke` (status-refresh and commands) on Ubuntu
   24.04 with pinned Yazi and chezmoi. The full runtime, E2E and guide suites
-  run only where someone runs them by hand, which so far means macOS and,
-  once, one Ubuntu 24.04 container.
+  run only where someone runs them by hand, which so far means macOS and
+  Ubuntu 24.04 containers.
 
-Nothing here establishes Linux beyond the smoke run and that container's
+Nothing here establishes Linux beyond the smoke run and those containers'
 runs, other Yazi versions, git.yazi in the guided walk, a real editor, or a
 person's judgment of readability. Say so rather than letting a green run
 imply it.
@@ -96,8 +98,8 @@ imply it.
 ## Writing a terminal-driven check
 
 - Wait on the screen or the probe with `wait_screen`, `wait` or `refresh`,
-  not on a sleep. `docs/validation.md` records several added checks that sent
-  keys too early and passed only after an explicit wait replaced the settle.
+  not on a sleep. Several checks added here sent keys too early and passed
+  only once an explicit wait replaced the settle.
 - Wait for the previous action to finish before the next key: a recorded
   verdict, a released action lock, a prepared fixture. Keys sent early answer
   the wrong prompt.
@@ -110,12 +112,13 @@ imply it.
   (`wait_screen(..., stable=True)`), as `confirmation_pages` does. After a
   resize, wait for Yazi to redraw before a key that reads the layout.
 - Yazi shows up to three notifications at a time, as many as fit the
-  height, starts a queued one's timeout
-  only once it shows, and drops one identical to a notification it still
-  holds. A notification, or text one covers, can therefore wait behind
-  several earlier ones; `SCREEN_TIMEOUT` in `test/support.py` allows for
-  that. To see a repeated notification, first wait for the earlier one to
-  go, as `source_ancestor` in `test/action_cases.py` does. To tell apart a
+  height, starts a queued one's timeout only once it shows, adds the age of
+  the oldest one it holds to a new one's timeout, and drops one identical to
+  a notification it still holds. A notification, or text one covers, can
+  therefore wait behind several earlier ones; `SCREEN_TIMEOUT` in
+  `test/support.py` allows for that. To see a repeated notification, first
+  wait for the earlier one to go, as `source_ancestor` in
+  `test/action_cases.py` does. To tell apart a
   notification whose words an earlier one or a row also shows, wait for its
   whole error line, reason through path, in one box from `screen.box_texts`,
   compared through `screen.compact`; a path alone also matches a
@@ -175,7 +178,7 @@ imply it.
 
 - Name each command that ran and its result. For a Yazi-driven suite, add the
   OS and the Yazi and chezmoi versions (`yazi -V`, `chezmoi --version`).
-- Quote the counts `test/check.py` prints: core assertions, action policy
+- Quote the counts `test/check.py` prints: core, action policy and main
   assertions and Python tests. A count that changed is part of the change.
 - Disclose reruns. A failure that passed unchanged on rerun is reported as a
   timing-sensitive failure, not dropped. A new flaky assertion is a finding,
@@ -184,6 +187,14 @@ imply it.
 - Distinguish an automated guide run from a human walk, and an injected
   failure from one that happened. Never record a guided-session verdict on the
   user's behalf.
-- A change that alters what was validated adds a dated entry to
-  `docs/validation.md` in the same pull request: what ran, the versions, the
-  counts, what failed first and why, and what stays unverified.
+- A pull request's description says what ran for it: the commands, the
+  versions, the counts, what failed first and why, reruns, and what stays
+  unverified.
+- `docs/validation.md` holds what has been checked as of the code on `main`,
+  not a log. A change that alters what was validated rewrites, in the same
+  pull request, the parts it alters: the latest runs, what a suite covers, a
+  hand check, a measurement, or what stays unverified. Replace what the change
+  supersedes instead of adding a dated entry beside it. Keep a mutant or a
+  timing there only while it describes the current code; how the change got
+  there, such as review rounds and the runs before its last commit, goes in
+  the description and the commits.

@@ -1,1716 +1,356 @@
 # Validation
 
-Validated locally on 2026-09-20 with Yazi 26.9.1, chezmoi 2.72.2, macOS,
-Lua 5.5.1, uv 0.11.19, Python 3.14.7, and tmux. These are tested versions, not a
-compatibility claim for every newer/older release or platform.
+What has been checked, as of the code on `main`: the latest run of each
+suite, what each covers, what people checked by hand, what was measured about
+the tools around the plugin, and what stays unverified. A change that alters
+any of that rewrites the part it alters. What ran for a particular change is
+in its pull request, and earlier states of this page are in its history.
+Versions are the ones tested, not a compatibility claim.
 
-## Manual fixture
+## Latest runs
 
-See the [guided manual acceptance walk](../test/MANUAL.md). `test/manual.py`
-opens one foreground Yazi with a bottom guide, single-key `P` acceptance,
-`S` skip/advance and `W` controls. Preparation,
-verdicts, retries, diagnostics, saving and cleanup are available in that session.
-Each case/retry gets fresh chezmoi paths; steps within a case share state.
+On the code of `488412c`, each suite alone, one run each, no reruns:
 
-The current walk has 12 cases and 34 steps focused on human UI acceptance:
-readability, command effects/targets/options, menu and native prompts, diff and
-approval stages, cancellation, interruption, rejection messages and terminal
-return. File/state outcomes are checked automatically. Refresh/cache behavior,
-membership discovery, navigation/tabs and visual-unset bookkeeping remain in
-automated runtime coverage. The dated 24-case evidence below describes the
-preceding catalog, not the current case numbers.
+- macOS 26.6.2 with Yazi 26.9.1, chezmoi 2.74.0, tmux 3.8 and Lua 5.5.1:
+  `test/check.py` with 63 core, 126 action policy and 20 main assertions and
+  59 Python tests; `test/runtime.py` 16 passes; `test/e2e.py` 6 scenarios;
+  `test/manual_runtime.py` 15 passes.
+- An Ubuntu 24.04 container on Docker Desktop (aarch64), with Yazi 26.9.1 and
+  chezmoi 2.72.2 from their aarch64 release assets and tmux 3.4:
+  `test/runtime.py` 16 passes, `test/e2e.py` 6 scenarios,
+  `test/manual_runtime.py` 15 passes.
 
-On 2026-10-03, all 24 case setups and step preparations were exercised locally
-with Yazi 26.9.1 and chezmoi 2.73.0 on macOS. `test/manual_runtime.py` verified
-the real guide and file rows, unanswered-verdict gating, fresh retries,
-hidden/compact/full layouts, actual refresh, visual unset preservation,
-theme/flavor reload with unchanged epoch, the disposable terminal editor,
-encrypted Add, extra-tab disposal, complete long-target selection, source
-ancestor rejection, foreground diagnostics, and an in-Yazi exit choice.
-A foreground launcher round trip also archived results and removed its owned
-fixtures after Yazi exited. The manual launcher itself creates no tmux server;
-its automated integration checks use a private socket.
+CI runs on every pull request and on pushes other than to Dependabot's
+branches. `checks` runs what `test/check.py` runs, adds the status and action
+suites under Lua 5.1 and 5.4 and `luac -p` under 5.1, 5.4 and 5.5, and
+validates commit messages. `E2E smoke` runs
+`test/e2e.py --smoke` on Ubuntu 24.04 (x86_64) with SHA-256-pinned Yazi
+26.9.1 and chezmoi 2.72.2. Both passed on `860e4bf`.
 
-`test/check.py` and the complete `test/runtime.py` passed. An initial runtime
-attempt timed out waiting for the resize-restart notification; the unchanged
-scenario passed on rerun. This is a timing-sensitive terminal assertion, not
-an established product regression.
+## What the suites cover
 
-On 2026-10-04, four guided-session state defects were corrected. Checking a
-skipped step preserves SKIP unless an automatic check fails; leaving a case
-preserves NOT RUN and ERROR instead of promoting them to PASS. The git plugin
-path is resolved before persistence, error markers identify their originating
-attempt/step, and a fresh case clears the completed-walk flag. Seven added
-harness regressions passed, including malformed/missing error-token fallback
-and archival after changing cases. Error markers were injected for attribution
-checks; this does not establish behavior under an actual backend timeout.
+`test/check.py` never starts Yazi. Its pure suites cover:
 
-`test/manual_runtime.py` passed with Yazi 26.9.1 and chezmoi 2.73.0 on macOS.
-Real `W/s`, `W/d`, and `W/n` interactions preserved a skipped case's saved
-result; restart and jump after completion restored the case title. Separate
-backend CLI processes exercised relative git plugin paths across working
-directories for both restart and jump. That path test used a disposable stub
-plugin and did not validate actual git.yazi rendering or coexistence.
+- **Status:** path boundaries, NUL framing, XY preservation, malformed or
+  out-of-scope status, bounded recovery, own and descendant independence,
+  summary disabling, exceptional filenames, and the filters the status
+  queries pass before `--`.
+- **Actions:** supported flags, invalid selections, recursive target
+  reduction, confirmation policy, literal path arguments, shared context,
+  matching preview and apply scope, and the rejections of a nonrecursive
+  directory destroy and of a destroy target containing the source. No
+  argument starting with `--force` reaches any stage of fourteen plans that
+  cover each action's options. `actions.facts` is pinned against a fake `run`:
+  each action's `managed` queries and their order. The command table's
+  destination-root exception is pinned through `actions.prepare`.
+- **`test/main.lua`:** `setup`'s `notify_timeout` range, and that
+  notifications use it, under stubs for Yazi's globals.
 
-`test/check.py` passed with 51 core assertions, 73 action assertions, and 29
-Python tests; the complete `test/runtime.py` also passed. The first added
-terminal scenario sent the next control before SKIP was recorded and timed
-out. It now waits for the recorded verdict, and the guided suite passed on rerun.
+On 2026-11-05, of the single-line mutants of `core.lua`, `actions.lua`,
+`main.lua` and `render.lua`, the pure suites killed 79%, 78%, 25% and none.
+Those four files have not changed since; the other root Lua files have no
+score.
 
-On 2026-10-11, both follow-up review findings were reproduced and corrected.
-Backend exceptions now update the case aggregate as well as the step. Saved
-case results are recomputed from the latest attempt for each case, so an older
-attempt's error cannot overwrite a successful retry. The originating error,
-marker, and failed fixtures remain available for diagnosis.
+`test/runtime.py` reads plugin state through the probe and checks the screen:
 
-Two added regressions cover exception responses, persisted and archived
-aggregates, and old errors after retrying and changing cases. They preserve
-the latest PASS, SKIP, NOT RUN, FAIL, or ERROR. `test/check.py` passed with 51
-core assertions, 73 action assertions, and 31 Python tests. An isolated real
-chezmoi encrypted-file corruption produced a decryption exception: the step,
-case, and archive all recorded ERROR after the fix. A fresh encrypted Add
-retry then archived PASS while preserving the older error marker. The marker
-was injected; an actual backend timeout was not induced.
-
-The complete `test/manual_runtime.py` and `test/runtime.py` passed on macOS
-with Yazi 26.9.1 and chezmoi 2.73.0, using isolated fixtures and private tmux
-sockets outside the restricted sandbox. No new Linux validation was run.
-
-Follow-up quality cleanup on the same date centralized result aggregation at
-save/archive boundaries, reused the shared text reader, and simplified fixture
-and verdict code. Guide requests now copy full status snapshots only for
-operations that inspect them; acquisition waits use lightweight progress data.
-Forbidden-command checks seek to the relevant log offset and stream records,
-while diagnostics select the same first 80 paths without sorting the full tree.
-
-A focused comparison against the preceding commit confirmed identical results
-for multibyte log records with byte offsets, the first 80 sorted paths, and all
-16 combinations of automatic and visual verdicts. Existing exception/retry
-regressions and isolated encrypted-file checks also passed. These checks do not
-measure startup latency or memory savings.
-
-After cleanup, `test/check.py` passed all 31 Python tests, 51 core assertions,
-and 73 action assertions; the complete `test/manual_runtime.py` and
-`test/runtime.py` passed on the same macOS/Yazi/chezmoi versions.
-
-A further correctness review on 2026-10-11 reproduced three guide defects.
-Ctrl-C in the fixture editor also interrupted the waiting launcher; stale
-backend requests changed the current case to ERROR; a second guide error
-overwrote the first marker. The launcher now catches SIGINT while waiting,
-allowing foreground children to handle it, and restores its handler afterward.
-Stale requests return the current view and a message without changing saved
-progress. Guide failures append to `manual-errors.jsonl`; the next valid request
-or finalization imports new entries once, records their originating steps, and
-retains the complete history. Legacy single markers remain supported.
-
-Three added regressions passed, covering stale CLI responses without persisted
-changes, multiple error origins and archived history, and successful rechecks
-without old errors being reapplied. An actual backend CLI process also returned
-the unchanged PASS result for a stale token. A private-tmux test launched the
-executable `test/manual.py`, interrupted its fixture editor twice, continued
-guide controls, recorded PASS for unchanged files, and verified archive/cleanup.
-Two injected diagnostic-command failures in real Yazi produced separate Lua
-journal entries and ERROR for both originating cases in the saved report.
-This tests the error path, not an actual backend timeout.
-
-After these fixes, `test/check.py` passed 34 Python tests, 51 core assertions,
-and 73 action assertions. The complete `test/manual_runtime.py` and
-`test/runtime.py` passed on macOS with Yazi 26.9.1, chezmoi 2.73.0, and
-Python 3.14.8. Initial added terminal checks advanced before action completion
-or journal append; their waits were corrected before the passing runs.
-
-Quality cleanup of that follow-up commit shared the terminal guide controls
-and case chooser between the guide suite and foreground launcher, preserving
-their existing key order and settle intervals. The multiple-error regression
-now reuses one loaded state for its assertion and subsequent updates.
-`test/check.py` again passed 34 Python tests, 51 core assertions, and 73 action
-assertions. The complete `test/manual_runtime.py` and `test/runtime.py` also
-passed after this cleanup on the same macOS/Yazi/chezmoi/Python versions.
-
-On 2026-10-16, a human walk of the preceding guide recorded 22 PASS and two
-SKIP cases, with no final FAIL or ERROR. Manual refresh was skipped because
-automatic acquisition updated the signs before `R`; git coexistence was skipped
-because no git plugin was supplied. The walk exposed unclear observations,
-unnecessary navigation/selection keys, repeated verdict/next menus, clipped
-instructions, missing command visibility, and stale instructions at completion.
-
-The revised English guide uses `P` to record visual PASS, check files/state and
-advance only on success. Failed checks stay on the current step, rapid repeated
-presses are ignored, and stale requests cannot answer the next step. `N`, `B`
-and `S` overrides were removed in favor of normal navigation and Escape. Wrapped
-instructions include concrete expectations and intended command stages; completed
-screens show case results. The manual-refresh case holds its cache for 24 hours
-and checks that a new acquisition occurred. Interactive execution displays actual
-argv, and fixture reports retain interactive command argv and exit codes.
-
-Five new unit regressions cover acceptance/advancement, failed-check gating,
-persistence before preparation errors, forced-refresh evidence and completed
-results. Archive checks also verify that command history survives cleanup.
-`test/check.py` passed 39 Python tests, 51 core and 73 action assertions. The
-complete `test/runtime.py` and `test/manual_runtime.py` passed with isolated
-fixtures and private tmux sockets on macOS, Yazi 26.9.1 and chezmoi 2.73.1.
-The guide suite checked repeated `P`, wrapping at 80 columns, failed acceptance
-before `R`, real refresh, actual argv/history, cancelled apply, standard Escape,
-completion, and repeated foreground editor interruption with archive/cleanup.
-
-Initial added terminal assertions needed to await fixture preparation, account
-for wrapped text, and separate Escape from the following digit so it was not
-decoded as Alt+digit. Those test issues were corrected before the passing run.
-The revised controls and instructions have not yet had another human acceptance
-walk, and no new Linux, personal-editor or actual git coexistence run was done.
-
-Follow-up cleanup on 2026-10-16 colocated command descriptions and epoch/cache
-policies with case/step definitions. Baseline snapshots now run only for the four
-steps that inspect epochs. Layout and redraw share wrapped guide lines, and
-acceptance and Next share advancement while retaining the PASS save before
-preparation. Prepared attempts are published only after preparation succeeds.
-Existing refresh, command-finish, current-attempt and owned-cleanup helpers are
-reused; empty preparation avoids context reconstruction. Result aggregation
-examines only the latest attempt per case, while retaining all historical errors.
-Saved-state fields, attempt metadata and case-wide forbidden-command checks remain.
-
-A comparison of all 24 cases and 49 steps preserved the existing instructions,
-expectations, preparation and command descriptions. An added regression verifies
-that failed case preparation preserves the previous attempt. `test/check.py`
-passed 40 Python tests, 51 core and 73 action assertions; the complete
-`test/manual_runtime.py` and `test/runtime.py` passed. The first runtime attempt
-timed out waiting for the existing resize-restart notification; the unchanged
-suite passed on rerun. These checks used isolated macOS/Yazi 26.9.1/chezmoi 2.73.1
-fixtures and do not measure latency or replace human acceptance of the revised UI.
-
-A subsequent review reproduced a saved-session regression: reopening Manual
-refresh at step 2 or 3 cleared its epoch baseline without collecting a new one,
-so recording PASS still failed after `R`. Guide startup now captures the new
-process baseline before accepting actions. Added real-terminal regressions run
-`test/manual.py open PATH` at both saved steps, reject PASS before `R`, and verify
-that `R` followed by `P` records PASS and advances. Both resumed-step checks passed.
-`test/check.py` (40 Python tests, 51 core and 73 action assertions) and the complete
-`test/manual_runtime.py` and `test/runtime.py` also passed after the fix.
-
-A later independent review exposed an exception-handling gap: `transition()`
-saved PASS before preparation, but the CLI error handler overwrote that verdict
-with ERROR if preparing the next step or case failed. CLI-path regressions
-reproduced the overwrite for acceptance, Next, Jump and Restart, including
-unanswered steps. Preparation failures now retain the saved position and verdicts,
-record the intended case/step and operation separately, appear in `W/d`, and
-retain fixtures after later successful retries. Check exceptions still mark
-their current step ERROR, and preparation history does not consume guide-error
-journal entries. `test/check.py` passed 42 Python tests, 51 core and 73 action
-assertions, including archive retention and diagnostic-history checks.
-The complete `test/manual_runtime.py` and `test/runtime.py` also passed. The guide
-suite injected a real Restart preparation failure and verified unchanged verdicts,
-the intended target in the notification, and error history in foreground details.
-Its first run sent PASS before a rejected action released its lock; explicit
-action-completion waits were added before the successful complete rerun.
-
-The human guide now presents numbered English instructions in execution order,
-placing each visible check immediately after its action. Command names are
-included with the keys that invoke them, and each existing step ends with one
-`P` verdict rather than adding verdicts for individual instructions. The bottom
-guide and foreground details share this prose without separate Do, Expect or
-Command sections. A comparison of all 24 cases and 49 steps confirmed unchanged
-case order, setup, preparation, file/state expectations, epoch policies and cache
-settings. `test/check.py` passed 42 Python tests, 51 core and 73 action assertions.
-The complete `test/manual_runtime.py` passed, including instruction order at 80
-columns, matching prose in foreground details, saved-session resume and cleanup.
-The complete `test/runtime.py` also passed with isolated fixtures and private
-tmux sockets.
-
-Single-key `S` now records SKIP for the current step and advances without a
-reason prompt or file/state checks. `W/s` still accepts an optional reason and
-stays on the step. The new binding replaces content search only in the manual
-session and is refreshed when reopening retained sessions. `P` and `S` share
-the repeat-key guard; completed walks ignore both. A narrow guide uses a shorter
-reminder that fits `P`, `S` and `W` at 40 columns.
-
-Three added unit regressions cover SKIP advancement without checks or answering
-the following step, persistence across preparation failure, and completion
-without PASS. Existing case-preparation checks now include SKIP advancement.
-`test/check.py` passed 45 Python tests, 51 core and 73 action assertions.
-The complete `test/manual_runtime.py` verified within-case and cross-case SKIP,
-mixed/repeated verdict keys, the 40-column reminder, unchanged `W/s` behavior,
-completed-walk handling and the new binding when resuming an older keymap.
-The complete `test/runtime.py` also passed on macOS with Yazi 26.9.1 and chezmoi
-2.73.1. Initial added checks needed a complete fixture and explicit separation
-from the repeat-key guard; the terminal sequence also avoids reentering the
-case it has just reached and waits for the first verdict before sending repeats.
-
-The manual session now bundles explicit Catppuccin Mocha status-bar and tab
-colors in `test/manual-theme.toml`. No personal flavor or network download is
-required. The baseline persists across case changes and chezmoi theme overrides;
-retained sessions keep their saved baseline. Reports include the palette's source
-hash. A regression covers custom/base theme transitions with and without git
-context. `test/check.py` passed 46 Python tests, 51 core and 73 action assertions.
-The complete `test/manual_runtime.py` injected light and dark terminal reports,
-verified Yazi's own appearance detection, and checked rendered RGB colors in
-normal, select and unset status modes, plus preservation through Case 8.
-The complete `test/runtime.py` also passed on macOS with Yazi 26.9.1 and chezmoi
-2.73.1. These captures verify emitted colors, not physical display calibration.
-
-On 2026-10-18, the human walk was consolidated from 24 cases/49 steps to
-12 cases/34 steps. Add, Re-add, template/encrypted Add, Forget, Destroy, Diff,
-Apply and Edit retain their distinct command UI paths. Multiple-target review
-combines direct/menu selection with a target in another directory. Rejection
-messages share one fixture whose source is nested below the destination while
-retaining the baseline managed files. Template failures and partial summaries
-are introduced sequentially to keep each warning observation focused.
-
-The session format now records version 2 and ordered case keys. Opening an
-older or reordered catalog is rejected before modifying progress, launching
-Yazi or archiving; a regression verifies unchanged saved bytes and retained
-fixtures. Existing reports, status queries and explicit cleanup remain usable.
-New-catalog sessions still resume their saved steps. Both theme steps were
-reopened with a stale epoch from the previous process; the launcher captured
-the new baseline and `Y` then `P` advanced successfully.
-
-`test/check.py` passed 47 Python tests, 51 core and 73 action assertions.
-The complete `test/manual_runtime.py` and `test/runtime.py` passed on macOS
-with Yazi 26.9.1 and chezmoi 2.73.1. Guide checks exercised the consolidated
-command flows, native Forget/Destroy approval, file-check failure gating,
-cross-directory confirmation, repeated foreground Ctrl-C, archive/cleanup and
-resumed theme steps. Existing refresh, navigation and visual-unset scenarios
-remain automated. The guide's case numbers/titles were also compared with
-the manual table. These are automated execution checks, not a new human walk.
-
-Follow-up cleanup removed the unused Destroy log offset, refresh-only epoch
-branch, per-case cache TTL and old guide-response fields. Theme sign expectations
-now live beside their steps and use a common comparison. The frontend receives
-case results directly and omits full snapshots for Next after a recorded verdict.
-CLI tests share their existing invocation helper, P/S timing shares one sender,
-and filename expectations reuse the baseline fixture list.
-
-A comparison preserved all 12 cases/34 steps, including instructions,
-preparation and file/state/theme expectations. `test/check.py` passed 47 Python
-tests, 51 core and 73 action assertions. The complete `test/manual_runtime.py`
-and `test/runtime.py` passed on the same macOS/Yazi/chezmoi versions. A trial
-cache of wrapped `ui.lines()` objects caused `ui.Text` redraw errors and was
-discarded before the passing guide run; wrapping still runs on layout. These
-checks do not measure a startup or memory improvement or establish human
-visual acceptance.
-
-Two follow-up regressions protect preparation errors and resumed evidence.
-The backend redirects helper diagnostics to stderr while keeping stdout JSON
-only, including cleanup after a constructor failure. With `KEEP_FIXTURE=1`,
-a failed case's retained fixture path is also recorded in its preparation-error
-message and history. Existing PASS verdicts remain unchanged.
-
-The launcher now compares the saved HEAD, working tree diff hash, source hashes
-and Yazi/chezmoi versions against the current execution before resuming. Missing
-or changed information rejects resume before modifying progress/configuration,
-launching Yazi or archiving; previous results remain intact. Session creation
-and resume share the same metadata collector.
-
-`test/check.py` passed 49 Python tests, 51 core and 73 action assertions.
-The complete `test/manual_runtime.py` passed on macOS with Yazi 26.9.1 and
-chezmoi 2.73.2. Real backend CLI checks injected preparation failures with and
-without fixture retention and verified parseable JSON, stderr diagnostics,
-retained paths and preserved PASS. Separate launcher processes rejected each
-stored metadata mismatch without changing saved bytes. Unit checks also cover
-constructor failure, each tool version and missing metadata. The real-terminal
-suite still resumed unchanged sessions, completed both theme steps, handled
-foreground interrupts, and archived/cleaned up successfully.
-The complete `test/runtime.py` also passed on the same macOS/Yazi/chezmoi versions.
-
-Execution screens now start with `chezmoi <subcommand>` for the stage actually
-running. An isolated real-terminal probe observed `chezmoi add`, followed by
-`chezmoi edit`, `chezmoi diff` and `chezmoi apply` during Edit and Apply. It also
-verified that the JSON argv remained visible and the edited content was applied.
-`test/check.py` passed 49 Python tests, 51 core and 73 action assertions.
-The complete `test/runtime.py` also passed with the updated headings.
-
-The manual instructions now double-quote file and directory names throughout
-the walk. Special filenames use JSON quoting so embedded quotes, backslashes,
-newlines and carriage returns remain unambiguous. The details legend, diagnostic
-path labels and fixture editor use the same convention. A comparison of all
-12 cases/34 steps preserved every non-instruction field, including preparation
-and file/state expectations. `test/check.py` passed 49 Python tests, 51 core and
-73 action assertions. The complete `test/manual_runtime.py` and `test/runtime.py`
-passed, including wrapped instructions, foreground details/editor, saved-session
-resume and cleanup. These are automated checks, not a new human acceptance walk.
-
-These automated checks do not constitute human visual acceptance of every
-case, font, color, or terminal. The guided launcher with git.yazi, actual editor
-integration, and Linux manual acceptance remain unverified. Earlier direct
-launcher evidence (2026-09-20) concerns the replaced checklist workflow.
-
-## Automated checks
-
-```sh
-npm ci --ignore-scripts
-npm run setup:types
-test/check.py
-test/runtime.py
-test/manual_runtime.py
-test/e2e.py
-test/e2e.py --smoke
-# test/check.py, test/runtime.py, test/manual_runtime.py and test/e2e.py at once:
-test/all.py
-# Optional, using an existing git.yazi checkout:
-test/runtime.py --git-plugin /absolute/path/to/git.yazi
-test/e2e.py --git-plugin /absolute/path/to/git.yazi
-```
-
-The pure status suite passes 51 assertions covering path boundaries, NUL framing,
-XY preservation, malformed
-or out-of-scope status rejection, bounded recovery, resolved differences,
-own/descendant independence, summary disabling, and exceptional filenames.
-The action suite adds 51 assertions for supported flags, invalid selections,
-recursive target reduction, confirmation policy, literal path arguments,
-shared context, and matching preview/apply scope.
-
-The real runtime suite uses a separate Yazi configuration and a private tmux
-socket. It inspects plugin state and actual terminal rendering. It covers:
-
-- Setup/fetcher state sharing; managed, unmanaged, clean, `" M"`, `MM`, and `" D"`.
-- Missing descendant summaries, `exact_` removals, `.chezmoiremove`, ignores,
-  symlinks, and pending scripts (which remain unexecuted).
-- Full template evaluation; age-encrypted status, missing identity, recovery.
-- Spaces, Japanese text, quotes, backslashes, CR/LF, and leading-dash names.
-  Both recursive batches and the nonrecursive CR/LF fallback are exercised.
-- Failed templates, independent-file recovery, `C!!`, and partial summaries.
-- Manual refresh, directory revisit, tab switching, externally added/forgotten
-  entries, failed membership, and recovery.
-- Manual refresh during an in-flight older generation; no stale publication.
-- Quiescent-view process counts with no periodic polling.
+- Managed, unmanaged, clean, `" M"`, `MM` and `" D"`; missing descendant
+  summaries, `exact_` removals, `.chezmoiremove`, ignores, symlinks, and
+  pending scripts, which stay unexecuted.
+- Template evaluation, age-encrypted status, a missing identity, failed
+  templates, `C!!`, partial summaries, and recovery.
+- Spaces, Japanese text, quotes, backslashes, CR/LF and leading dashes in
+  names, through recursive batches and the nonrecursive CR/LF fallback.
+- Manual refresh, also during an older generation; directory revisits, tab
+  switches, entries added or forgotten outside Yazi, a failed membership query
+  and recovery; process counts in a quiet view, with no polling.
 - Silent children, early stdout closure, unfinished output, stderr pressure,
-  timeout duration, and confirmation that the direct child has exited.
-- Flavor fallback, theme override and hot reload, wide signs, RGB styles.
-- Optional git.yazi coexistence and order (git before chezmoi).
+  and the timeout, with the direct child gone afterwards.
+- Flavor fallback, theme override and reload, wide signs, RGB styles.
+- Add and re-add through bindings and the menu; forget keeps the destination
+  and destroy removes both; diff before apply, refused and accepted apply,
+  chezmoi's conflict prompts, and a failed template stopping before apply.
+  Quitting a conflict prompt can exit 0, so the notice reports completion,
+  not a count of changed files.
+- Recursive and nonrecursive directory add, an orphan symlink whose outside
+  referent is neither followed nor created, and edit refused on a directory.
+- A nonrecursive directory destroy refused with the directory and its child
+  kept, and destroy targets containing the source directory refused, recursive
+  or not, with an unmanaged ancestor and in mixed selections.
+- Multiple selections, visual select and unset ranges, selections in another
+  directory, confirmation pages read back whole at 140x40 and 80x18, a resize
+  restarting review, and a 40x12 pane refused.
+- Template and encrypted add, encrypted edit leaving the destination alone
+  under `edit.apply` and `edit.watch`, the editor's Ctrl-C and failure, and
+  cancelled apply keeping the source edit.
+- Standalone diff honoring `[diff].exclude`, while apply's preview shows the
+  script apply runs.
+- The action lock: an obsolete query drains first, no refresh or mutation runs
+  while it is held, and target snapshots survive hover movement.
+- `support.check_call` over every recorded call at a fixture's end: no
+  `--force`, only known queries and actions, and the query flags and filters
+  in place. It cannot tell the three `managed` filter pairs apart. The guide's
+  fixtures, `test/benchmark.py` and `test/e2e.py` are not read.
+- Optionally, git.yazi's linemode beside this one, git's first.
 
-The black-box E2E suite does not read the probe, plugin records, or command
-history. Each scenario starts a fresh Yazi and asserts on current-pane rows and
-process exit state, plus fixture file effects for command actions. Its complete
-local run covers visible status and directory
-summaries, manual refresh, directory and tab navigation, template failure and
-recovery, theme/flavor reload, wide-sign alignment, and RGB output. The
-optional git.yazi scenario verifies both linemodes on the same row and their
-order. `--smoke` runs the initial status/refresh scenario and the basic command
-scenario used by CI; the default run adds navigation, failure recovery, theme
-reload and the command-edge scenario. The confirmation-pages, source-ancestor
-and visual-selection scenarios run only by `--case` since the test pruning
-below: `test/runtime.py` runs the same functions with more checks.
+`test/e2e.py` reads neither the probe, the plugin's records nor the command
+history: it checks the screen, the exit, fixture files, Yazi's log, tmux's
+state, and the recorded answers to Yazi's terminal probe. Its default
+run covers status and refresh, the basic commands, navigation, failure
+recovery, theme reload and the command edges; `--smoke` runs the first two.
+`confirmation-pages`, `source-ancestor` and `visual-selection` run only by
+`--case`, since `test/runtime.py` runs the same functions with more checks.
 
-Test diagnostics live below the isolated state directory so they do not
-themselves change files in Yazi's current or parent list. Cleanup affects only
-the test-created temporary directory and its private tmux server. No user
-configuration is installed, no real dotfiles are applied, and no user Git
-history is changed. The public age-manual key in the fixture protects only
-disposable test data.
+Both suites end `commands` with `terminal_left`. A fixture editor leaves a
+color, a hidden cursor, mouse and focus reports, line drawing, a scroll region
+and a raw terminal with a queued line, and the check reads the background,
+tmux's cursor, mouse and scroll region flags, line drawing through SO and SI,
+that the prompt still waits half a second, and the main screen after Enter.
+Each of these mutants failed it on macOS and in the container: `process.lua`
+as before the runner handled this, the drain removed, no reset, only `\27[0m`,
+no SI, no scroll region reset, and the prompt read with echo on. With the
+prompt's erase removed it still passes: on Yazi 26.9.1 something on resume
+clears the cursor's line, which with echo off is the prompt's (seen, not
+traced).
 
-The CI workflow runs the same Markdown, LuaLS, StyLua, and pure test checks
-as `test/check.py`, including Python syntax and harness unit tests. It
-additionally runs the pure suite and syntax checks on Lua 5.1 and 5.4, and
-validates commit messages with commitlint and the ASCII check. A separate
-Ubuntu 24.04 job downloads SHA-256-pinned Yazi 26.9.1 and chezmoi 2.72.2
-binaries and runs `test/e2e.py --smoke`; failure captures and logs are uploaded
-as artifacts. It does not run the full runtime or E2E suites. On 2026-09-20,
-both required jobs completed successfully for pull request #1: `checks` and
-`E2E smoke`. The latter ran the rendered status and refresh scenario on the
-pinned Ubuntu 24.04, Yazi 26.9.1, and chezmoi 2.72.2 environment.
+`test/manual_runtime.py` presses the guide's keys in a private tmux. It is an
+automated execution check, not a person's walk.
 
-## Command action validation
+`test/benchmark.py` times the three CLI calls of one recursive acquisition in a
+synthetic `.config`. One run on `860e4bf`, macOS 26.6.2 with chezmoi 2.74.0:
 
-The command extension was tested on macOS with the baseline versions above.
-`test/runtime.py` passed the existing status/rendering suite and the new command,
-command-edge, and operation-coordination scenarios. The terminal-driven
-command cases are also part of `test/e2e.py`, with the actual chezmoi executable
-and no probe or command wrapper in E2E mode.
-The full six-scenario E2E run passed; the basic command scenario was rerun after
-strengthening exact current-pane status assertions. The direct manual launcher
-also opened the new `C` menu and returned to the shell while retaining its fixture.
+| Managed files | Subprocesses | Total CLI time | Managed and status bytes |
+| --- | --- | --- | --- |
+| 100 | 3 | 0.035 s | 21,997 |
+| 5,000 | 3 | 0.157 s | 1,095,097 |
 
-Measured coverage includes:
+It excludes fixture creation, Lua reduction, rendering, encryption and failed
+query recovery, and does not predict a real dotfiles repository. CR/LF targets
+need extra queries, and fetcher bursts can start more than one pass. The 2 s
+reuse, 8 recovery queries and 10 s timeout are defaults, not measured optima.
 
-- Add/re-add through direct bindings and the menu; forget keeps destination
-  files and destroy deletes both entries. Current-pane status and row removal
-  are checked after these actions and after apply.
-- Diff before apply, refused and accepted apply, native conflict prompts,
-  quit without overwriting, and failed template evaluation stopping before apply.
-  In this runtime, quitting a native conflict prompt can exit with code zero;
-  the notification therefore reports command completion, not changed-file counts.
-- Multiple selections, paginated confirmation, selections in another directory,
-  known inapplicable mixed targets, and rejection of directory edit.
-- Literal spaces, Japanese, quotes, backslashes, CR/LF, leading dashes, and
-  shell-looking filenames; recursive and nonrecursive directory add; an orphan
-  symlink whose outside referent is not followed or created.
-- Template add and re-add skipping; age-encrypted add and transparent
-  edit/re-encryption; terminal editor input, Ctrl-C, partial editor failure,
-  edit-and-apply success, and cancellation preserving the source edit.
-- Standalone diff honoring `[diff].exclude=["scripts"]`, while the apply preview
-  includes the script that apply actually runs. Missing descendants are restored.
-- An obsolete status query draining before an action; no concurrent mutation
-  or refresh subprocess while the action lock is held; target snapshots surviving
-  hover movement during menu input; resumption of status acquisition afterward.
+## Checked by hand
 
-On 2026-09-22, an isolated chezmoi 2.72.2 reproduction showed that
-`destroy --recursive=false` on a directory still deletes the directory and
-its descendants, including an unmanaged child. The plugin now rejects this
-combination before confirmation or mutation, including mixed selections; the
-file-target form remains available. Three action-policy assertions cover this
-boundary. The full `test/runtime.py` suite and wrapper-free
-`test/e2e.py --case command-edges` passed with the directory and its child
-intact after rejection. `test/check.py` also passed with 51 core and 54 action
-assertions and 11 Python tests after the cleanup regression was added.
+Recorded only as the person who checked reported it.
 
-The fixture's chezmoi config now lives at `config/chezmoi.toml`. Keeping it at
-the fixture root caused chezmoi add to protect that whole directory, including
-the disposable destination. Interactive instrumentation inherits the terminal
-and does not impose the status wrapper's timeout. Tests never use `--force`.
+- **The guided walk.** The one human walk, on 2026-10-16, was of the earlier
+  24-case guide: 22 PASS and two SKIP. Manual refresh was skipped because
+  acquisition updated the signs before `R`; git coexistence because no git
+  plugin was given. The guide was revised after it, and the current 12-case
+  guide has had no human walk.
+- **The terminal after a command.** On 2026-11-10 the user checked the code of
+  `488412c`, as `39e3778` before the rebase merge, in Ghostty 1.4.0 outside
+  tmux, on macOS 26.6.2 with Yazi 26.9.1 and chezmoi 2.74.0, in a throwaway
+  setup whose editor left a red background, a hidden
+  cursor, mouse, focus and bracketed paste reports, kitty's first flag,
+  modifyOtherKeys 2, line drawing, a scroll region and a raw terminal, and
+  whose pager waited 5 s. The user reported every step fine: at the prompt no
+  red, a visible cursor, a drag selecting text, focus changes doing nothing,
+  and one Enter returning; Enter typed during the pager dropped; Ctrl-C at
+  apply's prompt reporting failure without the apply confirmation; and after
+  quitting, a normal shell with the diff's output and no prompt. That last
+  step came after Yazi's own exit, so it does not tell the plugin's line
+  drawing and scroll region resets from Yazi's; tmux checks those. No step
+  would have shown kitty's first flag, modifyOtherKeys or a focus report left
+  on: none changes a plain Enter, and the prompt does not echo.
+- **Kitty keyboard flags and modifyOtherKeys.** On 2026-11-10, on `860e4bf`
+  and the same setup, the user first saw Ctrl-C arrive at a shell's `read` as
+  an escape sequence under kitty's first flag and under modifyOtherKeys 2,
+  so Ghostty honored both. Then, with an editor leaving one of them on, Ctrl-C
+  at the prompt returned to Yazi with the failure notice, for each. The
+  sequences received were not recorded.
+- **The README picture.** `docs/images/readme.png` is the user's screenshot of
+  `test/readme.py` in Ghostty 1.3.1 on macOS 26.6.2, taken on 2026-10-27 at
+  100x21 with the font at 28pt, 1417x740 pixels. How it looks was judged by
+  eye. The scripted checks of `test/readme.py`, such as resizing, signals and
+  a failing chezmoi, ran only in a private tmux.
 
-These checks use a disposable editor program and public age test identity.
-They do not validate every real editor, GUI editor waiting convention, pager,
-interactive secret provider, arbitrary hook, or terminal size. On 2026-09-22,
-the basic status-refresh and command scenarios passed in a push-triggered
-Ubuntu CI run. A parallel PR run passed both scenarios but failed during
-fixture cleanup when a terminating child wrote into the directory being
-removed (`ENOTEMPTY`). Cleanup now retries only this bounded race, with a
-dedicated regression test. The extended command-edge and operation-coordination
-scenarios have not been run on Linux.
-
-### Confirmation and edit regressions
-
-On 2026-09-23, the fixes were checked on macOS with Yazi 26.9.1 and chezmoi
-2.72.2. `test/check.py` passed with 51 core assertions, 55 action assertions,
-and 11 Python tests. The full `test/runtime.py` suite passed, including action
-coordination and confirmation pagination. Wrapper-free E2E runs passed for
-`command-edges` and `confirmation-pages`:
-
-- With both `edit.apply=true` and `edit.watch=true`, plain encrypted edit
-  leaves the destination untouched. Edit-and-apply also leaves it untouched
-  before the diff and after refusing apply; accepted apply still works.
-- Six selected targets include long Unicode/control-character filenames and
-  a deeply nested path spanning pages. The test reconstructs every complete
-  escaped path from visible confirmation rows at 140x40 and 80x18 terminal
-  sizes, then cancels the final page and checks that all files remain.
-- Resizing during confirmation restarts review at page one. A 40x12 terminal
-  produces a current pane below the minimum size and rejects the operation.
-
-These regression scenarios have not been run on Linux or other Yazi versions.
-
-### Cleanup validation
-
-On 2026-10-03, cleanup changes were checked on macOS with Yazi 26.9.1 and
-chezmoi 2.73.0. `test/check.py` passed with 51 core assertions, 59 action
-assertions, and 11 Python tests. The same checks passed in a temporary snapshot
-combining these changes with main's dependency update, including
-markdownlint-cli2 0.23.3.
-
-The full `test/runtime.py` suite passed on rerun. Its initial run passed status,
-rendering, command, command-edge, and operation-coordination checks, but timed
-out waiting for the resize notification during confirmation pagination. The
-unmodified HEAD's instrumented confirmation scenario passed in isolation.
-Wrapper-free E2E runs of `command-edges` and `confirmation-pages` also passed.
-These results do not identify the cause of the initial notification timeout.
-
-Before/after action preparation matched in 6,000 generated comparisons covering
-selection scope, rejection messages, duplicate targets, path boundaries, and
-confirmation policy. A single CPU-time measurement preparing 10,000 independent
-directories fell from 3.9183 s to 0.0171 s after replacing pairwise directory
-coverage scans with ancestor lookups. This excludes CLI work and rendering and
-does not predict ordinary interactive latency. No new Linux validation was run.
-
-### Source ancestry and visual selection regressions
-
-On 2026-10-03, both review findings were reproduced on macOS with Yazi 26.9.1
-and chezmoi 2.73.0 in disposable fixtures:
-
-- With source at `dest/.local/share/chezmoi` and a managed `.local/bin`, recursive
-  destroy of `.local` passed plugin preflight. Accepting the first native prompt
-  removed the unrelated source entry `dot_bashrc`, while its destination remained.
-  Destroy now rejects any target containing the source directory before
-  confirmation or execution, regardless of recursion.
-- `v`, `j`, `j`, then add captured only the hovered third file and skipped
-  multiple-target confirmation. Actions now emit `escape --visual` before the
-  synchronous snapshot, committing select and unset ranges through Yazi's own
-  selection handling. The same snapshot is used by direct commands and the menu.
-
-`test/check.py` passed with 51 core assertions, 73 action assertions, and 11
-Python tests. The full `test/runtime.py` suite passed, including both new
-regression scenarios. The source-ancestor case covers recursive/nonrecursive
-destroy, an unmanaged ancestor, mixed selections, intact source/destination
-entries, and absence of interactive destroy calls. The visual-selection case
-covers three-file confirmation, cancellation, menu dispatch, selection in another
-directory, unset mode, and resulting source entries.
-Wrapper-free `test/e2e.py --case source-ancestor --case visual-selection` also
-passed for both scenarios.
-
-The initial sandboxed E2E attempt lost its private tmux sockets before any key
-input. Runtime and focused E2E checks therefore ran outside that sandbox with
-isolated config, source, destination, state, cache, and tmux paths. No new Linux
-validation was run.
-
-### Confirmation review flakes and cleanup
-
-On 2026-10-21, `confirmation_pages` ran alone in a loop on macOS 26.6.2 with
-Yazi 26.9.1 and chezmoi 2.73.3, through scripts that wrap the harness and are
-not kept:
-
-- **The resize restart.** 11 of 40 runs timed out waiting for it, 5 of 20 on an
-  idle machine and 6 of 20 beside ten `yes` processes. A trace of 24 runs saw,
-  within 0.01 s of `y`, the smaller pane's first page and the notice. At 80x18
-  the notice covers the box's `Continue?` row until it expires; the wait
-  required both at once, which held only while the notice slid away at about
-  7.3 s. That explains the resize-notification timeouts recorded above. The
-  wait now takes the notice and the smaller pane's page count, and the larger
-  pane's first page must show its own count. Each resize now waits for Yazi's
-  status bar, ending in its right-aligned position, on the new bottom row
-  instead of sleeping 0.2 s, since the plugin pages by the layout Yazi last
-  drew; a shrink can leave the old bar there, cut short.
-- **A row from outside the box.** The two failures recorded under the
-  tests entry of 2026-10-21 below did not recur in 64 runs. The one log kept
-  showed, between two rows of a path, the status bar's columns under the box:
-  the reading had gone past where the bottom border should be. `screen.box_rows`
-  now reads a box only once every row has both side borders and the bottom
-  border is drawn, counting a combining mark with the cell before it, and a
-  page is read only once two captures in a row agree, since a page change can
-  leave the borders whole over the old page's rows. `test/test_screen.py`
-  checks a covered row, a missing bottom and a combining mark at the right
-  edge. That this would have stopped those two failures is not shown.
-- **Yazi left running.** Each of the 21 failed runs left its Yazi running after
-  `tmux kill-server`. With the plugin's destroy confirmation open, Yazi ignored
-  the hangup and SIGTERM and exited only on SIGKILL. It exited with the
-  confirmation answered and with only a notice shown. In two runs with Yazi's
-  own remove confirmation open it exited, and in two alternating runs with the
-  plugin's it stayed. Ten seconds after the server stops, `support.stop` now
-  kills what still runs in a pane's process group and names a fixture, which
-  also reaches Yazi under the guide's launcher, and a test under
-  `support.fixture` that ended without an error then fails; `test/e2e.py` and
-  the guide's own calls only print it. `test/test_support.py` checks a pane
-  that exits, one that ignores both signals and one that leaves such a child;
-  counting only the panes' own processes failed the last. A first grace of two
-  seconds killed the guided walk's Yazi in `test/manual_runtime.py` three runs
-  in three. It runs in another fixture than its tmux server, so the old check
-  never watched it; at the end it showed Yazi's own "unfinished tasks, quit
-  anyway?" prompt for the `manual` plugin, and given 60 seconds it quit after
-  4.7. Whether closing a real terminal at the plugin's confirmation leaves
-  Yazi running was not checked.
-
-After the pull request's two reviews, the loop passed 30 of 30 runs. `test/check.py`
-passed with 52 core and 74 action policy assertions and 68 Python tests, two
-more than before. On the same machine `test/runtime.py` passed in three runs
-(16 passes each), and `test/e2e.py` (14), `test/manual_runtime.py` (15) and
-`test/benchmark.py` passed, none of them killing a process. Not run: these on
-Linux, and `test/runtime.py --git-plugin`.
+## Measured about the platform
 
 ### Yazi outliving its terminal
 
-On 2026-10-21, on macOS 26.6.2 with chezmoi 2.73.3, the leftover Yazi above
-was traced to Yazi, not this plugin, with scripts that are not kept; the
-entry's "ignored the hangup" was wrong, as the second bullet shows. Unless a
-bullet says otherwise, each opened Yazi in a private tmux, ran a plugin whose
-entry made one call, closed the terminal with `tmux kill-server` while the
-call ran and then looked for Yazi:
-
-- **Through the harness, Yazi 26.9.1, one run each unless counted.** An entry
-  waiting in `ya.confirm` left Yazi running in 3 of 3 runs, checked at 12 or
-  25 s; one of them had this plugin's setup removed. With no plugin call, or
-  an entry in `ya.sleep(15)` or `ya.input`, Yazi exited within 0.1 s. An
-  entry in a 12-second busy loop kept it until the loop ended, 10.6 s after
-  the terminal closed.
-- **SIGHUP alone, with the terminal still open, through the harness.** Yazi
-  exited after 5.1 to 5.2 s with no prompt open, at Yazi's own remove
-  confirmation and at this plugin's destroy confirmation, one run each.
-- **Without the harness or this plugin, in a directory holding a few files,
-  checked at 10 s.** `ya.confirm` left Yazi running in 9 of 9 runs, six with
-  26.9.1 and three with the nightly build 7c45837 (2026-10-20). `ya.input`
-  and Yazi's own remove confirmation each exited in 4 of 4, half on each
-  version, and `ya.which` in 2 of 2, one on each. Opened in an empty
-  directory, Yazi exited at `ya.confirm` in 3 of 3 runs with 26.9.1; why the
-  files matter was not traced.
+On 2026-10-21, on macOS 26.6.2, Yazi was opened in a private tmux, a plugin's
+entry made one call, and `tmux kill-server` closed the terminal while it ran.
+With the entry waiting in `ya.confirm`, Yazi kept running: 3 of 3 runs through
+the harness, and 9 of 9 without it or this plugin, six on 26.9.1 and three on
+the nightly `7c45837`. Through the harness, it exited within 0.1 s with no
+call, in `ya.sleep(15)` or in `ya.input`, and stayed through a busy loop until
+the loop ended. Without the harness, checked at 10 s, it had exited in
+`ya.input` (4 of 4 runs), `ya.which` (2 of 2) and Yazi's own remove
+confirmation (4 of 4). SIGTERM did not end the leftover. In an empty
+directory Yazi exited at `ya.confirm` in 3 of 3 runs; why files matter was not
+traced.
 
 Read off the 26.9.1 source, not traced in a debugger: when the terminal is
-gone, a draw fails and Yazi's main loop returns before the quit that the
-hangup requested exits the process. Dropping the tokio runtime then waits for
-every `spawn_blocking` task, and a plugin's entry runs in one. The
-`CompletionToken` that `ya.confirm` awaits is completed only by an answer, so
-the entry does not return. Yazi's own remove confirmation awaits the same
-token in a `tokio::spawn` task, which the runtime drops instead, and
-`ya.input`'s channel closes with the prompt. Why `ya.sleep` returns was not
-traced. The nightly runs the entry under a cancellation scope; since Yazi
-still kept running, nothing on this path cancels it; which code should
-was not traced. Yazi stops reading signals after a hangup, quit or terminate signal,
-and SIGTERM did not end the leftover. Not tried: closing a real terminal
-window at the prompt, and Linux.
-
-On 2026-10-22, on macOS 26.6.2 with Yazi 26.9.1, a plain `q` with no prompt
-open took 5.04 s to end Yazi in the harness's tmux in 3 of 3 runs, with
-scripts that are not kept. Read off the source: `app:quit` waits up to 5 s
-(`yazi-emulator/src/probe.rs`) for the reply to a terminal query that Yazi
-re-sends through tmux passthrough, and the detached tmux has no terminal to
-answer. The same wait would explain the 5.1 to 5.2 s after SIGHUP above;
-that path was not traced.
-
-### Answering Yazi's terminal probe
-
-Read off the Yazi 26.9.1 source (`yazi-emulator/src/probe.rs`, and
-`report.rs`, `stop.rs` and `quit.rs` in `yazi-actor/src/app`): once tmux's
-XTVERSION answer names it, Yazi re-sends DA1 as `\ePtmux;\e\e[0c\e\\`, and
-`app:stop`, which `ui.hide` reaches, and `app:quit` each wait up to 5 s for a
-DA1 report. The detached tmux has no terminal to pass the query to, so every
-command screen and every quit paid that wait. On 2026-10-24, before this
-change, a profiling wrapper that is not kept put 125 s of a 177 s
-`test/e2e.py` run of three scenarios in waits for the command screen, 4 to
-5 s each.
-
-`Runtime.session` now opens every pane with `pipe-pane -IO` running
-`test/da1.py`, which answers each passthrough DA1 with `\e[?62;22c` and
-records the answer. `support.fixture` and `test/e2e.py` fail a run that
-opened a pane but recorded no answer, so a Yazi that changes the query
-fails instead of running slowly. Each answered probe also runs Yazi's
-`app:theme` while the terminal's light or dark mode is unknown, as with a
-real terminal that answers DA1 but not the color queries. Attaching the
-harness's session inside a second detached tmux did not help: Yazi still
-took 5.04 s to quit, in two runs.
-
-Without those waits, notifications pile up. Read off the source
-(`yazi-core/src/notify/notify.rs`, and `tick.rs` and `push.rs` in
-`yazi-actor/src/notify`): Yazi shows up to three at a time, as many as fit the
-height, starts a queued one's timeout only once it shows, and drops one
-identical to a message it still holds. In both guide runs made with the old
-10-second `wait_screen` default, one of them beside the other two suites,
-notifications still covered the finish menu at the timeout, and the
-source-ancestor rejection showed after 9.84 and 9.95 s. `SCREEN_TIMEOUT` in
-`test/support.py` raises the default to 30 s; a passing run waits no longer, and
-a failing one reports 20 s later. The next section shortens the notifications in
-tests.
-
-Review found that tmux expands formats in `-c` and both formats and strftime
-sequences in the `pipe-pane` command: a `%s` in that command became the
-epoch time, and a `-c` directory containing `#S` started the pane in `$HOME`
-instead, both seen in tmux 3.8. `Runtime.session` now doubles `#` in `-c`
-and `%` and `#` in the command, and each escaped spelling reached the shell
-and the directory intact. `test/da1.py` records an answer before sending it
-and writes its stderr to `da1.log` in the fixture, which a failed check
-prints. A new Python test feeds
-`test/da1.answer` a stream of three queries in every chunk size and expects
-three.
-
-On macOS 26.6.2 with Yazi 26.9.1, chezmoi 2.73.3, tmux 3.8 and Python
-3.14.9, on `b88709b` plus this change, one run each, in turn:
-`test/runtime.py` passed 16 in 79 s, `test/e2e.py` 14 in 63 s,
-`test/manual_runtime.py` 15 in 129 s, and `support.stop` killed no leftover
-process. Single runs at `b88709b` took 252 s, 240 s (the sum of
-per-scenario runs) and 247 s. `test/benchmark.py` took 0.035 s for 100 files
-and 0.156 s for 5,000; this change does not touch what it times.
-`test/check.py` passed with 63 core and 126 action policy assertions and 69
-Python tests, one more than before. With a scratch wrapper in place of
-`Runtime.session`, the three suites passed together in 124 s, once. Not run:
-these on Linux, where CI's smoke job on Ubuntu 24.04's tmux will be the
-first, and `test/runtime.py --git-plugin`. How often the longer screen waits
-come close to 30 s was not measured beyond these runs.
-
-On `d0ae402`, whose tree `d53cbc7` merged unchanged, `test/manual_runtime.py`
-passed 3 of 3 runs in 130 to 133 s. Its longest screen waits were the finish
-menu, 12.40 to 12.43 s, and the source-ancestor rejection, 9.91 to 9.95 s,
-nearly the same in each run. A profiling wrapper that is not kept and that
-wrongly held every screen wait to 10 s failed all three runs on those two
-waits; `test/runtime.py` and `test/e2e.py` passed under it.
-
-### Shorter notifications in automated runs
-
-Before this change, the same profiling wrapper put about 36 s of each
-`test/runtime.py` and `test/e2e.py` run in waits for the plugin's 7-second
-notifications to go: four waits of about 7.3 s for the previous source-ancestor
-rejection to clear, and about 7 s for the unsafe directory destroy rejection,
-in one run each. `setup` now takes `notify_timeout`, the seconds that the
-notifications from commands show, 7 by default. The warning that status is
-unavailable keeps its 5 seconds. `Runtime.setup` sets it to `NOTIFY_TIMEOUT`,
-2 s. A first version gave `source_ancestor`'s previous rejection 5 s to
-clear, which failed once with `interaction.notify` changed back to a fixed
-7 s. A review found that too tight: read off `push.rs`, Yazi adds the age of
-the oldest notification it holds to a new one's timeout, so the 5-second
-status warning can keep the rejection past 5 s. That wait is back at
-`SCREEN_TIMEOUT`. `setup` takes 0.001 to 1e9 seconds, a range the plugin
-chose well inside what Yazi takes: read off `serde_with` 3.22.0, which
-converts the timeout, Yazi drops a notification below 1e-9 s, where it rounds
-to zero, and fails from about 1.8e19 s. A new pure test, `test/main.lua`,
-loads `main.lua` with stubs for Yazi's globals instead. It checks that
-`setup` rejects a `notify_timeout` outside that range and takes both ends,
-that a parse error, a refused action and a target with no file each notify
-with the configured value, and that the default stays 7 after an entry. It
-failed with each of these removed: the option from the numeric check, the new
-range, either place that sets the timeout, `opts` in either of
-`begin_action`'s returns, and the timeout in `interaction.notify`; and with
-either end of the range made exclusive, or the default read from
-`interaction.timeout` again. The value
-now comes from `begin_action`'s snapshot, so a refresh no longer takes a
-separate `ya.sync` call for it; only a parse error does.
-
-In the guide, a wrapper that is not kept and that saved each screen during
-waits over 2 s showed what the long waits waited for, in one run. The finish
-menu (12.40 s) and the source-ancestor rejection (9.86 s) sat behind queues
-of the plugin's command notifications and the guide's own 10-second errors,
-such as "Checks failed" and "Could not prepare case 9". `configure_guide` now
-takes a `notify_timeout` that the walk keeps: every case's `setup` options
-get it, and `test/manual.lua` shows its own notifications for that long
-instead of 3 to 10 s. `test/manual_runtime.py` passes `NOTIFY_TIMEOUT`; a
-walk that `test/manual.py create` starts keeps the defaults for the person
-reading it. A new Python test checks that the value, 0 included, reaches a
-restarted case's options only when given, and fails with the line that adds
-it removed. With
-the change, the same wrapper saw the finish menu in 2.42 s and the
-source-ancestor rejection in 2.60 s. Two waits stay long: the compact guide,
-5.3 s behind the status warning, and the foreground launcher's finish menu,
-6.1 s behind a 7-second command notification, since that check starts the
-guide through `test/manual.py`. `SCREEN_TIMEOUT` stays at 30 s; a passing
-run does not wait for it.
-
-On 2026-10-24, on macOS 26.6.2 with Yazi 26.9.1, chezmoi 2.73.3, tmux 3.8
-and Python 3.14.9, on `d53cbc7` plus this change, one run each, in turn:
-`test/runtime.py` passed 16 in 60 s, `test/e2e.py` 14 in 42 s, and
-`test/manual_runtime.py` 15 in 92 s, against 79 s, 63 s and 129 s in the
-runs of the previous section. `test/check.py` passed with 63 core, 126 action
-policy and 20 main assertions and 70 Python tests, one more. Not run: these on
-Linux, `test/runtime.py --git-plugin`, a person's walk of the guide with its
-default notifications, and an invalid `notify_timeout` in Yazi; only
-`test/main.lua`'s stubs pass one to `setup`.
-
-### Waiting for the second unsafe destroy rejection
-
-`Runtime.key` sleeps 0.1 s after each key. A wrapper that is not kept logged
-each key and the wait after it, in one run of each suite: about 25 s of
-`test/runtime.py`, 17 s of `test/e2e.py` and 36 s of the guide went to these
-sleeps. With them moved before the next key instead, so that a screen wait
-started at once, the three suites took 56 s, 42 s and 89 s against 58 s, 41 s
-and 91 s, one run each: Yazi took a median of 65 ms to show a key's effect in
-`test/e2e.py`, so the waits took up most of the time the sleeps had. The change
-was dropped.
-
-With the sleep removed altogether, `test/runtime.py` failed in each of three
-runs at the outside-link add in `extended`. A wrapper that is not kept saved
-each screen every 20 ms. The loop over `replaced_dirs` waited for
-"Non-recursive destroy" and the name on the screen after `D`, but the previous
-rejection still showed that reason, and the name shows in its row. The wait
-passed before Yazi handled `D`, and the add that followed was refused with
-"Another chezmoi action is already running." The checks after the wait, that
-no destroy reached chezmoi and that the source child was preserved, could pass
-without the rejection they were to follow. Only the 0.1 s sleeps between the
-keys hid this. The wait now looks for this target's whole error line, reason
-through path, in one notification: `screen.box_texts` returns each whole box
-whose top border holds the title, its rows joined and its whitespace dropped,
-since a wrap can drop the space it breaks at, and the wait compares through
-`screen.compact`. A path alone would also match a confirmation, which lists
-its targets. Read off `main.lua` and `interaction.lua`, the plugin queues a
-rejection's notification and only then ends the action, so the notification
-can show while the lock is held. Where the probe runs, the loop and the
-`newdir` rejection before it then wait with `Runtime.idle`, which
-`test/runtime.py` and `test/manual_runtime.py` now also use for the same
-wait; E2E has no probe and keeps relying on the key settle. No failure was
-seen from that gap. With the sleep removed except after a `g` chord,
-`test/runtime.py` had failed there in two of three runs; with the new wait,
-it passed in each of three, after each review round below too. With `D`
-removed from the loop, `test/e2e.py --case command-edges` failed at that
-wait, each time.
-
-A `/code-review xhigh` found that the first version judged a box's title from
-its whole line, so a pane left of a box showing `chezmoi.db` could make any
-box count, and read only the first box on a line; that it kept no space where
-a row wrapped, so a path with a space would not match; that `finish()` still
-had a local `screen` hiding the module, as `extended` had; and that the
-verify skill suggested waiting on a path alone. All four are fixed. New Python
-tests check that `box_texts` joins wrapped rows across a space, reads every
-box, skips one that is not whole, takes the title from the top border and
-reads a second box on the same line; they failed with the title read from the
-whole line, with only the first corner of a line read, and with the
-whitespace kept. Not taken: waiting on the probe's `epoch` and `action_busy`
-instead of the screen everywhere, since E2E has no probe.
-
-A second `/code-review xhigh` reproduced a box whose right corner another box
-covered being read through to that box's corner; `_tops` now skips a top
-border with another corner inside it, and a test, which failed without the
-skip, checks it. It found that matching the reason and the path apart let a
-reason from one error line pair with another line's path, so the wait now
-takes the whole line; a path still matches a longer one it begins. It also
-found the lock's cause misstated here and in the verify skill, and the wait
-for the lock written three ways. Not taken here: the same gap after the
-other rejections in `extended` and after `finish`, which predate this change
-and still rely on the key settle, and ending the action before the plugin
-notifies, which would make the gap go away in both suites but changes the
-plugin; and reading the first whole box in `box_rows` instead of the first
-box, as its one caller already waits for a stable capture.
-
-The same runs without the sleep showed two more failures, neither changed
-here. `test/e2e.py` failed once in three runs at `source_ancestor`, where an
-action key followed a `g` chord. With 0.1 s after each chord kept, it passed
-six runs; why a key was lost there was not read off Yazi's source. The guide
-failed in each of three runs at the Forget case, where a key followed one of
-its digit keys, which run `plugin manual -- nav` asynchronously.
-
-On 2026-10-24, on macOS 26.6.2 with Yazi 26.9.1, chezmoi 2.73.3, tmux 3.8
-and Python 3.14.9, on `ee3a5b1` plus this change with both rounds of review
-fixes, one run each, in turn: `test/runtime.py` passed 16 in 58 s,
-`test/e2e.py` 14 in 43 s, and `test/manual_runtime.py` 15 in 92 s.
-`test/check.py` passed with 63 core, 126 action policy and 20 main assertions
-and 72 Python tests, two more. Not run: these on Linux and
-`test/runtime.py --git-plugin`.
-
-### Running one runtime case
-
-`test/runtime.py` now takes `--case NAME`, repeated to select more, like
-`test/e2e.py`; with none it runs all seven in their former order. Each case
-still gets a fresh fixture with the shared baseline, which `status` and
-`action-coordination` used to set up themselves. Timed from the output of
-one full run, the cases took about 12 s (`status`), 6 s (`commands`), 16 s
-(`command-edges`), 5 s (`action-coordination`), 6 s (`confirmation-pages`),
-10 s (`source-ancestor`) and 5 s (`visual-selection`); alone,
-`--case source-ancestor` took 10.3 s and `--case visual-selection` 5.2 s.
-
-A review found that only `status` checks git.yazi coexistence, so
-`--git-plugin` with other cases checked nothing of it and still passed.
-`--git-plugin` now adds `status` when it is not selected, as `test/e2e.py`
-adds its coexistence scenario: `--git-plugin` with git.yazi `f703392` and
-`--case visual-selection` ran that case and then `status`, whose coexistence
-check passed. A failing case now prints `FAIL NAME` with its `--case` name
-before the traceback; a case replaced in a scratch wrapper by one that
-raised printed `FAIL visual-selection` and exited 1 without running the
-next case, as the suite stopped at its first failure before. Not taken from
-the review: running the remaining cases after a failure, a case runner
-shared with `test/e2e.py`, and dropping a case named twice.
-
-On 2026-10-24, on macOS 26.6.2 with Yazi 26.9.1, chezmoi 2.73.3, tmux 3.8
-and Python 3.14.9, on `7816d04` plus this change with the review fixes, one
-run each, in turn: `test/runtime.py` passed 16 in 59 s, `test/e2e.py` 14 in
-44 s, and `test/manual_runtime.py` 15 in 93 s. `test/check.py` passed with 63
-core, 126 action policy and 20 main assertions and 72 Python tests. Not run:
-these on Linux, `test/runtime.py --git-plugin` with every case, and the five
-cases other than `source-ancestor` and `visual-selection` alone.
-
-### Running the suites at once
-
-On `67f8dae`, a scratch script started `test/runtime.py`, `test/e2e.py` and
-`test/manual_runtime.py` together, three times. All three passed each time,
-in 58 to 60 s, 43 s and 91 to 97 s, about their times alone; each run took
-as long as its guide. Timed from each log's creation and last write. Most of
-each suite is spent waiting on the screen; this machine has 10 cores. No
-Yazi process or fixture of these runs was left.
-
-`test/all.py` now starts `test/check.py` and the three suites at once and
-prints each one's output whole as it ends, then a PASS or FAIL line per
-suite, and exits 1 if any failed. Started from `/tmp`, it passed all four in
-92 s. Two guide runs at once still fail: `foreground_launcher` expects
-exactly one new report under `.dev/manual-runs`. A new
-`test/test_all.py` runs two scripts in a temporary root and checks that each
-output comes whole, in the order the scripts end, with stderr, and that one
-failure fails the run; it failed with `as_completed` removed, with the exit
-code fixed at 0, and with stderr not captured. Its first version relied on
-a 0.5 s sleep to order the scripts and failed once in its first run, not in
-ten more; the scripts now order themselves through a file.
-
-A review found more, each reproduced by the reviewer with scratch scripts.
-A suite that could not start, or printed bytes that are not UTF-8, raised
-out of `test/all.py` and lost every other suite's output; a Ctrl-C lost it
-too; Python block-buffers stdout into a pipe, so a suite's stderr came out
-ahead of what it had printed before; an output without a final newline ran
-into the end marker; and unknown arguments such as `--git-plugin` were
-ignored. `test/all.py` now reports a suite that cannot start as failed,
-replaces bytes it cannot decode, sets `PYTHONUNBUFFERED=1` for the suites,
-ends each output with a newline, and takes no arguments. On Ctrl-C it waits
-for the suites, which get the signal too, and prints what they print while
-they clean up: in a scratch run with SIGINT sent to its process group, a
-suite that trapped it printed its cleanup line inside its block, and the run
-exited 1. A third test covers the rest; it failed with each of these
-changes undone. The ordering test now gives up after 5 s instead of hanging
-if the scripts ever run one after the other, which a pool of one worker
-showed, and waits 1 s instead of 0.3 s after the file, since `test/check.py`
-runs it under `test/all.py`'s load. The verify skill now says to rerun a
-suite that failed there alone before treating the failure as a finding.
-
-Not taken from the review: changing `foreground_launcher` so that two
-guides can run at once; stopping the suites when `test/all.py` itself gets
-SIGTERM, which a suite run directly does not handle either; and another name
-than `all`, which `test/test_all.py` imports under an alias. The reviewer
-also noted that every Yazi of the three suites shares one DDS socket under
-`$TMPDIR`, so a Yazi of one suite quitting could hand the server over while
-`test/runtime.py` sends `ya emit-to`; that a message is lost then is a
-hypothesis, not seen in the four runs above.
-
-A second review, after a `/simplify` pass, found that the ordering test
-passed whatever `test/all.py` set when it ran under `test/all.py` itself,
-since it inherited `PYTHONUNBUFFERED=1`; the reviewer showed it with the
-setting removed. The test now clears the variable, and with it set in the
-parent it still failed with the setting removed. `test/all.py` now decodes
-the output itself as UTF-8, since `text=True` followed the locale and turned
-a lone `\r` into a new line; the test failed with `text=True` back and with
-each `\r` replaced. Its script for stderr order starts Python through sh,
-since a shebang cannot hold a path with a space. An interrupted run exits
-130 instead of 1. A bash loop around it still goes on, as it does around a
-suite: in a scratch run, `uv run` exited 130 both when its Python child
-exited 130 and when it died of SIGINT, and bash went on in both cases. A
-block that Ctrl-C cuts short while printing is printed again; that was not
-exercised. The docstring now says that a SIGINT sent to `test/all.py` alone
-is not passed on, since a Ctrl-C in the terminal already reaches the suites
-and a second one would cut their cleanup short. The verify skill now says
-that load can let a check that waits a fixed time for something not to
-happen pass without seeing it, and to run that suite alone too. Not taken:
-waiting on through a second Ctrl-C, and progress lines while the suites run,
-which the whole-block output rules out.
-
-On 2026-10-25, on macOS 26.6.2 with Yazi 26.9.1, chezmoi 2.73.3, tmux 3.8
-and Python 3.14.9, on `67f8dae` plus this change with both rounds of review
-fixes and a `/simplify` pass, one `test/all.py` run passed in 92 s:
-`test/check.py` with 63 core, 126 action policy and 20 main assertions and
-75 Python tests, three more, in 9 s; `test/runtime.py` 16 in 59 s;
-`test/e2e.py` 14 in 43 s; `test/manual_runtime.py` 15 in 92 s. Not run:
-these on Linux or a machine with fewer cores, and `test/all.py` with a real
-suite failing or interrupted; only `test/test_all.py` and the scratch runs
-cover those.
-
-### Terminal state after a command
-
-On 2026-11-09 `M.interactive` began handling what a command leaves for the Enter
-prompt:
-
-- It saves the terminal mode with `stty -g` before the command. Afterwards it
-  drops queued keys and restores that mode, falling back to `stty icanon`.
-- It resets attributes, cursor visibility, mouse reporting, bracketed paste,
-  kitty keyboard flags, modifyOtherKeys and the character set before its exit
-  line.
-- After Enter, it erases the prompt's line when `stty -a` shows echo on.
-
-`terminal_left`, at the end of `commands`, uses the fixture editor's `terminal`
-mode. That mode sets a red background, hides the cursor and turns on mouse
-reports. It then takes the test's Enter as a complete line, the way one typed
-during a diff arrives, and goes raw with `TCSANOW` so that the line stays queued.
-`terminal_left` then checks:
-
-- that the prompt shows and echoes a key, so the queued line was dropped;
-- the background in effect at the exit line and at the prompt, through
-  `screen.background`, which follows SGR changes across lines because
-  `capture-pane -e` carries attributes from one line to the next;
-- tmux's `cursor_flag` and `mouse_any_flag`;
-- after Enter, the main screen through `capture-pane -a` while Yazi still runs,
-  so the fixture's check for processes left behind still applies.
-
-Because `commands` is in the smoke run, CI runs the check on Ubuntu 24.04.
-
-A review of the first version found that its queued key was a carriage return
-received in raw mode. Linux does not turn that into a line when canonical mode
-returns, so the check could pass on Linux with the drain removed. The review also
-found that tmux carries attributes across lines and that quitting Yazi left the
-process check nothing to look at. The version above answers all three.
-
-Mutants, in scratch copies, each run once with `test/e2e.py --case commands`, on
-macOS and in an Ubuntu 24.04 container:
-
-- With `process.lua` as on `main`, the prompt wrapped, since raw mode left
-  newlines without a carriage return, and it never returned. The wait for the
-  prompt failed.
-- With the drain removed, the queued line answered the prompt and Yazi came back:
-  in the container the screen showed Yazi with `clean` edited. The wait for the
-  prompt failed.
-- With no reset, the background check failed. With only `\27[0m` left, the flag
-  check failed with `['0', '1']`.
-- With the erase removed, the main-screen check failed.
-
-The erase makes `finish`'s half-second grace for a capture equal to the last
-prompt unnecessary: the main screen that `ui.hide` shows keeps the previous
-output but not its prompt. The grace is gone. Until the shell reads Enter,
-though, the prompt is still there, so a `finish` that leads to another command
-now waits for the screen to change. Since the prompt now disappears before Yazi
-draws again, `returned` waits for tmux's `alternate_on`, which `ui.hide` turns
-off and Yazi's return turns back on, instead of for the prompt to go. Mutants on
-macOS, one run each:
-
-- With `ya.sleep(0.7)` after `ui.hide`, `commands` passed. With the erase also
-  removed, it failed waiting for the action menu, after `finish` had answered a
-  stale prompt.
-- With `sleep 0.5` between the prompt's read and its erase, `command-edges`
-  passed. With `finish` as before that wait, it failed waiting for the
-  confirmation after the diff.
-
-The waits on the fixture editor's text in `command-edges` and
-`foreground_launcher` keep the window that the last section of "Test pruning"
-describes; this change does not touch them.
-
-All on `acd89cb` plus this change, each suite alone, one run each, none killing
-a process:
-
-- macOS 26.6.2 with Yazi 26.9.1, chezmoi 2.74.0, tmux 3.8 and Lua 5.5.1:
-  - `test/check.py` passed with 63 core, 126 action policy and 20 main
-    assertions and 59 Python tests. The one new test is for
-    `screen.background`.
-  - `test/runtime.py` passed 16 in 60 s.
-  - `test/e2e.py` passed 6 scenarios in 24 s.
-  - `test/manual_runtime.py` passed 15 in 94 s.
-- An Ubuntu 24.04 container on that Mac (Docker Desktop, aarch64), with Yazi
-  26.9.1 and chezmoi 2.72.2 from their aarch64 release assets, tmux 3.4 and uv
-  0.11.19:
-  - `test/runtime.py` passed 16 in 54 s.
-  - `test/e2e.py` passed 6 scenarios in 23 s.
-  - `test/manual_runtime.py` passed 15 in 85 s.
-
-CI's smoke run uses the x86_64 assets.
-
-A `/simplify` pass then moved the fixture editor's `[edit]` keys into
-`support.editor_config`, which the guide's backend uses too. It also gave
-`Runtime.capture` a `saved` argument for `capture-pane -a`, put the prompt text
-in one constant, and changed `returned` to `alternate_on`. Afterwards, each suite
-alone, one run each, none killing a process:
-
-- On macOS: `test/check.py` with the same counts, `test/runtime.py` 16 in
-  61 s, `test/e2e.py` 6 in 23 s, and `test/manual_runtime.py` 15 in 91 s.
-  `test/benchmark.py` timed 5000 files at 0.158 s.
-- In the container: `test/runtime.py` 16 in 55 s, `test/e2e.py` 6 in 23 s, and
-  `test/manual_runtime.py` 15 in 85 s.
-
-The mutant runs above predate the pass.
-
-A second `/code-review xhigh` found more cases, some reproduced by the reviewer
-in a private tmux:
-
-- The fallback `stty icanon` left a raw terminal without `icrnl`, `isig` and
-  `echo`, so neither Enter nor Ctrl-C answered.
-- `\27(B` without SI left a line-drawing G1 shifted in.
-- `\27[>4;0m` forced modifyOtherKeys off instead of restoring the default.
-- Focus reports, X10 mouse reports and a scroll region stayed.
-- Reports sent between the drain and the reset typed into the prompt.
-- The erase guessed where the cursor was, which failed after a key typed just
-  before the prompt, after a scroll, or with a scroll region.
-- A `finish` before another command could take the echo's scroll for the
-  prompt's erase.
-
-So:
-
-- The fallback turns on `icanon icrnl isig echo opost onlcr`.
-- The reset adds SI, `?9l`, `?1004l`, `\27[>4m` and a scroll region reset
-  between a cursor save and restore, and is written before the drain.
-- The prompt reads with echo off and erases its own line with `\r\033[2K`; a
-  trap restores the mode on Ctrl-C.
-
-The fixture editor now also turns on focus reports, leaves line drawing shifted
-in and sets a scroll region. `terminal_left` checks the scroll region through
-`scroll_region_upper` and `scroll_region_lower`, and line drawing through the SO
-and SI marks of `capture-pane -e`: a plain capture prints those cells as their
-letters, so a first run with only the plain text passed with SI removed. With
-echo off the queued line can no longer be seen through an echoed key, so the
-check waits half a second and requires the prompt still showing and
-`alternate_on` still off.
-
-Before the suites, the shell snippets ran by themselves in a private tmux under
-macOS's `/bin/sh` and the container's dash, once each:
-
-- Enter exited 0 with the prompt's line erased and `echo` and `icanon` back.
-- Ctrl-C exited 130 and Ctrl-D exited 1, both with `echo` back. Under dash the
-  wrapper script had to trap SIGINT, or it died with the prompt.
-- After a raw terminal and `stty "$1"` failing on a bad mode, Enter still
-  answered the prompt.
-
-Mutants, in scratch copies, each run once with `test/e2e.py --case commands`, on
-macOS and in the container, with the same result on both:
-
-- With `process.lua` as on `main`, or with the drain removed, the wait for the
-  prompt failed.
-- With no reset, the background check failed.
-- With only `\27[0m`, or without the scroll region reset, the state check
-  failed.
-- Without SI, the SO and SI check failed.
-- With echo left on during the read, the main-screen check failed.
-- With the erase removed, `commands` passed. The main screen lacked the prompt
-  anyway: something on Yazi 26.9.1's resume clears the cursor's line, which with
-  echo off is the prompt's (seen, not traced). The erase stays so as not to rely
-  on that, and no check covers it.
-
-Afterwards, each suite alone, one run each, none killing a process:
-
-- On macOS: `test/check.py` with the same counts, `test/runtime.py` 16 in
-  62 s, `test/e2e.py` 6 in 24 s and `test/manual_runtime.py` 15 in 91 s.
-  `test/benchmark.py` timed 5000 files at 0.153 s.
-- In the container: `test/runtime.py` 16 in 56 s, `test/e2e.py` 6 in 23 s and
-  `test/manual_runtime.py` 15 in 88 s.
-
-On 2026-11-10 the user checked `39e3778` by hand in Ghostty 1.4.0 outside tmux,
-on macOS 26.6.2 with Yazi 26.9.1 and chezmoi 2.74.0, and reported every step
-fine. A throwaway setup outside the checkout isolated Yazi's and chezmoi's
-configuration and state. Its editor left a red background, a hidden cursor,
-mouse (`?1000`, `?1006`), focus and bracketed paste reports, kitty's first flag,
-modifyOtherKeys 2, line drawing, a scroll region and a raw terminal. Its diff
-pager waited 5 s after the diff. The steps:
-
-- After the editor, at the prompt: the exit line and the prompt had no red
-  background, the cursor showed, a drag selected text, switching to another
-  application and back did nothing, and one Enter returned to Yazi.
-- Enter typed two or three times while the pager waited: the prompt stayed
-  until the next Enter.
-- Ctrl-C at the prompt after apply's diff: Yazi came back with a failure
-  notice and no apply confirmation.
-- After quitting Yazi, in the shell: normal colors, a visible cursor, typing
-  echoed and ran, a drag selected text, `echo lqqk` printed letters,
-  `seq 100` scrolled the whole screen, and the diff's output was there without
-  the prompt.
-
-The last step looked only after Yazi's own exit, so it does not tell the
-plugin's line drawing and scroll region resets from Yazi's; tmux checks those.
-No step would have shown kitty's first flag, modifyOtherKeys or a focus report
-left on: neither changes a plain Enter, and the prompt does not echo. Nothing
-was pasted.
-
-Not run:
-
-- a real terminal other than Ghostty 1.4.0 on macOS, and Ghostty inside tmux;
-- Linux on x86_64 beyond CI's smoke run;
-- the fallback restore inside Yazi; only the snippet ran by itself;
-- kitty keyboard flags, modifyOtherKeys, bracketed paste, focus and X10
-  reports, which tmux exposes no flag for and the Ghostty check did not show.
-
-Unhandled, by reading the code and not run:
-
-- A command that leaves `O_NONBLOCK` set, which `stty` cannot restore. The
-  prompt still returns at once and reports failure.
-- A command left in the alternate screen also stays there for the prompt.
-- In a pane narrower than the prompt, its upper rows stay after the erase.
-
-## Development tooling checks
-
-Locally verified on 2026-09-20:
-
-- With mise and its shims absent from `PATH`, direct execution of
-  `test/check.py`, `test/runtime.py`, `test/benchmark.py`, and
-  `test/manual.py` passed, including manual status and cleanup commands.
-  The scripts invoke uv themselves; mise is only an optional tool installer.
-- `test/check.py`: Markdown clean, LuaLS clean for plugin and harness,
-  StyLua clean, all 51 core and 51 action assertions passing, and ten Python
-  harness tests passing. The six screen-parser tests cover exact names, missing
-  rows, unmanaged spacing, ANSI/hover decorations, pane boundaries, and cell width;
-  the other four cover Lua string encoding, CR/LF preservation, cleanup guards,
-  and timeout.
-- Commit validation: eight valid/invalid message cases, including length,
-  capitalization, body spacing, and a body emoji; three commit-range cases
-  using an isolated Git repository, including rejection of an invalid commit.
-- ShellCheck for the local check scripts and workflow YAML parsing.
-- GitHub-hosted runs installed the fixed Linux LuaLS and StyLua releases and
-  completed both the development checks and E2E smoke job.
-- The Python real Yazi suite passes with and without git.yazi. It preserves
-  the Lua harness scenarios, including child lifetime and generation checks.
-- Before the command extension, E2E smoke and the four default scenarios passed
-  against the visible Yazi screen, as did the optional git.yazi coexistence
-  scenario. A temporary
-  copy with the managed sign changed from `C` to `X` made the smoke scenario
-  fail on the initial status assertion, confirming that it detects a rendered
-  status regression rather than only successful process startup.
-
-On 2026-10-19, `scripts/format-lua-hook.sh` passed ShellCheck and was run
-outside Claude Code with sample hook payloads in temporary Git repositories,
-with `CLAUDE_PROJECT_DIR` set to the main checkout. It formatted unformatted
-Lua at the root, in a subdirectory, in a linked worktree under
-`.claude/worktrees/`, and through the `/tmp` alias of the macOS `/private/tmp`
-directory, for the file path and for `CLAUDE_PROJECT_DIR` alike, including with
-a trailing slash. It left alone Lua under `.github/`, `.git/` and ignored
-`.dev/`, a hidden Lua file, Lua in another repository or in no repository,
-including a path that leaves the checkout through `..`, and a non-Lua payload
-without `jq` on `PATH`. It exited with status 2 and a message, leaving the
-file unchanged, without `jq`, Git or `stylua`, when the installed StyLua
-differed from the `STYLUA_VERSION` in the workflow or the pin was missing, and
-for a Lua syntax error. Those runs used StyLua 2.6.0 against a temporary
-workflow that pinned 2.6.0 or 2.5.2; StyLua 2.5.2 itself was not run. With
-StyLua 2.6.0, `stylua --check .` reported a root and a subdirectory file and
-skipped a hidden file, `.github/`, and a Git-ignored directory, the scope the
-hook formats. The entry on fresh sessions below records a Claude Code session
-loading the later version of the hook, which reads `mise.toml`.
-
-On 2026-10-20, `test/test_skills.py` was added to the harness unit tests, and
-`test/check.py` passed on macOS with Git 2.54.0, with 51 core and 73 action
-policy assertions and 52 Python tests (49 before). Its fixture cases build
-temporary Git repositories with staged and untracked files: correct links,
-including file names with a space and with Japanese text, pass; it reports
-exactly a missing link, a copied file, a link with the wrong relative target, a
-link to a missing skill file, a link to a Git-ignored skill file, a correct link
-that Git ignores, and a link to a skill directory or to the whole skills
-directory, each once and with its reason. Removing the real link in a temporary
-worktree made the repository case fail with the expected target. With `GIT_DIR`,
-`GIT_INDEX_FILE` and `GIT_WORK_TREE` pointing at a throwaway repository, the
-tests still passed and left that repository's files unchanged, and with a global
-Git ignore of `.claude/` under a substituted `HOME`, the fixture cases still
-passed. Claude Code offered the skill through the link in the session that added
-it; the entry on fresh sessions below records the path rules taking effect,
-at `73c8862` with `lua.md` on more than root Lua. On Linux, only CI's run of
-the same unit tests covers it.
-
-On 2026-10-20, `test/check.py` began running ShellCheck on `.githooks/*` and
-`scripts/*.sh`, which passed with ShellCheck 0.11.0, and `test/test_githooks.py`
-brought it to 62 Python tests (52 before) on macOS with Git 2.54.0. `pre-commit`
-refuses a commit on `main` with no `origin`, with this repository's GitHub URL,
-and with a fork as `origin`, and also beside a tag named `main`; it allows
-another branch and a detached HEAD, and only `CHEZMOI_YAZI_COMMIT_ON_MAIN=1`
-lets a commit through, with the tests passing while it is exported. `pre-push`
-refuses a push to `refs/heads/main` for eight spellings of this repository's
-GitHub URL, including case, a trailing slash, SSH with and without a user, and
-ports 22 and 443; it allows a fork, a lookalike host, a longer repository name,
-an unrelated local path, another ref, and pushing local `main` to another
-branch. Each single edit to the hooks that was tried, such as dropping the host
-boundary, the case folding, a URL spelling or the full ref comparison, failed at
-least one test, but not every possible edit was tried: narrowing the character
-class in front of `github.com` in some patterns goes unnoticed; the message text
-is checked by hand only. In temporary clones with the hooks installed by the
-README lines, a real `git commit` on `main` was refused, with a fork as `origin`
-too, and `git push --dry-run` of `main`, by remote name, by URL and as
-`HEAD:main` from a topic branch, was refused through a global `core.hooksPath`
-that passes control on to `.git/hooks`; a push to another branch name went
-through. The override let the commit through, and the commands the message
-suggests moved a commit on `main` to a topic branch, also when run from another
-branch. The URL match is by suffix, so a local path ending in
-`github.com/yohkuri/chezmoi.yazi` is refused too, while an SSH host alias is not
-recognized. Without `core.hooksPath`, and on Linux beyond CI's unit tests, the
-hooks were not run.
-
-On 2026-10-20, `mise.toml` began pinning LuaLS 3.19.2, ShellCheck 0.11.0 and
-StyLua 2.6.0, which CI now installs from it instead of downloading LuaLS 3.19.1
-and StyLua 2.5.2 and using the runner image's ShellCheck. Before this, local
-Homebrew had LuaLS 3.19.2 against CI's 3.19.1, a difference nothing reported.
-StyLua 2.6.0 changed nothing here: its release notes touch Luau, range
-formatting, ignore ranges, CRLF comments and a new `Input` value for
-`collapse_simple_statement`, while this repository writes Lua 5.4 syntax, has
-no ignore comments or CRLF files, formats whole files and sets `FunctionOnly`;
-`stylua --check .` passed with 2.6.0 before the pin moved. After `mise install`
-on macOS, the three tools resolved to the pinned versions through mise's shims
-ahead of Homebrew, and `test/check.py` passed with them: Markdown, LuaLS and
-ShellCheck clean, 51 core and 73 action policy assertions and 65 Python tests
-(62 before). `scripts/format-lua-hook.sh` now reads the StyLua version from
-`mise.toml` and runs StyLua from the edited file's checkout, where mise's shims
-pick the version that checkout pins; a `PATH` set by `mise activate` does not
-follow the change of directory, and that case was not run.
-`test/test_format_hook.py` runs the hook with a stand-in StyLua from another
-directory: it reads this repository's pin, calls StyLua from the file's
-checkout with the checkout's `.stylua.toml` and the file's relative path when
-the pin matches, with or without spaces and a trailing comment, and refuses
-with exit status 2 when no `stylua` line is set. Dropping the change of
-directory, the directory prefix of the path, the relative config path, the
-trailing comment or the line anchor each failed a test. Run by hand from
-another directory on a sample payload, the hook formatted a real file with
-StyLua 2.6.0 through mise's shim; from inside a repository that pinned a
-version not yet installed, the shim installed that version and used it. On
-the pull request, GitHub-hosted Ubuntu runs installed ShellCheck 0.11.0, LuaLS
-3.19.2 and StyLua 2.6.0 through mise, put them ahead of the image's tools on
-`PATH`, and passed `test/check.py` with 65 Python tests and the E2E smoke job.
-
-On 2026-10-20, fresh Claude Code 2.1.304 sessions on macOS checked the path
-rules and the Lua hook against a throwaway worktree of `main` at `73c8862`,
-with StyLua 2.6.0 found through mise's shim, Git 2.54.0 and jq 1.8.2. Each
-session got one prompt from `claude -p` with `claude-sonnet-5-5`,
-`--setting-sources project`, which loads neither user nor local settings,
-`--permission-mode acceptEdits`, `--tools Read Edit`, which left only those
-two tools, and `--output-format stream-json --verbose --include-hook-events`.
-The 29 checks read the transcripts, the hook events, the tool calls and the
-files, never the model's replies, and 28 passed. Path rules, one session per
-file with exactly one `Read`: `README.md` attached no rule, `core.lua`
-attached `.claude/rules/lua.md` alone, and `test/core.lua` attached
-`.claude/rules/test.md` and, against the intent, `lua.md` as well, whose
-`*.lua` pattern matches Lua below the root too; that failed the remaining
-check. The Lua hook, on the root `core.lua` only: after exactly one `Edit`
-that inserted an unformatted line as given, the `PostToolUse` hook exited 0
-and the file's first line was formatted. That held in a session working in
-the worktree, and in one working in the main checkout, whose settings, hook
-script, `mise.toml` and `.stylua.toml` matched `73c8862`, on a worktree file
-outside it reached through `--add-dir`. With the `stylua` line removed from
-the worktree's `mise.toml`, the hook exited with status 2, the file kept the
-unformatted line, and the transcript recorded the hook's message as a
-blocking error the session received. Two earlier runs with looser checks read
-`core.lua` and `test/core.lua` in one session, passed all their checks, and
-so missed the extra `lua.md`. Not run: the hook after `Write`, a Lua file
-below the root, a worktree that Claude Code creates under `.claude/worktrees/`,
-the interactive status message, sessions that also load user or local
-settings, and other platforms.
-
-On 2026-10-20, the path rules were split so that each discloses the skill its
-files need: `.claude/rules/lua.md` now matches `/*.lua` and points at the new
-`implement-chezmoi-yazi` skill and, before a change is reported as validated,
-at `verify-chezmoi-yazi`; `.claude/rules/test.md` points at
-`verify-chezmoi-yazi` alone. With a stand-in `lua.md`, fresh sessions as above
-attached it on reading `core.lua` and not `test/core.lua` for `/*.lua`, and on
-neither for `./*.lua`; that reading of the leading slash is Claude Code
-2.1.304's, and no check here would notice a release that changed it. On
-2026-10-21, with a worktree under `.claude/worktrees/`, a session in the main
-checkout attached the main checkout's `lua.md` alone on reading the
-worktree's `core.lua` and its `test.md` alone on `test/core.lua`, and a session
-inside the worktree attached the worktree's own rules in the same way. Not run
-with `/*.lua`: a file written with `Write`, an interactive session, other
-platforms; `scripts/` and `types/` Lua now get no rule. Five reviews found
-earlier drafts of the skill wrong wherever they restated `docs/design.md`, the
-README or the code, or mapped which suite checks what; it now points at those
-and says to search `test/` before changing a string or an argument. A sixth
-found that it also said to change the matches with the code, which would
-rewrite a check that the old value must stay; it now says to decide which a
-match is from the design and the README.
-
-On 2026-10-21, in throwaway worktrees on macOS 26.6.2 with Yazi 26.9.1 and
-chezmoi 2.73.2, removing `--no-pager`, `--color=false`, `--progress=false`,
-`--skip-secrets=false` and the status display's and the preflight's
-`--include=all --exclude=none` all at once, and separately `render.theme`'s
-control-character check on signs, left the pure suites, `test/runtime.py`,
-`test/e2e.py` and `test/manual_runtime.py` passing, and no test looked for
-`--force`. A first set of checks failed on those breaks and on `--force` added
-to every action or to `forget` alone. The fresh-session checks then all passed
-against the split and those checks, with the `.claude/`, `mise.toml` and
-`.stylua.toml` this entry was committed with, `test/core.lua` attaching
-`test.md` alone, with the same tools and versions. A sixth review got breaks
-past those checks: they matched `--force` exactly on single-file plans,
-accepted any `--include` and `--exclude` value, and found queries by
-`--no-tty`. A seventh got an added `-x encrypted`, a later `--color=true` and an
-unknown query past their first replacement, which was then tightened into the
-one below.
-
-They were replaced the same day. `test/core.lua` checks that the status
-display's `managed` and `status` queries pass `--include=all --exclude=none`
-and no other filter before `--`, and `test/actions.lua` that no argument
-starting with `--force` reaches any stage of fourteen plans that cover each
-action's options and directory targets, naming the first plan and stage that
-does. When a fixture that recorded the plugin's chezmoi calls ends without an
-error, it stops Yazi and `support.check_call` checks each call: none has an
-argument starting with `--force`; each is a known query or action; each
-`execute-template`, `managed` and `status` query, and any call with
-`--no-tty`, puts the five query flags before its subcommand and gives none of
-them another value before any `--`; and there, a `status` or `managed` query
-has one `--include=` and one `--exclude=` after its subcommand and no other
-filter. `status` must pass `all` and `none`. A `managed` query may also pass
-either of the preflight's two narrower pairs, since a call does not say which
-query it is, so narrowing the preflight's first `managed` query to one of those
-pairs would pass. Counted in one run, that covered 505 calls in the 7 fixtures
-of `test/runtime.py` and none elsewhere: the guide's cases record calls in fixtures
-of their own, which the check does not read, `test/benchmark.py` runs chezmoi
-directly, and `test/e2e.py` records nothing. `test/test_support.py` feeds the
-check altered calls, and `test/runtime.py` still checks that a theme sign
-holding a control character falls back to its default. Each new check failed on
-a break aimed at it: `--force=true` on a non-recursive `apply`, `--force` on a
-broad `add` and on a non-recursive `re-add` in `test/actions.lua`;
-`--exclude=encrypted`, and separately an added `-x encrypted`, in the `status`
-query in `test/core.lua`; and in `test/runtime.py`, at the fixture's end,
-`--exclude=encrypted` and separately an added `-x encrypted` in the preflight's
-first `managed` query, and `--force` before the context of an interactive
-`diff`, the last two after every other assertion of their scenario passed.
-`test/test_support.py` covers the other ways past it that the seventh review
-named. Three other breaks failed earlier assertions first: the
-`status` filters moved after `--` failed `test/core.lua`'s argument byte budget;
-in `test/runtime.py`, dropping `--no-tty` sent the slow status down the
-wrapper's action path, and the query flags moved to the end became paths.
-`test/check.py` passed with 52 core and 74 action policy assertions and 66
-Python tests, and `test/runtime.py` (16 passes), `test/e2e.py` (14),
-`test/manual_runtime.py` (15) and `test/benchmark.py` passed. `test/runtime.py`
-passed in three plain runs; run three times under a wrapper that only counted
-the calls each check read, it failed twice in a row in `confirmation_pages`,
-which had not reviewed one target's path on the destroy confirmation's pages,
-before any call was checked, and then passed. That is a timing-sensitive
-failure in the screen reading, recorded rather than fixed here. Not run: the
-Yazi-driven suites, and so `support.check_call` on real calls, on Linux, where
-CI runs the pure suites, the Python tests and an uninstrumented smoke run; and
-`test/runtime.py --git-plugin`.
-
-The initial project commit range from `main` to the pull request head passed
-the local commit validator and the pull request's `checks` job. The isolated
-Git histories above remain the negative-case coverage for invalid messages.
-
-### Dependency updates
-
-On 2026-10-22, CI annotated that `actions/checkout` v4, `actions/setup-node` v4
-and `jdx/mise-action` v3 target the deprecated Node.js 20. The workflow moved
-to checkout and setup-node v7 and mise-action v5, and `actions/upload-artifact`
-from v4 to v7 alongside them; its step runs only when E2E fails, so it never
-warned and v7 has not run. commitlint moved to 21.2.4. None of the breaking
-changes in their release notes applies: `package.json` has no `packageManager`
-field, `npm` caching is set explicitly, checkout keeps
-`persist-credentials: false`, and mise-action's new 24-hour delay concerns the
-mise binary only, not the tools `mise.toml` pins. That is a reading of the
-notes, not a run of each changed path.
-
-`test/check.py` passed on macOS 26.6.2 with 63 core and 126 action policy
-assertions and 68 Python tests, whose commit-validation cases ran commitlint
-21.2.4. On PR #16's first push, the `checks` job, whose `ubuntu-latest` was
-already the `ubuntu-26.04` image, and `E2E smoke` on `ubuntu-24.04` passed for
-both the push and the pull request; mise-action selected mise 2026.10.17. Their
-only annotation left was the `ubuntu-latest` migration notice. The `checks` job
-now names `ubuntu-26.04`, so its Ubuntu release changes only by an edit,
-though GitHub still updates the image's packages weekly; E2E stays on 24.04,
-where its pinned binaries were validated.
-
-`.github/dependabot.yml` asks for grouped monthly updates. Two of Dependabot's
-own commit messages, taken from `actions/checkout` with their headers rewritten
-the way this configuration words them, passed `npm run lint:commits -- --file`:
-commitlint skips body lines holding a URL, and the bodies are ASCII. A grouped
-header such as `build: bump the npm group with 3 updates` fits, and so does
-`ci: bump actions/upload-artifact from 7 to 8 in the actions group`; a
-single-package header such as
-`build: bump @commitlint/config-conventional from 21.2.4 to 21.3.0 in the npm group`
-is 82 columns and fails. No Dependabot pull request has run here yet. Its
-cooldown covers only Dependabot: this change took commitlint 21.2.4 and
-`fast-uri` 3.1.9 by hand, within four days of their releases.
-
-On 2026-11-06, Dependabot alert 8 (GHSA-gg6h-894w-4m9c) reported `re2js` 2.8.6,
-which `markdownlint` 0.42.0 pins and which `markdownlint-cli2` 0.24.0 brings
-through its own pin, so `package.json` overrides it with 2.8.7. `markdownlint`
-passes no `LOOKBEHINDS` flag, read off its code, so the flaw was not reachable
-here. The advisory's reproduction took 1510 ms at 8000 characters on 2.8.6 and
-2 ms on 2.8.7, one run each on macOS 26.6.2 with Node.js 24.22.2.
-
-`test/check.py` would miss a lint rule that stops reporting on clean documents,
-so two more checks cover the swapped engine. A file with planted violations
-reported MD011, MD013 and MD039 on 2.8.7, and its front matter was recognized.
-The expressions behind those rules and the front matter, called the way
-`markdownlint` calls them, gave the same results on 2.8.6 and 2.8.7 over 5,576
-inputs: English and Japanese Markdown, whole and by line, plus edge cases. That
-compares the expressions once, not a whole lint. `test/check.py` passed with 63
-core, 126 action policy and 20 main assertions and 58 Python tests.
-
-The override's key names `markdownlint@0.42.0`. With a key naming another
-version, standing in for a later `markdownlint`,
-`npm install --package-lock-only` resolved `re2js` 2.8.6, so the override
-stopped applying. Removing `overrides` without relocking made `npm ci` fail with
-`EUSAGE`. No real `markdownlint` update has run through this, whether by hand
-or by Dependabot. Whether the alert closes once this reaches `main` was unseen
-when this entry was written.
-
-## Acquisition measurement
-
-```sh
-test/benchmark.py
-```
-
-This creates a synthetic managed `.config` directory with missing ordinary
-files. It times the actual three CLI operations for a
-single recursive acquisition scope: destination discovery, managed index,
-and status. Sample local results:
-
-| Managed files | Subprocesses | Total CLI time | Combined managed/status bytes |
-| --- | --- | --- | --- |
-| 100 | 3 | 0.033 s | 21,997 |
-| 5,000 | 3 | 0.153 s | 1,095,097 |
-
-These are single-run Python harness measurements, excluding fixture creation, Lua
-reduction, rendering, encryption, external resources, and failed-query
-recovery. They do not predict real dotfile latency. Ordinary recursive roots
-batch well; CR/LF targets require extra queries. Fetcher bursts can produce
-multiple acquisition passes. The default 2-second reuse, 8 extra recovery
-queries, and 10-second subprocess timeout are configurable operating limits,
-not measured optimal settings.
-
-### Cancelled acquisition passes
-
-Read off the source before this change: once a refresh, navigation or action
-invalidated a running status pass, `process.run` killed the query in flight,
-but `core.collect` only skipped subdividing it and went on to spawn every
-remaining chunk, each killed at its first check. A query still waiting for
-output when its pass was cancelled ended as a timeout instead. An action
-waits for that worker before preflight. Now `process.run` checks for
-cancellation before it spawns, so a cancelled pass starts no further
-commands, and `core.collect` stops at the first cancelled query instead of
-walking its remaining chunks. A new case in `test/core.lua`, two one-path
-chunks, sees two queries when the first times out and one when it is
-cancelled; against the old `core.lua` the latter saw two. No pure suite runs
-`process.run`.
-
-On 2026-10-22, on macOS 26.6.2 with Yazi 26.9.1 and chezmoi 2.73.3,
-`test/check.py` passed with 55 core and 74 action policy assertions and 68
-Python tests, three core assertions more than before. `test/runtime.py` (16
-passes), `test/e2e.py` (14) and `test/manual_runtime.py` (15) passed in one
-run each, and `support.stop` killed no leftover process. No Yazi-driven check
-counts the commands started after a cancellation, so that rests on the code
-and the pure case; how much sooner an action starts in a large tree was not
-measured. Not run: these on Linux, and `test/runtime.py --git-plugin`.
-
-### Shared chezmoi queries
-
-On 2026-10-22 the discovery and `managed` queries moved into `core.dirs` and
-`core.list_managed`, which status acquisition and the action preflight now
-share, and the preflight's chezmoi queries moved into `actions.facts`.
-Background discovery now also asks for the source directory, with the
-template the preflight already used, so a source directory that does not
-parse as an absolute path now fails status too. `test/actions.lua` runs
-`actions.facts` against a fake `run` and pins, for each command, the exact
-`managed` queries after discovery and their order: the source-entry query only
-for edit, forget and destroy, the source-directory query only for
-nonrecursive destroy, whose result is absent otherwise. Each query answers
-with a different path, so a result stored in the wrong field fails. It also
-checks each failure message. `support.check_call` cannot tell those queries
-apart, since any `managed` call may pass any of the three filter pairs. New
-cases pin the command table's destination-root exception: of the commands
-that need a managed target, only recursive re-add, diff and apply may target
-the root, and not when nothing is managed; no other suite selects the root.
-`test/core.lua` pins the discovery template and adds malformed discovery
-output.
-
-On macOS 26.6.2 with Yazi 26.9.1 and chezmoi 2.73.3, `test/check.py` passed
-with 63 core and 126 action policy assertions and 68 Python tests, 8 and 52
-more than before. `test/runtime.py` (16 passes), `test/e2e.py` (14) and
-`test/manual_runtime.py` (15) passed in one run each, and `support.stop`
-killed no leftover process. `test/benchmark.py`, which now times the
-two-directory template, took 0.034 s for 100 files and 0.159 s for 5,000,
-against 0.033 s and 0.153 s in the sample table above from the
-destination-only template; with one run each, the difference says nothing.
-It ran before the last changes to `actions.lua` and the pure tests, which
-leave what it times alone. Not run: these on Linux, and
-`test/runtime.py --git-plugin`.
-
-## Force-push commit validation
-
-On 2026-10-03, PR #3 was rebased onto the dependency-update commit from PR #4.
-The push workflow failed commit validation because its pre-rebase `before` SHA
-was not present in the fresh checkout. The PR workflow and both E2E smoke jobs
-passed for the same head. The push workflow now validates all reachable commits
-when the previous head is unavailable, as it already does for a new branch.
-Available push bases and PR base/head ranges retain their scoped checks.
-
-An isolated single-branch clone reproduced the missing old SHA. The actual
-workflow shell block passed normal-push, missing-base force-push, new-branch,
-and PR cases, and rejected an invalid commit with a missing push base. Workflow
-YAML parsing and full reachable-history commit validation also passed locally.
-
-## Installation and release tags
-
-On 2026-10-26, with Yazi 26.9.1 on macOS and `YAZI_CONFIG_HOME` and
-`XDG_CACHE_HOME` pointed at empty temporary directories,
-`ya pkg add yohkuri/chezmoi` installed `main` at `daa34ca`: the six root Lua
+gone, a draw fails and the main loop returns before the hangup's quit exits.
+Dropping the tokio runtime then waits for every `spawn_blocking` task, a
+plugin's entry runs in one, and the token `ya.confirm` awaits completes only on
+an answer. Yazi stops reading signals after a hangup, quit or terminate
+signal. Not tried: a real terminal window closed at the prompt, and Linux.
+`support.stop` kills such a leftover ten seconds after the tmux server stops.
+
+### Yazi's terminal probe
+
+Read off the 26.9.1 source (`yazi-emulator/src/probe.rs`, and `report.rs`,
+`stop.rs` and `quit.rs` in `yazi-actor/src/app`): once tmux's XTVERSION names
+it, Yazi re-sends DA1 through tmux passthrough, and `app:stop`, which
+`ui.hide` reaches, and `app:quit` each wait up to 5 s for the answer. A
+detached tmux has no terminal to answer, so each command screen and each quit
+paid that wait: a plain `q` took 5.04 s in 3 of 3 runs, and as long in two
+runs inside a second detached tmux. `test/da1.py` answers it in every pane the
+harness opens, and a run that opened a pane but recorded no answer fails.
+
+### Claude Code's path rules and the Lua hook
+
+On 2026-10-20 and 2026-10-21, fresh `claude -p` sessions of Claude Code
+2.1.304 on macOS, loading only project settings, read one file each, and the
+checks read the transcripts and hook events, not the replies. `*.lua` in a
+rule's `paths` matched Lua below the root too; `/*.lua` matched `core.lua` and
+not `test/core.lua`, and `./*.lua` neither. From the main checkout and from a
+worktree under `.claude/worktrees/`, a session attached the rules of the
+checkout it worked in. After one `Edit` of `core.lua`, the `PostToolUse` hook
+formatted it, and with the `stylua` line gone from `mise.toml` it exited 2 and
+the session received its message as a blocking error. Not run: `Write`, an
+interactive session, other platforms, and sessions loading user or local
+settings.
+
+### The screen cleared before each stage
+
+Each stage starts with `\27[2J`. Recorded with the change merged as `c9bb335`
+on 2026-11-06: in a herdr 0.9.5 tab
+on Ghostty, with 300 lines printed by `seq` before the first action, 225 of
+them stayed in the scrollback. The Ghostty version was not recorded, later
+stages were not measured, and no other terminal was.
+
+### chezmoi destroying an ancestor of the source
+
+On 2026-10-03, through the plugin before it refused destroy targets containing
+the source directory, in a disposable fixture with chezmoi 2.73.0 and the
+source directory at `.local/share/chezmoi` under the destination, a recursive
+destroy of `.local` removed an unrelated source entry once its first prompt
+was accepted, while that entry's destination remained.
+
+### Installing with ya pkg
+
+On 2026-10-26, with Yazi 26.9.1 on macOS and empty `YAZI_CONFIG_HOME` and
+`XDG_CACHE_HOME`, `ya pkg add yohkuri/chezmoi` installed the six root Lua
 files, `README.md` and `LICENSE`, and not `docs/`, so an installed README's
-links into `docs/` lead nowhere offline. `ya pkg delete yohkuri/chezmoi`
-removed the directory and its `package.toml` entry. Yazi was not started on
-the installed copy; the suites load the checkout through a symlink instead.
+links into `docs/` lead nowhere offline. `ya pkg delete` removed it. Over a
+`plugins/chezmoi.yazi` placed by hand, a copy or a symlink to a clone,
+`ya pkg add` stopped with "You have modified the contents" and left it alone.
+Yazi was not started on the installed copy.
 
-The step in `.github/workflows/tag.yml` was run under `bash -e`, CI's shell
-(macOS's bash 3.2.57 with Git 2.54.0, not CI's Ubuntu bash and Git), in a
-clone whose origin was a local bare repository, with commits changing
-`main.lua`'s `@since` standing in for moves between Yazi releases. It tagged
-the head before a move up and not the commits after it, and a re-run read the
-tag as there. No move, a move down and a newly created `main` tagged nothing.
-A `before` not in the history, an unreadable `@since`, a tag already naming
-another commit, an origin that did not answer and a refused tag push each
-failed by name, the last printing the commands to tag by hand. The workflow
-has not run on GitHub, and no `rev = "=yazi-<version>"` pin has been tried:
-no tag exists yet.
+## Tooling without tests
 
-`ya pkg add` over a `plugins/chezmoi.yazi` placed by hand, a copied
-directory or a symlink to a clone, stopped with "You have modified the
-contents of the `chezmoi.yazi` plugin" and left it as it was. The
-`CONTRIBUTING.md` lines that link a clone in ran under sh and zsh with the
-default location, `XDG_CONFIG_HOME` and `YAZI_CONFIG_HOME`; a second run
-refused and left the clone untouched. `test/check.py` passed: 63 core, 126
-action policy and 20 main assertions, and 75 Python tests.
+These keep no tests, so what was run by hand is their evidence.
 
-## README picture
+- **`.githooks/`.** On macOS with Git 2.54.0, `pre-commit` refused a commit on
+  `main` with no `origin`, this repository's URL or a fork, and allowed other
+  branches, a detached HEAD and `CHEZMOI_YAZI_COMMIT_ON_MAIN=1`. `pre-push`
+  refused a push to `refs/heads/main` for eight spellings of the GitHub URL
+  and allowed a fork, a lookalike host and other refs. In clones with the
+  hooks installed by the two lines the README then gave, a real commit and
+  `git push --dry-run` were refused through a global `core.hooksPath`. On
+  2026-11-10, with Git 2.54.0 and no global Git configuration, the three lines
+  that "Install the git hooks" in `CONTRIBUTING.md` now gives installed both
+  hooks in a clone, from a linked worktree into the shared directory, and in a
+  clone without `.git/hooks`. In each, `pre-commit` then refused a commit on
+  `main` with its own message; a commit on another branch in the worktree went
+  through, and a second install was refused. The match is by suffix, so a
+  local path ending in `github.com/yohkuri/chezmoi.yazi` is refused too and an
+  SSH host alias is not recognized. Not run: without `core.hooksPath`, Linux.
+- **`scripts/format-lua-hook.sh`.** On 2026-10-19 the version then, which
+  read StyLua's pin from `check.yml`, ran with sample payloads: it formatted
+  Lua at the root, in a subdirectory and in a linked worktree, through `/tmp`
+  and `/private/tmp`, left alone Lua under `.github/`, `.git/`, ignored
+  directories, other repositories and hidden files, and exited 2 without
+  changing the file without `jq`, Git or `stylua`, on a StyLua version other
+  than the pin, and on a syntax error. The current version, which reads
+  `mise.toml` and runs StyLua from the edited file's checkout, ran by hand
+  once from another directory, where it formatted a real file, and in the
+  Claude Code sessions above. A version mismatch and a `PATH` set by
+  `mise activate` have not been run against it.
+- **The skill link checker.** Of `test/test_skills.py`, only
+  `test_repository`, which checks this checkout's links, is left. Until
+  2026-11-05, fixture cases that every `test/check.py` ran checked that
+  `problems()` reported a missing link, a copied file, a wrong relative
+  target, a link to a missing or Git-ignored skill file, a correct link Git
+  ignores, and a link to a skill directory or the whole skills directory,
+  each exactly once, and passed correct links holding a space or Japanese
+  text.
+- **`test/all.py`.** In scratch runs, one failing suite failed the run, each
+  output came whole, a suite that could not start was reported failed, and on
+  SIGINT to its process group it waited for the suites' cleanup and exited 1.
+  It now exits 130 when interrupted, which no run has shown, and it has not
+  run with a real suite failing or interrupted.
+- **Commit validation and its range.** `scripts/check-commits.sh`,
+  `scripts/check-ascii.lua` and the range `check.yml` passes them have no test
+  under `test/`. On 2026-09-20, eight valid and invalid messages, among them
+  length, capitalization, body spacing and a body emoji, and three commit
+  ranges in an isolated Git repository, one holding an invalid commit, gave
+  the expected results. On 2026-10-03, in an isolated single-branch clone, the
+  workflow's shell block passed a normal push, a force push whose previous head
+  was unreachable, a new branch and a pull request, and refused an invalid
+  commit with the push base missing.
+- **`.github/workflows/tag.yml`.** It has run and passed on each push to
+  `main`, most recently `860e4bf`; `@since` has not moved since it was added,
+  so it has tagged nothing and no tag exists. Its tagging path ran only under
+  macOS's bash 3.2.57 in a clone with a local bare origin. No
+  `rev = "=yazi-<version>"` pin has been tried.
+- **The `re2js` override.** `package.json` pins `re2js` 2.8.7 under
+  `markdownlint@0.42.0` for GHSA-gg6h-894w-4m9c. Its key names that version,
+  so a `markdownlint` update leaves it unapplied, as a stand-in key showed with
+  `npm install --package-lock-only`. A file with planted violations still
+  reported MD011, MD013 and MD039 on 2.8.7.
+- **CI's failure path.** `actions/upload-artifact` v7 runs only when
+  `E2E smoke` fails and has not run. No Dependabot pull request has come
+  through `.github/dependabot.yml`.
 
-On 2026-10-27, with Yazi 26.9.1 and chezmoi 2.73.3 on macOS,
-`test/readme.py` ran in a private tmux 100 columns wide, since no real
-terminal was at hand. At 12 rows it asked for 100x21 and waited; resized,
-it opened Yazi on `~` with `.zshrc` hovered, and the capture showed
-`"C M "` on `.zshrc` and `Brewfile`, `"CMM "` on `.tmux.conf`, `"C D "`
-on `.vimrc`, `"C  *"` on `.config`, `"C   "` on the other dotfiles and
-`"    "` on `.cache`, `.lesshst`, `.zsh_history` and the four folders.
-The capture's colors were the flavor's, `#89dceb` on each `C`. Quitting
-with `q` exited 0 and removed the scratch home. Closing the window, while
-it waited and while Yazi was open, removed it too and left no process. A
-SIGINT sent to the script while Yazi was open left Yazi running, and `q`
-then exited 0. A SIGTERM to the script while Yazi was open exited 143
-after about 5 seconds: Yazi took that long to quit, and left the alternate
-screen first. Two SIGTERMs 0.3 seconds apart did the same, with no Yazi
-left. With a `chezmoi` on `PATH` that fails, the script printed the failed
-command, its exit code and its stderr line by line, exited 1 and removed
-the scratch home; with stdin redirected it refused to start. Resized from
-100 to 40 and then 99 columns, the window showed only the tmux note and
-the current request. With `XDG_CONFIG_DIRS` naming a `chezmoi.toml` that
-sets another `sourceDir`, which a bare `chezmoi source-path` follows, and
-`XDG_DATA_DIRS` holding another source, the script opened the same screen.
-In an earlier fixture, with `TMUX` unset inside that tmux, Yazi logged an
-error configuring the default tmux server, and the script printed it and
-exited 1.
+## Unexplained and known windows
 
-The picture in `docs/images/readme.png` is a screenshot of a run in
-Ghostty 1.3.1 on macOS 26.6.2, taken by the user on 2026-10-27 at 100x21,
-with the font raised to 28pt with Command-= on a display without Retina
-scaling, and the window captured without its shadow: 1417x740 pixels,
-about 14 per column. A first take at the user's usual 14pt was 817 pixels
-wide with the shadow, too coarse for a Retina display. The PNG shows the
-same signs as the tmux capture, in the flavor's colors; how it looks was
-judged by eye and checked by nothing. `test/check.py` passed: 63 core, 126
-action policy and 20 main assertions, and 88 Python tests, 13 of them the
-new `test/test_readme.py`.
+- With `Runtime.key`'s 0.1 s settle removed, `test/e2e.py` lost a key that
+  followed a `g` chord once in three runs, and the guide failed in each of
+  three at a key following its digit keys. The settle stays.
+- While a screen clear after the prompt was in, until 2026-11-06, with
+  `ya.sleep(0.7)` after it, `command-edges` lost the `v` after Ctrl-C in 7 of
+  20 runs, the wait timing out with Yazi on the screen; and once, with no
+  delay, a `q` sent through `herdr pane send-text` right after the redraw did
+  nothing. Neither was tried after the clear went, and no suite run since has
+  failed this way.
+- A known window, not seen without an injected delay: `ui.hide` shows the last
+  command's screen until the next command clears it, so the waits on the
+  fixture editor's text in `command-edges` (`test/action_cases.py`) and in
+  `foreground_launcher`'s second round (`test/manual_runtime.py`) can match the
+  previous run's text. With `ya.sleep(0.3)` after `ui.hide` in a scratch copy,
+  both sent Ctrl-C before the new editor started and failed. The wait before
+  `Native edit applied before preview` has the same window, by reading the
+  code.
+- A hypothesis, not seen: the Yazis of suites run together share one DDS
+  socket under `$TMPDIR`, so one quitting could hand the server over while
+  `test/runtime.py` sends `ya emit-to`.
 
-## Test pruning
+## Not verified
 
-On 2026-11-05 every test was audited from one run of each suite on Ubuntu 24.04
-in a four-core container, with Yazi 26.9.1, chezmoi 2.72.2, tmux 3.4 and Lua
-5.4.6, all passing: 88 Python tests, `test/runtime.py` (16 passes),
-`test/e2e.py` (14), `test/manual_runtime.py` (15) and `test/benchmark.py`. It was
-the first recorded full run on Linux. Of 1,122 single-line mutants of the root
-Lua, the pure suites killed 79% of `core.lua`'s, 78% of `actions.lua`'s, 25% of
-`main.lua`'s and none of `render.lua`'s.
-
-Test code then went from 5743 lines to 5380, without Markdown and
-`test/.luarc.json`. `test/test_githooks.py`, `test/test_format_hook.py`,
-`test/test_all.py` and two tests of `test/test_skills.py` went at the
-maintainer's call, so the hooks, the format hook, the link checker and
-`test/all.py` keep no tests, and earlier entries are the evidence for them.
-A review found that other removals rested on a wrong reading. Eight mutations,
-seven of the guide's backend and one of `Runtime.setup`, passed every remaining
-unit test; with the tests restored, seven fail them and the eighth fails
-`backend_paths`. With `head` left out of `execution_info`, the Python tests pass
-and `resume_execution_guard` fails. `command-edges` stayed in `test/e2e.py`'s
-default run, since `test/command.py` exits non-zero on Ctrl-C whatever chezmoi
-returns. `test_skips_a_block_named_for_another_file` came back too: `if named:`
-in `setup_blocks` passes every other test, and such a block would be written
-through the links to the checkout or a flavor.
-
-`finish` could match the previous command's prompt, which `ui.hide` shows until
-the new command clears it: once in five runtime runs on Linux, and in
-`test/runtime.py`, `test/e2e.py` and `test/manual_runtime.py` with
-`ya.sleep(0.7)` after `ui.hide`. It now gives a prompt capture equal to the last
-one half a second to change, which narrows that window and does not close it.
-Other waits have no such grace. With `ya.sleep(0.3)` after `ui.hide` in a scratch
-copy, `command-edges` and `foreground_launcher` matched the last command's text
-and sent Ctrl-C before the new one started, and both failed. The wait before
-`Native edit applied before preview` has the same window, by reading the code.
-
-This pull request first closed the window by clearing the screen after the
-prompt in `M.interactive`, then took the clear out, so `process.lua` is as on
-`main`. The clear removed the only copy of a command's output, and each review
-found another way for that to happen unread. In the last, in scratch clones on
-macOS and not repeated, a command leaving its terminal in `min 0 time 0` or
-`O_NONBLOCK`, or Yazi running with stdin from `/dev/null`, lost the output with
-no prompt shown; a command leaving the alternate screen kept its output on the
-main screen, which the clear missed.
-
-With `process.lua` as on `main`, a further review measured what stays, each once
-in a scratch copy on macOS, left for a change of its own and covered by no suite.
-After a command leaves raw mode, Enter, Ctrl-C and Ctrl-D do nothing at the prompt
-and only Ctrl-J answers it. A color a command leaves fills the next action's screen
-and stays after Yazi exits. Enter typed during a diff answers its prompt, and the
-answered prompt stays on the terminal after Yazi exits.
-
-The maintainer saw the clear on Ghostty 1.4.0 and herdr 0.9.5 on Ghostty, in
-`test/manual.py` and Case 4's Add, which was not a walk: no verdict was recorded.
-`main`'s own clear at the first action takes the rows then on the screen: with
-`seq -f 'mark-%g' 1 300` beforehand, a herdr tab kept 225 of the 300 lines.
-
-On macOS 26.6.2 with Yazi 26.9.1, chezmoi 2.74.0, tmux 3.8 and Lua 5.5.1, each
-alone, one run each, none killing a process: `test/check.py` with 63 core, 126
-action policy and 20 main assertions and 58 Python tests, `test/runtime.py`
-(16 passes) in 60 s, `test/e2e.py` (6 scenarios) in 24 s, the three by
-`--case` in 20 s and `test/manual_runtime.py` (15 passes) in 93 s.
-`test/all.py` passed all four in 89 s, and `test/benchmark.py` timed 5000 files
-at 0.160 s.
-
-One failure stays unexplained. While the clear was in, with `ya.sleep(0.7)` after
-it, `command-edges` in `test/e2e.py` lost the `v` after Ctrl-C in 7 of 20 runs,
-the wait timing out with Yazi on the screen. Samples every 0.1 s for 3 s never
-showed `Another chezmoi action is already running`, and the cause is unknown.
-Once, with no delay, a `q` sent through `herdr pane send-text` right after the
-redraw did nothing. Neither was tried after the clear went, and no suite run
-without an injected delay has failed this way.
-
-Not run: `--git-plugin`, `test/readme.py`, a full walk of `test/manual.py`, and,
-after the removals' last commit, anything on Linux beyond CI's smoke run.
-
-## Limits of the evidence
-
-The Ubuntu 24.04 E2E smoke scenario is validated in CI. The full runtime, E2E
-and guide suites ran on Linux only in one container, during the test pruning
-above and before its review's fixes; the manual workflow, unusual terminal
-configurations, and git.yazi coexistence remain unverified on Linux.
-Windows, older versions, interactive
-secret providers, and arbitrary external hooks are not validated. Windows is
-explicitly rejected by setup. Source-state browsing is outside this release.
-The direct-child deadline does not promise grandchild termination or cleanup
-when Yazi itself exits. In tmux, Yazi opened in a directory holding files kept
-running when its terminal closed while a plugin waited in `ya.confirm`, a
-Yazi bug traced under "Yazi outliving its terminal"; a real terminal window
-closed at that prompt is untested. The output cap applies after line reads,
-so one long line can allocate more than the cap temporarily.
-
-The pure tests are not substitutes for the Yazi suite. Scrolling through very
-large interactive lists, unusual grapheme/font combinations, and every
-possible hovered-row theme remain manual acceptance areas. The renderer
-deliberately leaves hovered signs unstyled to inherit the selected-row style.
+- Linux beyond the aarch64 container above and CI's x86_64 smoke run; the
+  guided walk and git.yazi coexistence on Linux; Windows, which `setup`
+  rejects; other Yazi releases and chezmoi versions than those above.
+- `--git-plugin` in full since the command actions were added; only
+  `test/runtime.py --git-plugin --case visual-selection`, which adds `status`,
+  ran since, with git.yazi `f703392` on 2026-10-24.
+- A human walk of the current guide, and readability across fonts, colors,
+  grapheme combinations, very long lists and hovered rows.
+- For the terminal state after a command, real terminals other than Ghostty
+  1.4.0 on macOS outside tmux, including Ghostty inside tmux; and the
+  bracketed paste, focus and X10 mouse resets, which tmux exposes no state for
+  and no hand check showed.
+- The fallback restore inside Yazi; only the snippet ran by itself.
+- The scripts without mise since `test/check.py`'s analyzers were pinned in
+  `mise.toml`; the last run without it, on 2026-09-20, predates the pins.
+- Not handled, by reading the code: a command that leaves `O_NONBLOCK` set or
+  stays in the alternate screen, and a pane narrower than the prompt, which
+  keeps the prompt's upper rows.
+- Real editors, GUI editors and their wait conventions, pagers, interactive
+  secret providers, arbitrary hooks, and terminal sizes other than those
+  above.
+- Grandchildren of a timed-out query: the deadline covers the direct child
+  only. The output cap applies after line reads, so one long line can
+  allocate more than the cap for a while.

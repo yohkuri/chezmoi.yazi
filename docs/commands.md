@@ -83,3 +83,6 @@ automatic retry or rollback. Cancelling apply after edit keeps the source edit.
 Completion means the command finished, not that every entry was changed.
 Raw command output stays in the terminal and is not copied to plugin logs or
 notifications. Terminal scrollback remains subject to your terminal settings.
+Each stage starts on a cleared screen, and whether the rows on the screen
+before it reach the scrollback depends on the terminal
+([validation](validation.md#the-screen-cleared-before-each-stage)).

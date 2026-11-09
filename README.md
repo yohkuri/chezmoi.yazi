@@ -31,10 +31,10 @@ untested: Yazi changes its plugin API between releases.
 
 chezmoi, found as `chezmoi` on your `PATH` or wherever `setup`'s `command`
 points. `test/check.py`, `test/runtime.py`, `test/e2e.py` and
-`test/manual_runtime.py` last ran on macOS with chezmoi 2.74.0, and before that
-in an Ubuntu 24.04 container with 2.72.2; CI runs a short
+`test/manual_runtime.py` last ran on macOS with chezmoi 2.74.0, and the last
+three of them in an Ubuntu 24.04 container with 2.72.2; CI runs a short
 end-to-end check with 2.72.2 on Ubuntu 24.04. [Validation](docs/validation.md)
-has the earlier runs. Destination paths must
+has what they cover and what remains unverified. Destination paths must
 be local Unix paths: Windows and source-tree display are unsupported.
 
 ## Installation
