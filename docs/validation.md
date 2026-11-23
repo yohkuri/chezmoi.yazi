@@ -9,28 +9,38 @@ Versions are the ones tested, not a compatibility claim.
 
 ## Latest runs
 
-Each suite alone, one run each, no reruns:
+Each suite ran alone, on 2026-11-23 unless noted:
 
-- On `bb5a339` with `markdownlint-cli2` 0.24.2 (`markdownlint` 0.42.2,
-  `re2js` 2.9.1) in place of its 0.24.0 and `re2js` override, macOS 27.2.1
-  with Yazi 26.9.1, chezmoi 2.74.1, tmux 3.8 and Lua 5.5.1: `test/check.py`
-  with 63 core, 126 action policy and 20 main assertions and 59 Python tests;
+- On the code of `03bda2c`, macOS 27.2.1 with Yazi 26.9.1, chezmoi 2.74.1,
+  tmux 3.8 and Lua 5.5.1, one run each: `test/check.py` with 63 core, 126
+  action policy and 20 main assertions and 59 Python tests;
   `test/runtime.py` 16 passes; `test/e2e.py` 6 scenarios;
   `test/manual_runtime.py` 15 passes. With git.yazi `f703392`,
   `test/runtime.py --git-plugin` 17 passes and `test/e2e.py --git-plugin`
-  7 scenarios, coexistence included.
-- On `488412c`, which differs from `bb5a339` in comments and docs only, an
-  Ubuntu 24.04 container on Docker Desktop (aarch64), with Yazi 26.9.1 and
-  chezmoi 2.72.2 from their aarch64 release assets and tmux 3.4:
-  `test/runtime.py` 16 passes, `test/e2e.py` 6 scenarios,
-  `test/manual_runtime.py` 15 passes.
+  7 scenarios, coexistence included. The Yazi suites ran on `bb5a339` with
+  this code's `package.json` and lockfile, which change no code;
+  `test/check.py` passed again on `03bda2c` itself, docs included.
+- On the same code and machine, a second run of those first four suites and
+  of `test/benchmark.py`, with mise absent from `PATH`: no shims, no `mise`
+  binary and no `MISE_*` variables. uv 0.11.19 was linked alone into its own
+  directory. The analyzers came from Homebrew at the versions `mise.toml`
+  pins, and Python 3.14 from Homebrew in a new environment set by
+  `UV_PROJECT_ENVIRONMENT`. Lua 5.5.1 and Node.js 24 came from their install
+  directories, the only copies, which mise had installed. The counts matched
+  the first run. A first attempt left `~/.local/bin`, which holds the `mise`
+  binary, on `PATH`; it passed too and was redone without it.
+- Earlier, on `488412c`, which differs from `03bda2c` in comments, docs and
+  the Markdown linter's version only, one run each in an Ubuntu 24.04
+  container on Docker Desktop (aarch64), with Yazi 26.9.1 and chezmoi 2.72.2
+  from their aarch64 release assets and tmux 3.4: `test/runtime.py` 16
+  passes, `test/e2e.py` 6 scenarios, `test/manual_runtime.py` 15 passes.
 
 CI runs on every pull request and on pushes other than to Dependabot's
 branches. `checks` runs what `test/check.py` runs, adds the status and action
 suites under Lua 5.1 and 5.4 and `luac -p` under 5.1, 5.4 and 5.5, and
 validates commit messages. `E2E smoke` runs
 `test/e2e.py --smoke` on Ubuntu 24.04 (x86_64) with SHA-256-pinned Yazi
-26.9.1 and chezmoi 2.72.2. Both passed on `860e4bf`.
+26.9.1 and chezmoi 2.72.2. Both passed on `03bda2c`.
 
 ## What the suites cover
 
@@ -121,12 +131,14 @@ traced).
 automated execution check, not a person's walk.
 
 `test/benchmark.py` times the three CLI calls of one recursive acquisition in a
-synthetic `.config`. One run on `860e4bf`, macOS 26.6.2 with chezmoi 2.74.0:
+synthetic `.config`. One run in the usual environment on `03bda2c`, macOS
+27.2.1 with chezmoi 2.74.1; the two runs without mise above took 0.031 to
+0.032 s and 0.161 to 0.184 s, with the same counts and bytes:
 
 | Managed files | Subprocesses | Total CLI time | Managed and status bytes |
 | --- | --- | --- | --- |
-| 100 | 3 | 0.035 s | 21,997 |
-| 5,000 | 3 | 0.157 s | 1,095,097 |
+| 100 | 3 | 0.039 s | 21,997 |
+| 5,000 | 3 | 0.163 s | 1,095,097 |
 
 It excludes fixture creation, Lua reduction, rendering, encryption and failed
 query recovery, and does not predict a real dotfiles repository. CR/LF targets
@@ -297,7 +309,7 @@ These keep no tests, so what was run by hand is their evidence.
   was unreachable, a new branch and a pull request, and refused an invalid
   commit with the push base missing.
 - **`.github/workflows/tag.yml`.** It has run and passed on each push to
-  `main`, most recently `860e4bf`; `@since` has not moved since it was added,
+  `main`, most recently `03bda2c`; `@since` has not moved since it was added,
   so it has tagged nothing and no tag exists. Its tagging path ran only under
   macOS's bash 3.2.57 in a clone with a local bare origin. No
   `rev = "=yazi-<version>"` pin has been tried.
@@ -339,9 +351,10 @@ These keep no tests, so what was run by hand is their evidence.
   1.4.0 on macOS outside tmux, including Ghostty inside tmux; and the
   bracketed paste, focus and X10 mouse resets, which tmux exposes no state for
   and no hand check showed.
+- Without mise: `npm run lint:commits`, its Lua check included,
+  `scripts/format-lua-hook.sh`, `test/readme.py`, `test/all.py` and the
+  `--git-plugin` runs. The other suites ran without it (above).
 - The fallback restore inside Yazi; only the snippet ran by itself.
-- The scripts without mise since `test/check.py`'s analyzers were pinned in
-  `mise.toml`; the last run without it, on 2026-09-20, predates the pins.
 - Not handled, by reading the code: a command that leaves `O_NONBLOCK` set or
   stays in the alternate screen, and a pane narrower than the prompt, which
   keeps the prompt's upper rows.
