@@ -9,13 +9,18 @@ Versions are the ones tested, not a compatibility claim.
 
 ## Latest runs
 
-On the code of `488412c`, each suite alone, one run each, no reruns:
+Each suite alone, one run each, no reruns:
 
-- macOS 26.6.2 with Yazi 26.9.1, chezmoi 2.74.0, tmux 3.8 and Lua 5.5.1:
-  `test/check.py` with 63 core, 126 action policy and 20 main assertions and
-  59 Python tests; `test/runtime.py` 16 passes; `test/e2e.py` 6 scenarios;
-  `test/manual_runtime.py` 15 passes.
-- An Ubuntu 24.04 container on Docker Desktop (aarch64), with Yazi 26.9.1 and
+- On `bb5a339` with `markdownlint-cli2` 0.24.2 (`markdownlint` 0.42.2,
+  `re2js` 2.9.1) in place of its 0.24.0 and `re2js` override, macOS 27.2.1
+  with Yazi 26.9.1, chezmoi 2.74.1, tmux 3.8 and Lua 5.5.1: `test/check.py`
+  with 63 core, 126 action policy and 20 main assertions and 59 Python tests;
+  `test/runtime.py` 16 passes; `test/e2e.py` 6 scenarios;
+  `test/manual_runtime.py` 15 passes. With git.yazi `f703392`,
+  `test/runtime.py --git-plugin` 17 passes and `test/e2e.py --git-plugin`
+  7 scenarios, coexistence included.
+- On `488412c`, which differs from `bb5a339` in comments and docs only, an
+  Ubuntu 24.04 container on Docker Desktop (aarch64), with Yazi 26.9.1 and
   chezmoi 2.72.2 from their aarch64 release assets and tmux 3.4:
   `test/runtime.py` 16 passes, `test/e2e.py` 6 scenarios,
   `test/manual_runtime.py` 15 passes.
@@ -296,11 +301,6 @@ These keep no tests, so what was run by hand is their evidence.
   so it has tagged nothing and no tag exists. Its tagging path ran only under
   macOS's bash 3.2.57 in a clone with a local bare origin. No
   `rev = "=yazi-<version>"` pin has been tried.
-- **The `re2js` override.** `package.json` pins `re2js` 2.8.7 under
-  `markdownlint@0.42.0` for GHSA-gg6h-894w-4m9c. Its key names that version,
-  so a `markdownlint` update leaves it unapplied, as a stand-in key showed with
-  `npm install --package-lock-only`. A file with planted violations still
-  reported MD011, MD013 and MD039 on 2.8.7.
 - **CI's failure path.** `actions/upload-artifact` v7 runs only when
   `E2E smoke` fails and has not run. No Dependabot pull request has come
   through `.github/dependabot.yml`.
@@ -333,9 +333,6 @@ These keep no tests, so what was run by hand is their evidence.
 - Linux beyond the aarch64 container above and CI's x86_64 smoke run; the
   guided walk and git.yazi coexistence on Linux; Windows, which `setup`
   rejects; other Yazi releases and chezmoi versions than those above.
-- `--git-plugin` in full since the command actions were added; only
-  `test/runtime.py --git-plugin --case visual-selection`, which adds `status`,
-  ran since, with git.yazi `f703392` on 2026-10-24.
 - A human walk of the current guide, and readability across fonts, colors,
   grapheme combinations, very long lists and hovered rows.
 - For the terminal state after a command, real terminals other than Ghostty
