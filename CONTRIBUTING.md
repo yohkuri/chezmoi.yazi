@@ -348,16 +348,25 @@ type annotations' revision, the workflows' runner labels, or the
 SHA-256-pinned Yazi and chezmoi downloads. Its commits go through the same
 commit check.
 
-A security fix can also arrive as an alert alone. `markdownlint` 0.42.0 pins the
-vulnerable `re2js` 2.8.6 ([GHSA-gg6h-894w-4m9c]), and Dependabot raised an
-alert for it but opened no pull request in the five days that followed. So
-`overrides` in `package.json` holds `re2js` at 2.8.7 for that `markdownlint`.
-`markdownlint-cli2` pins `markdownlint` in turn, so only its update can bring
-another version. The key then stops matching and that version's own `re2js`
-applies. If that is 2.8.7 or later, delete the override; if not, name the new
-version in the key. Either way, run `npm install --package-lock-only` so that
-`npm ci` still works. Do this in a pull request of its own after merging
-Dependabot's: Dependabot stops updating a branch someone else pushed to.
+A security fix can also arrive as an alert alone, when a dependency pins the
+vulnerable version exactly and Dependabot opens no pull request. Then hold the
+fixed version with an `overrides` entry in `package.json` whose key names that
+dependency's exact version, such as `"markdownlint@0.42.0"`, and run
+`npm install --package-lock-only` so that `npm ci` still works. npm applies
+the entry as long as the package requiring the dependency asks for a range
+that includes the keyed version, so it lapses only once an update of that
+package stops asking for it. When an update brings a new version of the
+dependency, check in its lockfile, or with `npm ls`, which version of the
+vulnerable package it resolves:
+
+- If the new version still pins a vulnerable one, merge a pull request that
+  adds a key naming the new version first. A key naming a version that is not
+  installed changes nothing until it is. Then have Dependabot recreate its
+  pull request (`@dependabot recreate`) rather than pushing to its branch,
+  which stops Dependabot updating it, and merge it once its lockfile resolves
+  the fixed version.
+- If the new version's own pin is fixed, merge the update, then delete the
+  entry in a pull request of its own.
 
 ## How the code is laid out
 
@@ -447,6 +456,5 @@ as `LICENSE` says.
 
 [Conventional Commits]: https://www.conventionalcommits.org/
 [config-conventional]: https://github.com/conventional-changelog/commitlint/tree/master/%40commitlint/config-conventional
-[GHSA-gg6h-894w-4m9c]: https://github.com/advisories/GHSA-gg6h-894w-4m9c
 [mise]: https://mise.jdx.dev/
 [plugin-overview]: https://yazi-rs.github.io/docs/plugins/overview/

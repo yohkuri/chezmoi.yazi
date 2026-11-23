@@ -13,12 +13,7 @@
   "devDependencies": {
     "@commitlint/cli": "21.2.4",
     "@commitlint/config-conventional": "21.2.4",
-    "markdownlint-cli2": "0.24.0"
-  },
-  "overrides": {
-    "markdownlint@0.42.0": {
-      "re2js": "2.8.7"
-    }
+    "markdownlint-cli2": "0.24.2"
   },
   "engines": {
     "node": ">=24"
