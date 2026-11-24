@@ -36,6 +36,8 @@ def enter(t):
 def returned(t):
     # ui.hide leaves Yazi's alternate screen, so its return is the screen coming
     # back, whatever the main screen still shows.
+    # Yazi 26.9.1 discards unread input shortly before that, so an earlier key
+    # can be lost.
     t.wait_screen(lambda s: "Continue?" not in s and t.pane_format("#{alternate_on}") == "1", "Yazi restored")
     time.sleep(0.15)
 
