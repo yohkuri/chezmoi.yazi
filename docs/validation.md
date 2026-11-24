@@ -11,23 +11,26 @@ Versions are the ones tested, not a compatibility claim.
 
 Each suite ran alone, on 2026-11-23 unless noted:
 
-- On the code of `03bda2c`, macOS 27.2.1 with Yazi 26.9.1, chezmoi 2.74.1,
+- On 2026-11-24, on `38f8265` and one comment added to
+  `test/action_cases.py`, macOS 27.2.1 with Yazi 26.9.1, chezmoi 2.74.2,
   tmux 3.8 and Lua 5.5.1, one run each: `test/check.py` with 63 core, 126
   action policy and 20 main assertions and 59 Python tests;
   `test/runtime.py` 16 passes; `test/e2e.py` 6 scenarios;
-  `test/manual_runtime.py` 15 passes. With git.yazi `f703392`,
+  `test/manual_runtime.py` 15 passes. Not rerun with chezmoi 2.74.2: the
+  `--git-plugin` runs, `test/benchmark.py` and the runs without mise below.
+- With git.yazi `f703392` and chezmoi 2.74.1 on the same machine,
   `test/runtime.py --git-plugin` 17 passes and `test/e2e.py --git-plugin`
-  7 scenarios, coexistence included. The Yazi suites ran on `bb5a339` with
-  this code's `package.json` and lockfile, which change no code;
-  `test/check.py` passed again on `03bda2c` itself, docs included.
-- On the same code and machine, a second run of those first four suites and
-  of `test/benchmark.py`, with mise absent from `PATH`: no shims, no `mise`
+  7 scenarios, coexistence included. They ran on `bb5a339` with `03bda2c`'s
+  `package.json` and lockfile, which change no code.
+- On the code of `03bda2c`, which differs from `38f8265` in docs only, with
+  chezmoi 2.74.1 on the same machine, the four suites of the first entry and
+  `test/benchmark.py`, with mise absent from `PATH`: no shims, no `mise`
   binary and no `MISE_*` variables. uv 0.11.19 was linked alone into its own
   directory. The analyzers came from Homebrew at the versions `mise.toml`
   pins, and Python 3.14 from Homebrew in a new environment set by
   `UV_PROJECT_ENVIRONMENT`. Lua 5.5.1 and Node.js 24 came from their install
   directories, the only copies, which mise had installed. The counts matched
-  the first run. A first attempt left `~/.local/bin`, which holds the `mise`
+  that entry's. A first attempt left `~/.local/bin`, which holds the `mise`
   binary, on `PATH`; it passed too and was redone without it.
 - Earlier, on `488412c`, which differs from `03bda2c` in comments, docs and
   the Markdown linter's version only, one run each in an Ubuntu 24.04
